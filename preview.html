@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Wealthflow — icon preview (open via file://)</title>
+<style>
+  :root { --accent: #10B981; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: #1e1e1e; color: #d4d4d4; padding: 24px; }
+  h1 { font-size: 17px; color: #fff; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; color: #858585; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; max-width: 900px; }
+  .card { background: #252526; border: 1px solid #3e3e3e; border-radius: 8px; padding: 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: #858585; margin: 0 0 12px; }
+  .row { display: flex; align-items: end; gap: 16px; }
+  .cell { text-align: center; color: #858585; font-size: 11px; }
+  .cell img, .cell svg { display: block; margin: 0 auto 6px; }
+  .dark-strip { background: #333333; border-radius: 6px; padding: 12px; display: flex; gap: 12px; align-items: center; }
+  .light-strip { background: #f8fafc; border-radius: 6px; padding: 12px; display: flex; gap: 12px; align-items: center; }
+  .activity-mock { display: flex; gap: 4px; align-items: center; background: #2d2d2d; border-radius: 6px; padding: 8px; width: max-content; }
+  .activity-mock .active { border-left: 2px solid var(--accent); background: #3a3a3a; border-radius: 0 4px 4px 0; }
+  .activity-mock span { display: flex; padding: 8px; }
+  code { background: #3c3c3c; padding: 1px 6px; border-radius: 4px; font-size: 12px; color: #fff; }
+  .swatches { display: flex; gap: 8px; align-items: center; }
+  .sw { width: 28px; height: 28px; border-radius: 6px; border: 1px solid #3e3e3e; }
+  .ok { color: #4ec9b0; }
+</style>
+</head>
+<body>
+  <h1>Wealthflow — icon preview</h1>
+  <p class="sub">Open this file directly (<code>preview.html</code> via <code>file://</code>, no server). Source: <code>assets/icon.svg</code> · original scaffold palette (<code>#252526</code> / <code>#858585</code> / <code>#f8fafc</code>).</p>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Sizes (dark)</h2>
+      <div class="row">
+        <div class="cell"><img src="assets/icon.svg" width="16" height="16" alt="16px" />16px</div>
+        <div class="cell"><img src="assets/icon.svg" width="24" height="24" alt="24px" />24px</div>
+        <div class="cell"><img src="assets/icon.svg" width="32" height="32" alt="32px" />32px</div>
+        <div class="cell"><img src="assets/icon.svg" width="48" height="48" alt="48px" />48px</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Activity-bar mock</h2>
+      <div class="activity-mock">
+        <span><img src="assets/icon.svg" width="24" height="24" alt="inactive" /></span>
+        <span class="active"><img src="assets/icon.svg" width="24" height="24" alt="active" /></span>
+      </div>
+      <p class="sub" style="margin:10px 0 0">Left: idle · Right: selected (accent bar).</p>
+    </div>
+
+    <div class="card">
+      <h2>Dark vs light strip</h2>
+      <div class="dark-strip">
+        <img src="assets/icon.svg" width="24" height="24" alt="dark bg" />
+        <span>Wealth Flow</span>
+      </div>
+      <div style="height:8px"></div>
+      <div class="light-strip" style="color:#0f172a">
+        <img src="assets/icon.svg" width="24" height="24" alt="light bg" />
+        <span>Wealth Flow</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Inline SVG (pixel check)</h2>
+      <div class="row">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+          <rect x="1.5" y="1.5" width="21" height="21" rx="5.5" fill="#252526" stroke="#858585" stroke-width="1.5"/>
+          <rect x="6" y="14" width="3" height="4" rx="0.8" fill="#858585" opacity="0.55"/>
+          <rect x="10.5" y="11.5" width="3" height="6.5" rx="0.8" fill="#858585" opacity="0.8"/>
+          <rect x="15" y="9" width="3" height="9" rx="0.8" fill="#858585"/>
+          <path d="M5.5 9.5 L10 6.5 L12.8 8.2 L18.5 4.8" fill="none" stroke="#f8fafc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M15.8 4.8 L18.5 4.8 L18.5 7.5" fill="none" stroke="#f8fafc" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+          <div class="swatches">
+            <span class="sw" style="background:#252526" title="#252526"></span>
+            <span class="sw" style="background:#858585" title="#858585"></span>
+            <span class="sw" style="background:#f8fafc" title="#f8fafc"></span>
+          </div>
+          <p style="margin:8px 0 0">Original scaffold palette + bars &amp; growth arrow.<br /><span class="ok">✔</span> 1.8px strokes (legible at 16px) · <span class="ok">✔</span> no external deps.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>themeColor candidates (taken: salary #F59E0B · dashboard #4EC9B0 · budget #EA580C · mortgage #2196F3 · taxflow #FFEB3B · todo #7B1FA2 · taskflow #64748B)</h2>
+      <div style="display:grid;gap:10px">
+        <div style="display:flex;gap:12px;align-items:center"><span class="sw" style="background:#6366F1"></span><code>#6366F1 Indigo</code><span>scaffold default · clashes with nothing · neutral, less "money"</span></div>
+        <div style="display:flex;gap:12px;align-items:center"><span class="sw" style="background:#10B981"></span><code>#10B981 Emerald ★ (current)</code><span>money / growth · no green in use · recommended</span></div>
+        <div style="display:flex;gap:12px;align-items:center"><span class="sw" style="background:#C9A227"></span><code>#C9A227 Gold</code><span>wealth / premium · muted, reads apart from salary amber + taxflow yellow</span></div>
+        <div style="display:flex;gap:12px;align-items:center"><span class="sw" style="background:#E11D48"></span><code>#E11D48 Crimson</code><span>high-contrast · free · bold, less "finance"</span></div>
+        <div style="display:flex;gap:12px;align-items:center"><span class="sw" style="background:#0EA5E9"></span><code>#0EA5E9 Sky</code><span>clean fintech feel · closest to mortgage blue #2196F3, side-by-side only</span></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="sub" style="margin-top:20px">Checklist: crisp at 16px · visible on #2d2d2d and #f8fafc · original scaffold colors kept · manifest already points at <code>assets/icon.svg</code> (no package.json change needed).</p>
+</body>
+</html>

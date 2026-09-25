@@ -9,14 +9,14 @@
     "displayName": "Wealthflow",
     "version": "0.1.0",
     "description": "Wealthflow extension",
-    "themeColor": "#6366F1",
+    "themeColor": "#10B981",
     "activationEvents": ["onView:wealthflow"],
     "contributions": {
       "views": [{ "id": "wealthflow", "name": "Wealthflow", "icon": "assets/icon.svg" }],
       "commands": [{ "id": "wealthflow.hello", "title": "Wealthflow: Hello" }],
       "navigation": [{ "id": "wealthflow-main", "label": "Wealthflow", "command": "wealthflow.hello", "group": "Wealthflow" }],
       "configuration": [
-        { "key": "wealthflow.themeColor", "type": "string", "label": "Accent color for icons, topbar actions, and in-view highlights (hex).", "default": "#6366F1", "pattern": "^#[0-9A-Fa-f]{6}$", "formatHint": "#RRGGBB", "placeholder": "#6366F1" }
+        { "key": "wealthflow.themeColor", "type": "string", "label": "Accent color for icons, topbar actions, and in-view highlights (hex).", "default": "#10B981", "pattern": "^#[0-9A-Fa-f]{6}$", "formatHint": "#RRGGBB", "placeholder": "#10B981" }
       ],
       "allowedCommands": ["wealthflow.hello"],
       "allowedUiEvents": []
