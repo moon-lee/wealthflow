@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
+import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
 import { computeFinanceYear, isValidIsoDate } from '../utils/finance-year.js';
 import { listStocks, type Stock } from '../dao/stocks.js';
@@ -20,7 +21,9 @@ const logger = new ExtensionLogger('wealthflow');
 
 export class DividendForm extends Base {
   static override styles =
-    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
+    typeof HTMLElement !== 'undefined'
+      ? ([sharedStyles, wealthflowStyles] as any)
+      : [];
   finance: any = null;
   fy = '';
   stocks: Stock[] = [];

@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
+import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
 import { formatAUD, maskAccount, formatBSB } from '../utils/format.js';
 import { validateBsb, getInterestTotals } from '../services/bank-service.js';
@@ -20,7 +21,9 @@ type StatusFilter = 'active' | 'inactive' | 'all';
 
 export class BankList extends Base {
   static override styles =
-    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
+    typeof HTMLElement !== 'undefined'
+      ? ([sharedStyles, wealthflowStyles] as any)
+      : [];
   finance: any = null;
   fy = '';
   banks: Bank[] = [];

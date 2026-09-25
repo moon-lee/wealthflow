@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
+import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
 import { formatAUD } from '../utils/format.js';
 import { DIVIDEND_TYPE_LABELS } from '../services/stock-service.js';
@@ -13,7 +14,9 @@ const logger = new ExtensionLogger('wealthflow');
 
 export class OverviewView extends Base {
   static override styles =
-    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
+    typeof HTMLElement !== 'undefined'
+      ? ([sharedStyles, wealthflowStyles] as any)
+      : [];
   finance: any = null;
   fy = '';
   summary: OverviewSummary | null = null;

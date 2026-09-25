@@ -1,5 +1,6 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
+import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { formatAUD } from '../utils/format.js';
 
 const Base =
@@ -30,7 +31,9 @@ function fyOptions(center: string): string[] {
 
 export class WealthOrchestrator extends Base {
   static override styles =
-    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
+    typeof HTMLElement !== 'undefined'
+      ? ([sharedStyles, wealthflowStyles] as any)
+      : [];
   finance: any = null;
   tab: WealthTab = 'banks';
   fy = currentFy();
@@ -242,7 +245,10 @@ export class WealthOrchestrator extends Base {
           <div class="spacer"></div>
           ${tabs.map(
             (t) =>
-              html`<button class="filter-btn" @click=${() => this.navigate(t)}>
+              html`<button
+                class="filter-btn${this.tab === t ? ' active' : ''}"
+                @click=${() => this.navigate(t)}
+              >
                 ${t[0].toUpperCase() + t.slice(1)}
               </button>`,
           )}
