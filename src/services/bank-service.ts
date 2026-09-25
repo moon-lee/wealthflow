@@ -3,6 +3,7 @@ import { fyMonths, monthKey } from '../utils/finance-year.js';
 import type { Bank } from '../dao/banks.js';
 import type { InterestEntry } from '../dao/interest-entries.js';
 import { listInterestEntries } from '../dao/interest-entries.js';
+import type { InterestSummary } from './public-wealth-adapter.js';
 
 export function validateBsb(bsb: string | null | undefined): string | null {
   if (bsb == null || bsb === '') return null;
@@ -29,9 +30,10 @@ export async function getInterestTotals(
   finance: FinanceApi,
   banks: Pick<Bank, 'id' | 'name'>[],
   financeYear: string,
-): Promise<{ total: number; byBank: { bankId: number; name: string; total: number }[] }> {
+): Promise<InterestSummary> {
   const entries = await listInterestEntries(finance, { financeYear });
-  return sumInterestByBank(banks, entries);
+  const { total, byBank } = sumInterestByBank(banks, entries);
+  return { financialYear: financeYear, total, byBank };
 }
 
 export function interestGridModel(

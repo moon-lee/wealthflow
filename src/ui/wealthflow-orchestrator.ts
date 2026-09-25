@@ -127,6 +127,11 @@ export class WealthOrchestrator extends Base {
     this.addEventListener('interest-create', this._onDataChanged as EventListener);
     this.addEventListener('interest-edit', this._onDataChanged as EventListener);
     this.addEventListener('interest-delete', this._onDataChanged as EventListener);
+    this.addEventListener('stock-create', this._onDataChanged as EventListener);
+    this.addEventListener('stock-edit', this._onDataChanged as EventListener);
+    this.addEventListener('dividend-create', this._onDataChanged as EventListener);
+    this.addEventListener('dividend-edit', this._onDataChanged as EventListener);
+    this.addEventListener('dividend-delete', this._onDataChanged as EventListener);
   }
 
   override disconnectedCallback(): void {
@@ -138,6 +143,11 @@ export class WealthOrchestrator extends Base {
     this.removeEventListener('interest-create', this._onDataChanged as EventListener);
     this.removeEventListener('interest-edit', this._onDataChanged as EventListener);
     this.removeEventListener('interest-delete', this._onDataChanged as EventListener);
+    this.removeEventListener('stock-create', this._onDataChanged as EventListener);
+    this.removeEventListener('stock-edit', this._onDataChanged as EventListener);
+    this.removeEventListener('dividend-create', this._onDataChanged as EventListener);
+    this.removeEventListener('dividend-edit', this._onDataChanged as EventListener);
+    this.removeEventListener('dividend-delete', this._onDataChanged as EventListener);
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
