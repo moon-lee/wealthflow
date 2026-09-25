@@ -1,0 +1,39 @@
+{
+  "name": "wealthflow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/main.ts",
+  "financeExtension": {
+    "id": "wealthflow",
+    "displayName": "Wealthflow",
+    "version": "0.1.0",
+    "description": "Wealthflow extension",
+    "themeColor": "#6366F1",
+    "activationEvents": ["onView:wealthflow"],
+    "contributions": {
+      "views": [{ "id": "wealthflow", "name": "Wealthflow", "icon": "assets/icon.svg" }],
+      "commands": [{ "id": "wealthflow.hello", "title": "Wealthflow: Hello" }],
+      "navigation": [{ "id": "wealthflow-main", "label": "Wealthflow", "command": "wealthflow.hello", "group": "Wealthflow" }],
+      "configuration": [
+        { "key": "wealthflow.themeColor", "type": "string", "label": "Accent color for icons, topbar actions, and in-view highlights (hex).", "default": "#6366F1", "pattern": "^#[0-9A-Fa-f]{6}$", "formatHint": "#RRGGBB", "placeholder": "#6366F1" }
+      ],
+      "allowedCommands": ["wealthflow.hello"],
+      "allowedUiEvents": []
+    },
+    "main": "src/main.ts"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "node D:/finance_flow_ai/scripts/sdk/cli.mjs build .",
+    "version:bump": "node scripts/version-bump.mjs",
+    "release": "node scripts/version-bump.mjs && node D:/finance_flow_ai/scripts/sdk/cli.mjs build ."
+  },
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "lit": "^3.1.0"
+  }
+}
