@@ -108,18 +108,22 @@ export class DividendForm extends Base {
     const franking = this.franking.trim() === '' ? 0 : Number(this.franking);
     if (this.stockId == null) {
       this.error = 'Choose a stock.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!isValidIsoDate(this.date)) {
       this.error = 'Date must be YYYY-MM-DD.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!Number.isFinite(gross) || gross < 0) {
       this.error = 'Gross must be ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!Number.isFinite(franking) || franking < 0) {
       this.error = 'Franking must be ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -166,6 +170,7 @@ export class DividendForm extends Base {
     } catch (err: any) {
       logger.error('dividend save failed:', err);
       this.error = String(err?.message || err);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -188,6 +193,7 @@ export class DividendForm extends Base {
       this.editEntry(null);
     } catch (e: any) {
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -201,7 +207,11 @@ export class DividendForm extends Base {
           <label
             >Stock
             <select
-              @change=${(e: Event) => (this.stockId = Number((e.target as HTMLSelectElement).value) || null)}
+              @change=${(e: Event) => {
+                this.stockId =
+                  Number((e.target as HTMLSelectElement).value) || null;
+                (this as any).requestUpdate?.();
+              }}
             >
               <option value="">— choose —</option>
               ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockId === s.id}>${s.code}${s.is_active ? '' : ' (inactive)'}</option>`)}
@@ -214,6 +224,7 @@ export class DividendForm extends Base {
               @input=${(e: Event) => {
                 this.date = (e.target as HTMLInputElement).value;
                 this.autofillFy();
+                (this as any).requestUpdate?.();
               }}
               placeholder="YYYY-MM-DD"
             />
@@ -221,7 +232,10 @@ export class DividendForm extends Base {
           <label
             >Type
             <select
-              @change=${(e: Event) => (this.type = (e.target as HTMLSelectElement).value)}
+              @change=${(e: Event) => {
+                this.type = (e.target as HTMLSelectElement).value;
+                (this as any).requestUpdate?.();
+              }}
             >
               ${(DIVIDEND_TYPES as readonly string[]).map((t) => html`<option value=${t} ?selected=${this.type === t}>${DIVIDEND_LABELS[t as keyof typeof DIVIDEND_LABELS]}</option>`)}
             </select>
@@ -230,7 +244,10 @@ export class DividendForm extends Base {
             >Gross (AUD)
             <input
               .value=${this.gross}
-              @input=${(e: Event) => (this.gross = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.gross = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               inputmode="decimal"
               placeholder="0.00"
             />
@@ -239,7 +256,10 @@ export class DividendForm extends Base {
             >Franking (AUD)
             <input
               .value=${this.franking}
-              @input=${(e: Event) => (this.franking = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.franking = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               inputmode="decimal"
               placeholder="0.00"
             />
@@ -251,6 +271,7 @@ export class DividendForm extends Base {
               @input=${(e: Event) => {
                 this.financeYear = (e.target as HTMLInputElement).value;
                 this.financeYearTouched = true;
+                (this as any).requestUpdate?.();
               }}
             />
           </label>
@@ -259,7 +280,10 @@ export class DividendForm extends Base {
             >Notes
             <input
               .value=${this.notes}
-              @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.notes = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
           /></label>
           <button class="btn-primary" type="submit">
             ${this.editId == null ? 'Log Dividend' : 'Save'}

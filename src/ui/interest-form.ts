@@ -95,14 +95,17 @@ export class InterestForm extends Base {
     const amount = Number(this.amount);
     if (this.bankId == null) {
       this.error = 'Choose a bank.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!isValidIsoDate(this.date)) {
       this.error = 'Date must be YYYY-MM-DD.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!Number.isFinite(amount) || amount < 0) {
       this.error = 'Amount must be ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -145,6 +148,7 @@ export class InterestForm extends Base {
     } catch (err: any) {
       logger.error('interest save failed:', err);
       this.error = String(err?.message || err);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -167,6 +171,7 @@ export class InterestForm extends Base {
       this.editEntry(null);
     } catch (e: any) {
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -182,7 +187,11 @@ export class InterestForm extends Base {
           <label
             >Bank
             <select
-              @change=${(e: Event) => (this.bankId = Number((e.target as HTMLSelectElement).value) || null)}
+              @change=${(e: Event) => {
+                this.bankId =
+                  Number((e.target as HTMLSelectElement).value) || null;
+                (this as any).requestUpdate?.();
+              }}
             >
               <option value="">— choose —</option>
               ${this.banks.map((b) => html`<option value=${b.id} ?selected=${this.bankId === b.id}>${b.name}</option>`)}
@@ -195,6 +204,7 @@ export class InterestForm extends Base {
               @input=${(e: Event) => {
                 this.date = (e.target as HTMLInputElement).value;
                 this.autofillFy();
+                (this as any).requestUpdate?.();
               }}
               placeholder="YYYY-MM-DD"
             />
@@ -203,7 +213,10 @@ export class InterestForm extends Base {
             >Amount (AUD)
             <input
               .value=${this.amount}
-              @input=${(e: Event) => (this.amount = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.amount = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               inputmode="decimal"
               placeholder="0.00"
             />
@@ -215,6 +228,7 @@ export class InterestForm extends Base {
               @input=${(e: Event) => {
                 this.financeYear = (e.target as HTMLInputElement).value;
                 this.financeYearTouched = true;
+                (this as any).requestUpdate?.();
               }}
             />
           </label>
@@ -223,7 +237,10 @@ export class InterestForm extends Base {
             >Notes
             <input
               .value=${this.notes}
-              @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.notes = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
           /></label>
           <button class="btn-primary" type="submit">
             ${this.editId == null ? 'Log Interest' : 'Save'}

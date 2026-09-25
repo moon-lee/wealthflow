@@ -151,10 +151,12 @@ export class BankList extends Base {
     this.editBsb = b.bsb ?? '';
     this.editAccount = b.account_number;
     this.error = '';
+    (this as any).requestUpdate?.();
   }
 
   private cancelEdit(): void {
     this.editingId = null;
+    (this as any).requestUpdate?.();
   }
 
   private async saveEdit(b: Bank): Promise<void> {
@@ -165,6 +167,7 @@ export class BankList extends Base {
       bsbErr
     ) {
       this.error = bsbErr ?? 'Name and account are required.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -186,6 +189,7 @@ export class BankList extends Base {
     } catch (e: any) {
       logger.error('bank edit failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -210,6 +214,7 @@ export class BankList extends Base {
     } catch (e: any) {
       logger.error('bank activate/deactivate failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -290,7 +295,10 @@ export class BankList extends Base {
         <td>
           <input
             .value=${this.editName}
-            @input=${(e: Event) => (this.editName = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => {
+              this.editName = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.saveEdit(b);
               if (e.key === 'Escape') this.cancelEdit();
@@ -300,12 +308,18 @@ export class BankList extends Base {
         <td>
           <input
             .value=${this.editBsb}
-            @input=${(e: Event) => (this.editBsb = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => {
+              this.editBsb = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
             placeholder="BSB"
           />
           <input
             .value=${this.editAccount}
-            @input=${(e: Event) => (this.editAccount = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => {
+              this.editAccount = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
             placeholder="Account"
           />
           ${bsbErr ? html`<p class="field-error">${bsbErr}</p>` : ''}

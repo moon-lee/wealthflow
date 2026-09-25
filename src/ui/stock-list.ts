@@ -117,10 +117,12 @@ export class StockList extends Base {
     const shares = Number(this.newShares);
     if (this.newCode.trim() === '' || this.newName.trim() === '') {
       this.formError = 'Code and name are required.';
+      (this as any).requestUpdate?.();
       return;
     }
     if (!Number.isFinite(shares) || shares < 0) {
       this.formError = 'Shares must be ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -143,6 +145,7 @@ export class StockList extends Base {
     } catch (err: any) {
       logger.error('stock create failed:', err);
       this.formError = String(err?.message || err);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -151,12 +154,14 @@ export class StockList extends Base {
     this.editName = s.name;
     this.editShares = String(s.shares);
     this.error = '';
+    (this as any).requestUpdate?.();
   }
 
   private async saveEdit(s: Stock): Promise<void> {
     const shares = Number(this.editShares);
     if (this.editName.trim() === '' || !Number.isFinite(shares) || shares < 0) {
       this.error = 'Name is required and shares must be ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -176,6 +181,7 @@ export class StockList extends Base {
     } catch (e: any) {
       logger.error('stock edit failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -200,6 +206,7 @@ export class StockList extends Base {
     } catch (e: any) {
       logger.error('stock activate/deactivate failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -271,21 +278,32 @@ export class StockList extends Base {
             >Code
             <input
               .value=${this.newCode}
-              @input=${(e: Event) => (this.newCode = (e.target as HTMLInputElement).value.toUpperCase())}
+              @input=${(e: Event) => {
+                this.newCode = (
+                  e.target as HTMLInputElement
+                ).value.toUpperCase();
+                (this as any).requestUpdate?.();
+              }}
               placeholder="VAS"
           /></label>
           <label
             >Name
             <input
               .value=${this.newName}
-              @input=${(e: Event) => (this.newName = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.newName = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               placeholder="Vanguard Australian Shares"
           /></label>
           <label
             >Shares
             <input
               .value=${this.newShares}
-              @input=${(e: Event) => (this.newShares = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.newShares = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               inputmode="decimal"
               placeholder="120"
           /></label>
@@ -330,17 +348,26 @@ export class StockList extends Base {
         <td>
           <input
             .value=${this.editName}
-            @input=${(e: Event) => (this.editName = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => {
+              this.editName = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
             @keydown=${(e: KeyboardEvent) => {
               if (e.key === 'Enter') void this.saveEdit(s);
-              if (e.key === 'Escape') this.editingId = null;
+              if (e.key === 'Escape') {
+                this.editingId = null;
+                (this as any).requestUpdate?.();
+              }
             }}
           />
         </td>
         <td>
           <input
             .value=${this.editShares}
-            @input=${(e: Event) => (this.editShares = (e.target as HTMLInputElement).value)}
+            @input=${(e: Event) => {
+              this.editShares = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
             inputmode="decimal"
           />
         </td>
@@ -352,7 +379,13 @@ export class StockList extends Base {
           <button class="btn-primary" @click=${() => this.saveEdit(s)}>
             Save
           </button>
-          <button class="filter-btn" @click=${() => (this.editingId = null)}>
+          <button
+            class="filter-btn"
+            @click=${() => {
+              this.editingId = null;
+              (this as any).requestUpdate?.();
+            }}
+          >
             Cancel
           </button>
         </td>

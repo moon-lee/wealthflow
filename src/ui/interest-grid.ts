@@ -84,6 +84,7 @@ export class InterestGrid extends Base {
     const amount = Number(text);
     if (!Number.isFinite(amount) || amount < 0) {
       this.fieldError = 'Enter an amount ≥ 0.';
+      (this as any).requestUpdate?.();
       return;
     }
     try {
@@ -121,6 +122,7 @@ export class InterestGrid extends Base {
     } catch (e: any) {
       logger.error('interest cell write failed:', e);
       this.fieldError = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 

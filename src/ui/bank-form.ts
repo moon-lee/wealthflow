@@ -69,6 +69,7 @@ export class BankForm extends Base {
       this.error = String(err?.message || err);
     } finally {
       this.saving = false;
+      (this as any).requestUpdate?.();
     }
   }
 
@@ -83,14 +84,20 @@ export class BankForm extends Base {
             >Name
             <input
               .value=${this.name}
-              @input=${(e: Event) => (this.name = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.name = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               required
           /></label>
           <label
             >BSB
             <input
               .value=${this.bsb}
-              @input=${(e: Event) => (this.bsb = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.bsb = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               placeholder="012345"
           /></label>
           ${this.bsbError ? html`<p class="field-error">${this.bsbError}</p>` : ''}
@@ -98,14 +105,20 @@ export class BankForm extends Base {
             >Account
             <input
               .value=${this.account}
-              @input=${(e: Event) => (this.account = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.account = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
               required
           /></label>
           <label
             >Notes
             <input
               .value=${this.notes}
-              @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => {
+                this.notes = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
           /></label>
           <button class="btn-primary" type="submit" ?disabled=${!this.canSave}>
             Add Bank

@@ -109,6 +109,7 @@ export class DividendLog extends Base {
       await this.reload();
     } catch (e: any) {
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
     }
   }
 
