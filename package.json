@@ -19,7 +19,7 @@
           "id": "wealthflow",
           "name": "Wealth Flow",
           "icon": "assets/icon.svg",
-          "openCommand": "wealthflow.show-banks"
+          "openCommand": "wealthflow.show-overview"
         }
       ],
       "commands": [

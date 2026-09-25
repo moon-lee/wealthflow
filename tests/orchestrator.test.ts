@@ -5,8 +5,9 @@ describe('orchestrator mapping', () => {
     const { WealthOrchestrator, viewForMount } =
       await import('../src/ui/wealthflow-orchestrator.js');
     expect(viewForMount({ view: 'stocks' })).toBe('stocks');
-    expect(viewForMount({})).toBe('banks');
-    expect(viewForMount({ view: 'nope' })).toBe('banks');
+    expect(viewForMount({ view: 'banks' })).toBe('banks');
+    expect(viewForMount({})).toBe('overview');
+    expect(viewForMount({ view: 'nope' })).toBe('overview');
     expect(typeof WealthOrchestrator).toBe('function');
   });
 });

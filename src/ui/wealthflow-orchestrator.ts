@@ -12,10 +12,11 @@ export type WealthTab = 'banks' | 'stocks' | 'dividends' | 'overview';
 
 export function viewForMount(mount: Record<string, unknown> = {}): WealthTab {
   const v = (mount.view ?? mount.viewId) as string | undefined;
+  if (v === 'banks' || v === 'bank-list') return 'banks';
   if (v === 'stocks' || v === 'stock-list') return 'stocks';
   if (v === 'dividends' || v === 'dividend-log') return 'dividends';
   if (v === 'overview' || v === 'overview-view') return 'overview';
-  return 'banks';
+  return 'overview';
 }
 
 export function currentFy(d = new Date()): string {
@@ -35,7 +36,7 @@ export class WealthOrchestrator extends Base {
       ? ([sharedStyles, wealthflowStyles] as any)
       : [];
   finance: any = null;
-  tab: WealthTab = 'banks';
+  tab: WealthTab = 'overview';
   fy = currentFy();
   footerTotal: number | null = null;
   error = '';

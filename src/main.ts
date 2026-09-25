@@ -63,7 +63,7 @@ export async function activate(
       delete (base as any).viewId;
       queueMicrotask(() => {
         if (typeof el.init === 'function')
-          void el.init(finance, { view: 'banks', ...base });
+          void el.init(finance, { view: 'overview', ...base });
         else if (typeof el.setFinance === 'function')
           void el.setFinance(finance);
         else el.finance = finance;
@@ -73,7 +73,7 @@ export async function activate(
           string,
           unknown
         >;
-        void el.init(finance, { view: detail.view ?? 'banks', ...detail });
+        void el.init(finance, { view: detail.view ?? 'overview', ...detail });
       });
     }
   }
