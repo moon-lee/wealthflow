@@ -3,6 +3,10 @@ import { BankList } from './bank-list';
 import { BankForm } from './bank-form';
 import { InterestGrid } from './interest-grid';
 import { InterestForm } from './interest-form';
+import { StockList } from './stock-list';
+import { DividendLog } from './dividend-log';
+import { DividendForm } from './dividend-form';
+import { OverviewView } from './overview-view';
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('wealthflow-orchestrator'))
@@ -30,13 +34,24 @@ if (typeof customElements !== 'undefined') {
       'interest-form',
       InterestForm as unknown as CustomElementConstructor,
     );
-  // Stock + overview milestones (Tasks 14-15) self-register on import; missing files are fine at the Bank milestone.
-  for (const mod of [
-    './stock-list.js',
-    './dividend-log.js',
-    './dividend-form.js',
-    './overview-view.js',
-  ]) {
-    void import(/* @vite-ignore */ mod).catch(() => {});
-  }
+  if (!customElements.get('stock-list'))
+    customElements.define(
+      'stock-list',
+      StockList as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('dividend-log'))
+    customElements.define(
+      'dividend-log',
+      DividendLog as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('dividend-form'))
+    customElements.define(
+      'dividend-form',
+      DividendForm as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('overview-view'))
+    customElements.define(
+      'overview-view',
+      OverviewView as unknown as CustomElementConstructor,
+    );
 }
