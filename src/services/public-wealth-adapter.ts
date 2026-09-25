@@ -2,7 +2,10 @@ import type { FinanceApi } from 'finance';
 import { ExtensionLogger } from 'finance-logger';
 import { listBanks } from '../dao/banks.js';
 import { listInterestEntries } from '../dao/interest-entries.js';
+import { listStocks } from '../dao/stocks.js';
+import { listDividends } from '../dao/dividends.js';
 import { sumInterestByBank } from './bank-service.js';
+import { sumDividends } from './stock-service.js';
 
 const logger = new ExtensionLogger('wealthflow');
 
@@ -59,11 +62,34 @@ export function createPublicWealthAdapter(finance: FinanceApi): PublicWealthServ
         return null;
       }
     },
-    async getDividendSummary(): Promise<DividendSummary | null> {
-      return null;
+    async getDividendSummary(financialYear: string): Promise<DividendSummary | null> {
+      try {
+        const stocks = await listStocks(finance, { status: 'all' });
+        const entries = await listDividends(finance, { financeYear: financialYear });
+        return sumDividends(financialYear, stocks, entries);
+      } catch (err) {
+        logger.error('getDividendSummary failed:', err);
+        return null;
+      }
     },
-    async getOverviewSummary(): Promise<OverviewSummary | null> {
-      return null;
+    async getOverviewSummary(financialYear: string): Promise<OverviewSummary | null> {
+      try {
+        const [dividends, interest] = await Promise.all([
+          this.getDividendSummary(financialYear),
+          this.getInterestSummary(financialYear),
+        ]);
+        if (!dividends || !interest) return null;
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        return {
+          financialYear: financialYear,
+          dividends,
+          interest,
+          combined: { gross: round2(dividends.gross + interest.total), franking: round2(dividends.franking) },
+        };
+      } catch (err) {
+        logger.error('getOverviewSummary failed:', err);
+        return null;
+      }
     },
   };
 }

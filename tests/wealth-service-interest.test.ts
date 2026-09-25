@@ -18,6 +18,8 @@ describe('getInterestSummary', () => {
     expect(s.byBank).toHaveLength(2);
     const empty: any = await svc.getInterestSummary('2030-2031');
     expect(empty.total).toBe(0);
-    expect(await svc.getDividendSummary('2025-2026')).toBeNull();
+    const emptyDiv: any = await svc.getDividendSummary('2030-2031');
+    expect(emptyDiv.gross).toBe(0);
+    expect(emptyDiv.franking).toBe(0);
   });
 });
