@@ -10,11 +10,15 @@ import {
   type InterestEntry,
 } from '../dao/interest-entries.js';
 
-const Base = typeof HTMLElement !== 'undefined' ? LitElement : (class {} as unknown as typeof LitElement);
+const Base =
+  typeof HTMLElement !== 'undefined'
+    ? LitElement
+    : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
 export class InterestForm extends Base {
-  static override styles = typeof HTMLElement !== 'undefined' ? [sharedStyles] as any : [];
+  static override styles =
+    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
   finance: any = null;
   fy = '';
   banks: Bank[] = [];
@@ -68,14 +72,18 @@ export class InterestForm extends Base {
 
   private autofillFy(): void {
     if (this.financeYearTouched) return;
-    const auto = isValidIsoDate(this.date) ? computeFinanceYear(this.date, '07-01') : null;
+    const auto = isValidIsoDate(this.date)
+      ? computeFinanceYear(this.date, '07-01')
+      : null;
     this.financeYear = auto ?? this.fy ?? '';
   }
 
   private get fyMismatch(): boolean {
     if (!isValidIsoDate(this.date)) return false;
     const auto = computeFinanceYear(this.date, '07-01');
-    return auto !== null && this.financeYear !== '' && this.financeYear !== auto;
+    return (
+      auto !== null && this.financeYear !== '' && this.financeYear !== auto
+    );
   }
 
   private async onSubmit(e: Event): Promise<void> {
@@ -107,7 +115,13 @@ export class InterestForm extends Base {
           },
           '07-01',
         );
-        this.dispatchEvent(new CustomEvent('interest-create', { detail: { entry: row }, bubbles: true, composed: true }));
+        this.dispatchEvent(
+          new CustomEvent('interest-create', {
+            detail: { entry: row },
+            bubbles: true,
+            composed: true,
+          }),
+        );
       } else {
         await updateInterestEntry(this.finance, this.editId, {
           bank_id: this.bankId,
@@ -116,7 +130,13 @@ export class InterestForm extends Base {
           finance_year: this.financeYear,
           notes: this.notes.trim() === '' ? null : this.notes.trim(),
         });
-        this.dispatchEvent(new CustomEvent('interest-edit', { detail: { id: this.editId }, bubbles: true, composed: true }));
+        this.dispatchEvent(
+          new CustomEvent('interest-edit', {
+            detail: { id: this.editId },
+            bubbles: true,
+            composed: true,
+          }),
+        );
       }
       this.editEntry(null);
     } catch (err: any) {
@@ -127,10 +147,20 @@ export class InterestForm extends Base {
 
   private async onDelete(): Promise<void> {
     if (this.editId == null) return;
-    if (typeof confirm !== 'undefined' && !confirm('Delete this interest entry?')) return;
+    if (
+      typeof confirm !== 'undefined' &&
+      !confirm('Delete this interest entry?')
+    )
+      return;
     try {
       await deleteInterestEntry(this.finance, this.editId);
-      this.dispatchEvent(new CustomEvent('interest-delete', { detail: { id: this.editId }, bubbles: true, composed: true }));
+      this.dispatchEvent(
+        new CustomEvent('interest-delete', {
+          detail: { id: this.editId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
       this.editEntry(null);
     } catch (e: any) {
       this.error = String(e?.message || e);
@@ -141,16 +171,22 @@ export class InterestForm extends Base {
     if (typeof HTMLElement === 'undefined') return html``;
     return html`
       <div class="section">
-        <h3>${this.editId == null ? 'Log Interest (corrections)' : 'Edit Interest Entry'}</h3>
+        <h3>
+          ${this.editId == null ? 'Log Interest (corrections)' : 'Edit Interest Entry'}
+        </h3>
         ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
         <form @submit=${this.onSubmit}>
-          <label>Bank
-            <select @change=${(e: Event) => (this.bankId = Number((e.target as HTMLSelectElement).value) || null)}>
+          <label
+            >Bank
+            <select
+              @change=${(e: Event) => (this.bankId = Number((e.target as HTMLSelectElement).value) || null)}
+            >
               <option value="">— choose —</option>
               ${this.banks.map((b) => html`<option value=${b.id} ?selected=${this.bankId === b.id}>${b.name}</option>`)}
             </select>
           </label>
-          <label>Date
+          <label
+            >Date
             <input
               .value=${this.date}
               @input=${(e: Event) => {
@@ -160,10 +196,17 @@ export class InterestForm extends Base {
               placeholder="YYYY-MM-DD"
             />
           </label>
-          <label>Amount (AUD)
-            <input .value=${this.amount} @input=${(e: Event) => (this.amount = (e.target as HTMLInputElement).value)} inputmode="decimal" placeholder="0.00" />
+          <label
+            >Amount (AUD)
+            <input
+              .value=${this.amount}
+              @input=${(e: Event) => (this.amount = (e.target as HTMLInputElement).value)}
+              inputmode="decimal"
+              placeholder="0.00"
+            />
           </label>
-          <label>Financial year
+          <label
+            >Financial year
             <input
               .value=${this.financeYear}
               @input=${(e: Event) => {
@@ -173,18 +216,45 @@ export class InterestForm extends Base {
             />
           </label>
           ${this.fyMismatch ? html`<p class="callout-warn">FY differs from the date — kept as an override.</p>` : ''}
-          <label>Notes <input .value=${this.notes} @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)} /></label>
-          <button class="btn-primary" type="submit">${this.editId == null ? 'Log Interest' : 'Save'}</button>
-          ${this.editId != null
-            ? html`<button class="filter-btn" type="button" @click=${() => this.editEntry(null)}>Cancel</button>
-                <button class="filter-btn" type="button" @click=${() => this.onDelete()}>Delete</button>`
-            : ''}
+          <label
+            >Notes
+            <input
+              .value=${this.notes}
+              @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)}
+          /></label>
+          <button class="btn-primary" type="submit">
+            ${this.editId == null ? 'Log Interest' : 'Save'}
+          </button>
+          ${
+            this.editId != null
+              ? html`<button
+                    class="filter-btn"
+                    type="button"
+                    @click=${() => this.editEntry(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    class="filter-btn"
+                    type="button"
+                    @click=${() => this.onDelete()}
+                  >
+                    Delete
+                  </button>`
+              : ''
+          }
         </form>
       </div>
     `;
   }
 }
 
-if (typeof customElements !== 'undefined' && !customElements.get('interest-form')) {
-  customElements.define('interest-form', InterestForm as unknown as CustomElementConstructor);
+if (
+  typeof customElements !== 'undefined' &&
+  !customElements.get('interest-form')
+) {
+  customElements.define(
+    'interest-form',
+    InterestForm as unknown as CustomElementConstructor,
+  );
 }

@@ -3,15 +3,24 @@ import { sharedStyles } from '../styles/shared-styles.js';
 import { ExtensionLogger } from 'finance-logger';
 import { formatAUD, maskAccount, formatBSB } from '../utils/format.js';
 import { validateBsb, getInterestTotals } from '../services/bank-service.js';
-import { listBanks, updateBank, setBankActive, type Bank } from '../dao/banks.js';
+import {
+  listBanks,
+  updateBank,
+  setBankActive,
+  type Bank,
+} from '../dao/banks.js';
 
-const Base = typeof HTMLElement !== 'undefined' ? LitElement : (class {} as unknown as typeof LitElement);
+const Base =
+  typeof HTMLElement !== 'undefined'
+    ? LitElement
+    : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
 type StatusFilter = 'active' | 'inactive' | 'all';
 
 export class BankList extends Base {
-  static override styles = typeof HTMLElement !== 'undefined' ? [sharedStyles] as any : [];
+  static override styles =
+    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
   finance: any = null;
   fy = '';
   banks: Bank[] = [];
@@ -34,8 +43,14 @@ export class BankList extends Base {
     try {
       this.banks = await listBanks(this.finance, { status: this.statusFilter });
       if (this.fy) {
-        const { byBank } = await getInterestTotals(this.finance, this.banks, this.fy);
-        this.totals = Object.fromEntries(byBank.map((b) => [b.bankId, b.total]));
+        const { byBank } = await getInterestTotals(
+          this.finance,
+          this.banks,
+          this.fy,
+        );
+        this.totals = Object.fromEntries(
+          byBank.map((b) => [b.bankId, b.total]),
+        );
       } else {
         this.totals = {};
       }
@@ -86,16 +101,37 @@ export class BankList extends Base {
   override connectedCallback(): void {
     (super.connectedCallback as (() => void) | undefined)?.call(this);
     this.addEventListener('bank-create', this._onChildChanged as EventListener);
-    this.addEventListener('interest-create', this._onChildChanged as EventListener);
-    this.addEventListener('interest-edit', this._onChildChanged as EventListener);
-    this.addEventListener('interest-delete', this._onChildChanged as EventListener);
+    this.addEventListener(
+      'interest-create',
+      this._onChildChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-edit',
+      this._onChildChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-delete',
+      this._onChildChanged as EventListener,
+    );
   }
 
   override disconnectedCallback(): void {
-    this.removeEventListener('bank-create', this._onChildChanged as EventListener);
-    this.removeEventListener('interest-create', this._onChildChanged as EventListener);
-    this.removeEventListener('interest-edit', this._onChildChanged as EventListener);
-    this.removeEventListener('interest-delete', this._onChildChanged as EventListener);
+    this.removeEventListener(
+      'bank-create',
+      this._onChildChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-create',
+      this._onChildChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-edit',
+      this._onChildChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-delete',
+      this._onChildChanged as EventListener,
+    );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
@@ -120,18 +156,29 @@ export class BankList extends Base {
 
   private async saveEdit(b: Bank): Promise<void> {
     const bsbErr = validateBsb(this.editBsb);
-    if (this.editName.trim() === '' || this.editAccount.trim() === '' || bsbErr) {
+    if (
+      this.editName.trim() === '' ||
+      this.editAccount.trim() === '' ||
+      bsbErr
+    ) {
       this.error = bsbErr ?? 'Name and account are required.';
       return;
     }
     try {
       await updateBank(this.finance, b.id, {
         name: this.editName.trim(),
-        bsb: this.editBsb.trim() === '' ? null : this.editBsb.replace(/\D/g, ''),
+        bsb:
+          this.editBsb.trim() === '' ? null : this.editBsb.replace(/\D/g, ''),
         account_number: this.editAccount.trim(),
       });
       this.editingId = null;
-      this.dispatchEvent(new CustomEvent('bank-edit', { detail: { id: b.id, fromList: true }, bubbles: true, composed: true }));
+      this.dispatchEvent(
+        new CustomEvent('bank-edit', {
+          detail: { id: b.id, fromList: true },
+          bubbles: true,
+          composed: true,
+        }),
+      );
       await this.reload();
     } catch (e: any) {
       logger.error('bank edit failed:', e);
@@ -141,11 +188,20 @@ export class BankList extends Base {
 
   private async toggleActive(b: Bank): Promise<void> {
     const toActive = !b.is_active;
-    if (!toActive && typeof confirm !== 'undefined' && !confirm(`Deactivate ${b.name}? Its history stays in all totals.`)) return;
+    if (
+      !toActive &&
+      typeof confirm !== 'undefined' &&
+      !confirm(`Deactivate ${b.name}? Its history stays in all totals.`)
+    )
+      return;
     try {
       await setBankActive(this.finance, b.id, toActive);
       this.dispatchEvent(
-        new CustomEvent(toActive ? 'bank-activate' : 'bank-deactivate', { detail: { id: b.id }, bubbles: true, composed: true }),
+        new CustomEvent(toActive ? 'bank-activate' : 'bank-deactivate', {
+          detail: { id: b.id },
+          bubbles: true,
+          composed: true,
+        }),
       );
       await this.reload();
     } catch (e: any) {
@@ -162,25 +218,40 @@ export class BankList extends Base {
         <h3>Banks</h3>
         <div>
           ${filters.map(
-            (f) => html`<label><input type="radio" name="bank-status" .checked=${this.statusFilter === f} @change=${() => {
-              this.statusFilter = f;
-              void this.reload();
-            }} />${f[0].toUpperCase() + f.slice(1)}</label>`,
+            (f) =>
+              html`<label
+                ><input
+                  type="radio"
+                  name="bank-status"
+                  .checked=${this.statusFilter === f}
+                  @change=${() => {
+                    this.statusFilter = f;
+                    void this.reload();
+                  }}
+                />${f[0].toUpperCase() + f.slice(1)}</label
+              >`,
           )}
         </div>
         ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        ${this.banks.length === 0
-          ? html`<p>Add your first bank below to start tracking interest.</p>`
-          : html`<div class="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Bank</th><th>BSB / Account</th><th>FY ${this.fy}</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  ${this.banks.map((b) => (this.editingId === b.id ? this.editRow(b) : this.viewRow(b)))}
-                </tbody>
-              </table>
-            </div>`}
+        ${
+          this.banks.length === 0
+            ? html`<p>Add your first bank below to start tracking interest.</p>`
+            : html`<div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Bank</th>
+                      <th>BSB / Account</th>
+                      <th>FY ${this.fy}</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${this.banks.map((b) => (this.editingId === b.id ? this.editRow(b) : this.viewRow(b)))}
+                  </tbody>
+                </table>
+              </div>`
+        }
       </div>
       <bank-form></bank-form>
       <interest-grid></interest-grid>
@@ -191,12 +262,19 @@ export class BankList extends Base {
   private viewRow(b: Bank): unknown {
     return html`
       <tr class=${b.is_active ? '' : 'muted'}>
-        <td>${b.name} ${b.is_active ? '' : html`<span class="badge">inactive</span>`}</td>
+        <td>
+          ${b.name}
+          ${b.is_active ? '' : html`<span class="badge">inactive</span>`}
+        </td>
         <td>${formatBSB(b.bsb)} ${maskAccount(b.account_number)}</td>
         <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
         <td>
-          <button class="filter-btn" @click=${() => this.startEdit(b)}>Edit</button>
-          <button class="filter-btn" @click=${() => this.toggleActive(b)}>${b.is_active ? 'Deactivate' : 'Activate'}</button>
+          <button class="filter-btn" @click=${() => this.startEdit(b)}>
+            Edit
+          </button>
+          <button class="filter-btn" @click=${() => this.toggleActive(b)}>
+            ${b.is_active ? 'Deactivate' : 'Activate'}
+          </button>
         </td>
       </tr>
     `;
@@ -206,19 +284,37 @@ export class BankList extends Base {
     const bsbErr = validateBsb(this.editBsb);
     return html`
       <tr>
-        <td><input .value=${this.editName} @input=${(e: Event) => (this.editName = (e.target as HTMLInputElement).value)} @keydown=${(e: KeyboardEvent) => {
-          if (e.key === 'Enter') void this.saveEdit(b);
-          if (e.key === 'Escape') this.cancelEdit();
-        }} /></td>
         <td>
-          <input .value=${this.editBsb} @input=${(e: Event) => (this.editBsb = (e.target as HTMLInputElement).value)} placeholder="BSB" />
-          <input .value=${this.editAccount} @input=${(e: Event) => (this.editAccount = (e.target as HTMLInputElement).value)} placeholder="Account" />
+          <input
+            .value=${this.editName}
+            @input=${(e: Event) => (this.editName = (e.target as HTMLInputElement).value)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === 'Enter') void this.saveEdit(b);
+              if (e.key === 'Escape') this.cancelEdit();
+            }}
+          />
+        </td>
+        <td>
+          <input
+            .value=${this.editBsb}
+            @input=${(e: Event) => (this.editBsb = (e.target as HTMLInputElement).value)}
+            placeholder="BSB"
+          />
+          <input
+            .value=${this.editAccount}
+            @input=${(e: Event) => (this.editAccount = (e.target as HTMLInputElement).value)}
+            placeholder="Account"
+          />
           ${bsbErr ? html`<p class="field-error">${bsbErr}</p>` : ''}
         </td>
         <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
         <td>
-          <button class="btn-primary" @click=${() => this.saveEdit(b)}>Save</button>
-          <button class="filter-btn" @click=${() => this.cancelEdit()}>Cancel</button>
+          <button class="btn-primary" @click=${() => this.saveEdit(b)}>
+            Save
+          </button>
+          <button class="filter-btn" @click=${() => this.cancelEdit()}>
+            Cancel
+          </button>
         </td>
       </tr>
     `;
@@ -226,5 +322,8 @@ export class BankList extends Base {
 }
 
 if (typeof customElements !== 'undefined' && !customElements.get('bank-list')) {
-  customElements.define('bank-list', BankList as unknown as CustomElementConstructor);
+  customElements.define(
+    'bank-list',
+    BankList as unknown as CustomElementConstructor,
+  );
 }

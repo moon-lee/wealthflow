@@ -17,11 +17,18 @@ function round2(n: number): number {
 export function sumInterestByBank(
   banks: Pick<Bank, 'id' | 'name'>[],
   entries: Pick<InterestEntry, 'bank_id' | 'amount'>[],
-): { total: number; byBank: { bankId: number; name: string; total: number }[] } {
+): {
+  total: number;
+  byBank: { bankId: number; name: string; total: number }[];
+} {
   const byBank = banks.map((b) => ({
     bankId: b.id,
     name: b.name,
-    total: round2(entries.filter((e) => e.bank_id === b.id).reduce((s, e) => s + Number(e.amount ?? 0), 0)),
+    total: round2(
+      entries
+        .filter((e) => e.bank_id === b.id)
+        .reduce((s, e) => s + Number(e.amount ?? 0), 0),
+    ),
   }));
   return { total: round2(byBank.reduce((s, b) => s + b.total, 0)), byBank };
 }
@@ -57,10 +64,14 @@ export function interestGridModel(
     cells[m] = {};
     let row = 0;
     for (const b of banks) {
-      const hit = entries.find((e) => e.bank_id === b.id && monthKey(e.date) === m);
+      const hit = entries.find(
+        (e) => e.bank_id === b.id && monthKey(e.date) === m,
+      );
       cells[m][b.id] = hit ? Number(hit.amount) : null;
       row += hit ? Number(hit.amount) : 0;
-      colTotals[b.id] = round2(colTotals[b.id] + (hit ? Number(hit.amount) : 0));
+      colTotals[b.id] = round2(
+        colTotals[b.id] + (hit ? Number(hit.amount) : 0),
+      );
     }
     rowTotals[m] = round2(row);
     grand = round2(grand + row);

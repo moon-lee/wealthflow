@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { sumInterestByBank, interestGridModel } from '../src/services/bank-service.js';
+import {
+  sumInterestByBank,
+  interestGridModel,
+} from '../src/services/bank-service.js';
 
 describe('bank service', () => {
   it('sums by bank incl. inactive history', () => {
@@ -17,9 +20,11 @@ describe('bank service', () => {
     expect(byBank.find((b) => b.bankId === 1)?.total).toBeCloseTo(5.49, 2);
   });
   it('grid model maps 12 FY months', () => {
-    const g = interestGridModel('2025-2026', [{ id: 1, name: 'M' }] as any, [
-      { bank_id: 1, date: '2025-07-31', amount: 3.39 },
-    ] as any);
+    const g = interestGridModel(
+      '2025-2026',
+      [{ id: 1, name: 'M' }] as any,
+      [{ bank_id: 1, date: '2025-07-31', amount: 3.39 }] as any,
+    );
     expect(g.months[0]).toBe('2025-07');
     expect(g.cells['2025-07'][1]).toBe(3.39);
     expect(g.cells['2025-08'][1]).toBeNull();

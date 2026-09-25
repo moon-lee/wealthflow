@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeFinanceYear, monthEnd, fyMonths, monthKey } from '../src/utils/finance-year.js';
+import {
+  computeFinanceYear,
+  monthEnd,
+  fyMonths,
+  monthKey,
+} from '../src/utils/finance-year.js';
 import { formatAUD, maskAccount, formatBSB } from '../src/utils/format.js';
 
 describe('utils', () => {

@@ -12,11 +12,15 @@ import {
   type DividendEntry,
 } from '../dao/dividends.js';
 
-const Base = typeof HTMLElement !== 'undefined' ? LitElement : (class {} as unknown as typeof LitElement);
+const Base =
+  typeof HTMLElement !== 'undefined'
+    ? LitElement
+    : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
 export class DividendForm extends Base {
-  static override styles = typeof HTMLElement !== 'undefined' ? [sharedStyles] as any : [];
+  static override styles =
+    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
   finance: any = null;
   fy = '';
   stocks: Stock[] = [];
@@ -80,14 +84,18 @@ export class DividendForm extends Base {
 
   private autofillFy(): void {
     if (this.financeYearTouched) return;
-    const auto = isValidIsoDate(this.date) ? computeFinanceYear(this.date, '07-01') : null;
+    const auto = isValidIsoDate(this.date)
+      ? computeFinanceYear(this.date, '07-01')
+      : null;
     this.financeYear = auto ?? this.fy ?? '';
   }
 
   private get fyMismatch(): boolean {
     if (!isValidIsoDate(this.date)) return false;
     const auto = computeFinanceYear(this.date, '07-01');
-    return auto !== null && this.financeYear !== '' && this.financeYear !== auto;
+    return (
+      auto !== null && this.financeYear !== '' && this.financeYear !== auto
+    );
   }
 
   private async onSubmit(e: Event): Promise<void> {
@@ -126,7 +134,13 @@ export class DividendForm extends Base {
           },
           '07-01',
         );
-        this.dispatchEvent(new CustomEvent('dividend-create', { detail: { entry: row }, bubbles: true, composed: true }));
+        this.dispatchEvent(
+          new CustomEvent('dividend-create', {
+            detail: { entry: row },
+            bubbles: true,
+            composed: true,
+          }),
+        );
       } else {
         await updateDividend(this.finance, this.editId, {
           stock_id: this.stockId,
@@ -137,7 +151,13 @@ export class DividendForm extends Base {
           finance_year: this.financeYear,
           notes: this.notes.trim() === '' ? null : this.notes.trim(),
         });
-        this.dispatchEvent(new CustomEvent('dividend-edit', { detail: { id: this.editId }, bubbles: true, composed: true }));
+        this.dispatchEvent(
+          new CustomEvent('dividend-edit', {
+            detail: { id: this.editId },
+            bubbles: true,
+            composed: true,
+          }),
+        );
       }
       this.editEntry(null);
     } catch (err: any) {
@@ -148,10 +168,20 @@ export class DividendForm extends Base {
 
   private async onDelete(): Promise<void> {
     if (this.editId == null) return;
-    if (typeof confirm !== 'undefined' && !confirm('Delete this dividend receipt?')) return;
+    if (
+      typeof confirm !== 'undefined' &&
+      !confirm('Delete this dividend receipt?')
+    )
+      return;
     try {
       await deleteDividend(this.finance, this.editId);
-      this.dispatchEvent(new CustomEvent('dividend-delete', { detail: { id: this.editId }, bubbles: true, composed: true }));
+      this.dispatchEvent(
+        new CustomEvent('dividend-delete', {
+          detail: { id: this.editId },
+          bubbles: true,
+          composed: true,
+        }),
+      );
       this.editEntry(null);
     } catch (e: any) {
       this.error = String(e?.message || e);
@@ -165,13 +195,17 @@ export class DividendForm extends Base {
         <h3>${this.editId == null ? 'Log Dividend' : 'Edit Dividend'}</h3>
         ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
         <form @submit=${this.onSubmit}>
-          <label>Stock
-            <select @change=${(e: Event) => (this.stockId = Number((e.target as HTMLSelectElement).value) || null)}>
+          <label
+            >Stock
+            <select
+              @change=${(e: Event) => (this.stockId = Number((e.target as HTMLSelectElement).value) || null)}
+            >
               <option value="">— choose —</option>
               ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockId === s.id}>${s.code}${s.is_active ? '' : ' (inactive)'}</option>`)}
             </select>
           </label>
-          <label>Date
+          <label
+            >Date
             <input
               .value=${this.date}
               @input=${(e: Event) => {
@@ -181,18 +215,34 @@ export class DividendForm extends Base {
               placeholder="YYYY-MM-DD"
             />
           </label>
-          <label>Type
-            <select @change=${(e: Event) => (this.type = (e.target as HTMLSelectElement).value)}>
+          <label
+            >Type
+            <select
+              @change=${(e: Event) => (this.type = (e.target as HTMLSelectElement).value)}
+            >
               ${(DIVIDEND_TYPES as readonly string[]).map((t) => html`<option value=${t} ?selected=${this.type === t}>${DIVIDEND_LABELS[t as keyof typeof DIVIDEND_LABELS]}</option>`)}
             </select>
           </label>
-          <label>Gross (AUD)
-            <input .value=${this.gross} @input=${(e: Event) => (this.gross = (e.target as HTMLInputElement).value)} inputmode="decimal" placeholder="0.00" />
+          <label
+            >Gross (AUD)
+            <input
+              .value=${this.gross}
+              @input=${(e: Event) => (this.gross = (e.target as HTMLInputElement).value)}
+              inputmode="decimal"
+              placeholder="0.00"
+            />
           </label>
-          <label>Franking (AUD)
-            <input .value=${this.franking} @input=${(e: Event) => (this.franking = (e.target as HTMLInputElement).value)} inputmode="decimal" placeholder="0.00" />
+          <label
+            >Franking (AUD)
+            <input
+              .value=${this.franking}
+              @input=${(e: Event) => (this.franking = (e.target as HTMLInputElement).value)}
+              inputmode="decimal"
+              placeholder="0.00"
+            />
           </label>
-          <label>Financial year
+          <label
+            >Financial year
             <input
               .value=${this.financeYear}
               @input=${(e: Event) => {
@@ -202,18 +252,45 @@ export class DividendForm extends Base {
             />
           </label>
           ${this.fyMismatch ? html`<p class="callout-warn">FY differs from the date — kept as an override.</p>` : ''}
-          <label>Notes <input .value=${this.notes} @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)} /></label>
-          <button class="btn-primary" type="submit">${this.editId == null ? 'Log Dividend' : 'Save'}</button>
-          ${this.editId != null
-            ? html`<button class="filter-btn" type="button" @click=${() => this.editEntry(null)}>Cancel</button>
-                <button class="filter-btn" type="button" @click=${() => this.onDelete()}>Delete</button>`
-            : ''}
+          <label
+            >Notes
+            <input
+              .value=${this.notes}
+              @input=${(e: Event) => (this.notes = (e.target as HTMLInputElement).value)}
+          /></label>
+          <button class="btn-primary" type="submit">
+            ${this.editId == null ? 'Log Dividend' : 'Save'}
+          </button>
+          ${
+            this.editId != null
+              ? html`<button
+                    class="filter-btn"
+                    type="button"
+                    @click=${() => this.editEntry(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    class="filter-btn"
+                    type="button"
+                    @click=${() => this.onDelete()}
+                  >
+                    Delete
+                  </button>`
+              : ''
+          }
         </form>
       </div>
     `;
   }
 }
 
-if (typeof customElements !== 'undefined' && !customElements.get('dividend-form')) {
-  customElements.define('dividend-form', DividendForm as unknown as CustomElementConstructor);
+if (
+  typeof customElements !== 'undefined' &&
+  !customElements.get('dividend-form')
+) {
+  customElements.define(
+    'dividend-form',
+    DividendForm as unknown as CustomElementConstructor,
+  );
 }

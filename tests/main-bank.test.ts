@@ -10,8 +10,12 @@ describe('main bank wiring', () => {
     await activate(f, { viewId: 'wealthflow' });
     expect(cmds).toContain('wealthflow.show-banks');
     expect(cmds).toContain('wealthflow.add-interest');
-    expect(await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026')).toBeTruthy();
+    expect(
+      await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026'),
+    ).toBeTruthy();
     deactivate();
-    expect(await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026')).toBeNull();
+    expect(
+      await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026'),
+    ).toBeNull();
   });
 });

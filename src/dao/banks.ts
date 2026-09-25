@@ -28,11 +28,19 @@ export class BankValidationError extends Error {
 
 const TABLE = 'wealthflow_banks' as const;
 
-export async function createBank(finance: FinanceApi, input: BankInput): Promise<Bank> {
+export async function createBank(
+  finance: FinanceApi,
+  input: BankInput,
+): Promise<Bank> {
   const name = input.name.trim();
   if (!name) throw new BankValidationError('name is required');
-  if (!input.account_number.trim()) throw new BankValidationError('account_number is required');
-  if (input.bsb != null && input.bsb !== '' && !/^\d{6}$/.test(input.bsb.replace(/\D/g, '')))
+  if (!input.account_number.trim())
+    throw new BankValidationError('account_number is required');
+  if (
+    input.bsb != null &&
+    input.bsb !== '' &&
+    !/^\d{6}$/.test(input.bsb.replace(/\D/g, ''))
+  )
     throw new BankValidationError('bsb must be 6 digits');
   const row = (await finance.db.table(TABLE).insert({
     name,
@@ -55,15 +63,33 @@ export async function listBanks(
   return rows.slice().sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export async function updateBank(finance: FinanceApi, id: number, patch: Partial<BankInput>): Promise<number> {
-  if (patch.name !== undefined && !patch.name.trim()) throw new BankValidationError('name is required');
-  return finance.db.table(TABLE).update({ id }, patch as Record<string, unknown>);
+export async function updateBank(
+  finance: FinanceApi,
+  id: number,
+  patch: Partial<BankInput>,
+): Promise<number> {
+  if (patch.name !== undefined && !patch.name.trim())
+    throw new BankValidationError('name is required');
+  return finance.db
+    .table(TABLE)
+    .update({ id }, patch as Record<string, unknown>);
 }
 
-export async function setBankActive(finance: FinanceApi, id: number, active: boolean): Promise<number> {
-  return finance.db.table(TABLE).update({ id }, { is_active: active } as Record<string, unknown>);
+export async function setBankActive(
+  finance: FinanceApi,
+  id: number,
+  active: boolean,
+): Promise<number> {
+  return finance.db
+    .table(TABLE)
+    .update({ id }, { is_active: active } as Record<string, unknown>);
 }
 
-export async function findBank(finance: FinanceApi, id: number): Promise<Bank | null> {
-  return (await finance.db.table(TABLE).findOne({ id })) as unknown as Bank | null;
+export async function findBank(
+  finance: FinanceApi,
+  id: number,
+): Promise<Bank | null> {
+  return (await finance.db
+    .table(TABLE)
+    .findOne({ id })) as unknown as Bank | null;
 }

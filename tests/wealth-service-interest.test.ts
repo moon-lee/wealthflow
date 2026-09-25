@@ -7,10 +7,31 @@ import { createPublicWealthAdapter } from '../src/services/public-wealth-adapter
 describe('getInterestSummary', () => {
   it('totals + byBank, includes deactivated history, empty→zeros, error→null', async () => {
     const f: any = createMockFinance();
-    const a: any = await createBank(f, { name: 'Macquarie', account_number: '1' });
+    const a: any = await createBank(f, {
+      name: 'Macquarie',
+      account_number: '1',
+    });
     const b: any = await createBank(f, { name: 'BOQ', account_number: '2' });
-    await createInterestEntry(f, { bank_id: a.id, date: '2025-07-31', amount: 3.39, finance_year: '2025-2026' }, '07-01');
-    await createInterestEntry(f, { bank_id: b.id, date: '2025-07-31', amount: 6.48, finance_year: '2025-2026' }, '07-01');
+    await createInterestEntry(
+      f,
+      {
+        bank_id: a.id,
+        date: '2025-07-31',
+        amount: 3.39,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    await createInterestEntry(
+      f,
+      {
+        bank_id: b.id,
+        date: '2025-07-31',
+        amount: 6.48,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
     await setBankActive(f, b.id, false);
     const svc = createPublicWealthAdapter(f);
     const s: any = await svc.getInterestSummary('2025-2026');

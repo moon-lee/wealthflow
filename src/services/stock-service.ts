@@ -8,7 +8,11 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-export const DIVIDEND_TYPE_LABELS = { non_trust: 'Non Trust', trust: 'Trust (ETF)', foreign: 'Foreign' } as const;
+export const DIVIDEND_TYPE_LABELS = {
+  non_trust: 'Non Trust',
+  trust: 'Trust (ETF)',
+  foreign: 'Foreign',
+} as const;
 
 export function sumDividends(
   financialYear: string,

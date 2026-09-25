@@ -34,7 +34,11 @@ export interface DividendSummary {
   financialYear: string;
   gross: number;
   franking: number;
-  byType: { non_trust: DividendTypeSplit; trust: DividendTypeSplit; foreign: DividendTypeSplit };
+  byType: {
+    non_trust: DividendTypeSplit;
+    trust: DividendTypeSplit;
+    foreign: DividendTypeSplit;
+  };
   byStock: DividendSummaryByStock[];
 }
 export interface OverviewSummary {
@@ -49,12 +53,18 @@ export interface PublicWealthService {
   getOverviewSummary(financialYear: string): Promise<OverviewSummary | null>;
 }
 
-export function createPublicWealthAdapter(finance: FinanceApi): PublicWealthService {
+export function createPublicWealthAdapter(
+  finance: FinanceApi,
+): PublicWealthService {
   return {
-    async getInterestSummary(financialYear: string): Promise<InterestSummary | null> {
+    async getInterestSummary(
+      financialYear: string,
+    ): Promise<InterestSummary | null> {
       try {
         const banks = await listBanks(finance, { status: 'all' });
-        const entries = await listInterestEntries(finance, { financeYear: financialYear });
+        const entries = await listInterestEntries(finance, {
+          financeYear: financialYear,
+        });
         const { total, byBank } = sumInterestByBank(banks, entries);
         return { financialYear, total, byBank };
       } catch (err) {
@@ -62,17 +72,23 @@ export function createPublicWealthAdapter(finance: FinanceApi): PublicWealthServ
         return null;
       }
     },
-    async getDividendSummary(financialYear: string): Promise<DividendSummary | null> {
+    async getDividendSummary(
+      financialYear: string,
+    ): Promise<DividendSummary | null> {
       try {
         const stocks = await listStocks(finance, { status: 'all' });
-        const entries = await listDividends(finance, { financeYear: financialYear });
+        const entries = await listDividends(finance, {
+          financeYear: financialYear,
+        });
         return sumDividends(financialYear, stocks, entries);
       } catch (err) {
         logger.error('getDividendSummary failed:', err);
         return null;
       }
     },
-    async getOverviewSummary(financialYear: string): Promise<OverviewSummary | null> {
+    async getOverviewSummary(
+      financialYear: string,
+    ): Promise<OverviewSummary | null> {
       try {
         const [dividends, interest] = await Promise.all([
           this.getDividendSummary(financialYear),
@@ -84,7 +100,10 @@ export function createPublicWealthAdapter(finance: FinanceApi): PublicWealthServ
           financialYear: financialYear,
           dividends,
           interest,
-          combined: { gross: round2(dividends.gross + interest.total), franking: round2(dividends.franking) },
+          combined: {
+            gross: round2(dividends.gross + interest.total),
+            franking: round2(dividends.franking),
+          },
         };
       } catch (err) {
         logger.error('getOverviewSummary failed:', err);

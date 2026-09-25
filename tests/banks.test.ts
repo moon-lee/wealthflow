@@ -7,8 +7,14 @@ function stub(rows: Record<string, unknown>[] = []) {
   return {
     db: {
       table: () => ({
-        find: async (f: any = {}) => mem.filter((r) => Object.entries(f).every(([k, v]) => (r as any)[k] === v)),
-        findOne: async (f: any = {}) => mem.find((r) => Object.entries(f).every(([k, v]) => (r as any)[k] === v)) ?? null,
+        find: async (f: any = {}) =>
+          mem.filter((r) =>
+            Object.entries(f).every(([k, v]) => (r as any)[k] === v),
+          ),
+        findOne: async (f: any = {}) =>
+          mem.find((r) =>
+            Object.entries(f).every(([k, v]) => (r as any)[k] === v),
+          ) ?? null,
         insert: async (row: any) => {
           const r = { id: id++, is_active: true, ...row };
           mem.push(r);
@@ -33,17 +39,26 @@ function stub(rows: Record<string, unknown>[] = []) {
 describe('banks dao', () => {
   it('creates + lists active by default', async () => {
     const f: any = stub();
-    const row: any = await createBank(f, { name: 'Macquarie', bsb: '012345', account_number: '1234567' });
+    const row: any = await createBank(f, {
+      name: 'Macquarie',
+      bsb: '012345',
+      account_number: '1234567',
+    });
     expect(row.id).toBeDefined();
     expect(await listBanks(f, { status: 'active' })).toHaveLength(1);
   });
   it('rejects blank name/account', async () => {
     const f: any = stub();
-    await expect(createBank(f, { name: '', account_number: '1' })).rejects.toThrow();
+    await expect(
+      createBank(f, { name: '', account_number: '1' }),
+    ).rejects.toThrow();
   });
   it('deactivate hides from active filter but keeps row', async () => {
     const f: any = stub();
-    const row: any = await createBank(f, { name: 'BOQ', account_number: '999' });
+    const row: any = await createBank(f, {
+      name: 'BOQ',
+      account_number: '999',
+    });
     await setBankActive(f, row.id, false);
     expect(await listBanks(f, { status: 'active' })).toHaveLength(0);
     expect(await listBanks(f, { status: 'all' })).toHaveLength(1);

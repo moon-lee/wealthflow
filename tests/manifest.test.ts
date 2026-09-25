@@ -25,6 +25,7 @@ describe('manifest', () => {
         'wealthflow_stocks',
       ].sort(),
     );
-    for (const id of ids) expect(fe.contributions.allowedCommands).toContain(id);
+    for (const id of ids)
+      expect(fe.contributions.allowedCommands).toContain(id);
   });
 });

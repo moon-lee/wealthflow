@@ -2,7 +2,10 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { formatAUD } from '../utils/format.js';
 
-const Base = typeof HTMLElement !== 'undefined' ? LitElement : (class {} as unknown as typeof LitElement);
+const Base =
+  typeof HTMLElement !== 'undefined'
+    ? LitElement
+    : (class {} as unknown as typeof LitElement);
 
 export type WealthTab = 'banks' | 'stocks' | 'dividends' | 'overview';
 
@@ -26,7 +29,8 @@ function fyOptions(center: string): string[] {
 }
 
 export class WealthOrchestrator extends Base {
-  static override styles = typeof HTMLElement !== 'undefined' ? [sharedStyles] as any : [];
+  static override styles =
+    typeof HTMLElement !== 'undefined' ? ([sharedStyles] as any) : [];
   finance: any = null;
   tab: WealthTab = 'banks';
   fy = currentFy();
@@ -101,10 +105,14 @@ export class WealthOrchestrator extends Base {
         // Variable specifier keeps tsc quiet until the stock milestone lands (Tasks 11-13).
         const stocksMod: string = '../dao/stocks.js';
         const stockSvcMod: string = '../services/stock-service.js';
-        const { listStocks } = (await import(/* @vite-ignore */ stocksMod)) as typeof import('../dao/banks.js') & {
+        const { listStocks } = (await import(
+          /* @vite-ignore */ stocksMod
+        )) as typeof import('../dao/banks.js') & {
           listStocks: any;
         };
-        const { getDividendTotals } = (await import(/* @vite-ignore */ stockSvcMod)) as { getDividendTotals: any };
+        const { getDividendTotals } = (await import(
+          /* @vite-ignore */ stockSvcMod
+        )) as { getDividendTotals: any };
         const stocks = await listStocks(this.finance, { status: 'all' });
         const div = await getDividendTotals(this.finance, stocks, this.fy);
         combined = Math.round((total + div.gross) * 100) / 100;
@@ -124,30 +132,78 @@ export class WealthOrchestrator extends Base {
     this.addEventListener('host-navigate', this._onHostNav as EventListener);
     this.addEventListener('bank-create', this._onDataChanged as EventListener);
     this.addEventListener('bank-edit', this._onDataChanged as EventListener);
-    this.addEventListener('interest-create', this._onDataChanged as EventListener);
-    this.addEventListener('interest-edit', this._onDataChanged as EventListener);
-    this.addEventListener('interest-delete', this._onDataChanged as EventListener);
+    this.addEventListener(
+      'interest-create',
+      this._onDataChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-edit',
+      this._onDataChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-delete',
+      this._onDataChanged as EventListener,
+    );
     this.addEventListener('stock-create', this._onDataChanged as EventListener);
     this.addEventListener('stock-edit', this._onDataChanged as EventListener);
-    this.addEventListener('dividend-create', this._onDataChanged as EventListener);
-    this.addEventListener('dividend-edit', this._onDataChanged as EventListener);
-    this.addEventListener('dividend-delete', this._onDataChanged as EventListener);
+    this.addEventListener(
+      'dividend-create',
+      this._onDataChanged as EventListener,
+    );
+    this.addEventListener(
+      'dividend-edit',
+      this._onDataChanged as EventListener,
+    );
+    this.addEventListener(
+      'dividend-delete',
+      this._onDataChanged as EventListener,
+    );
   }
 
   override disconnectedCallback(): void {
     this.removeEventListener('fy-changed', this._onFy as EventListener);
-    this.removeEventListener('wealthflow-navigate', this._onNav as EventListener);
+    this.removeEventListener(
+      'wealthflow-navigate',
+      this._onNav as EventListener,
+    );
     this.removeEventListener('host-navigate', this._onHostNav as EventListener);
-    this.removeEventListener('bank-create', this._onDataChanged as EventListener);
+    this.removeEventListener(
+      'bank-create',
+      this._onDataChanged as EventListener,
+    );
     this.removeEventListener('bank-edit', this._onDataChanged as EventListener);
-    this.removeEventListener('interest-create', this._onDataChanged as EventListener);
-    this.removeEventListener('interest-edit', this._onDataChanged as EventListener);
-    this.removeEventListener('interest-delete', this._onDataChanged as EventListener);
-    this.removeEventListener('stock-create', this._onDataChanged as EventListener);
-    this.removeEventListener('stock-edit', this._onDataChanged as EventListener);
-    this.removeEventListener('dividend-create', this._onDataChanged as EventListener);
-    this.removeEventListener('dividend-edit', this._onDataChanged as EventListener);
-    this.removeEventListener('dividend-delete', this._onDataChanged as EventListener);
+    this.removeEventListener(
+      'interest-create',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-edit',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-delete',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'stock-create',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'stock-edit',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'dividend-create',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'dividend-edit',
+      this._onDataChanged as EventListener,
+    );
+    this.removeEventListener(
+      'dividend-delete',
+      this._onDataChanged as EventListener,
+    );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
@@ -165,7 +221,10 @@ export class WealthOrchestrator extends Base {
   };
 
   private _onHostNav = (e: Event): void => {
-    const d = (e as CustomEvent).detail as { view?: string; mountData?: Record<string, unknown> };
+    const d = (e as CustomEvent).detail as {
+      view?: string;
+      mountData?: Record<string, unknown>;
+    };
     void this.init(this.finance, { view: d.view, ...(d.mountData ?? {}) });
   };
 
@@ -182,12 +241,21 @@ export class WealthOrchestrator extends Base {
           <span class="crumb-current">Wealth Flow</span>
           <div class="spacer"></div>
           ${tabs.map(
-            (t) => html`<button class="filter-btn" @click=${() => this.navigate(t)}>${t[0].toUpperCase() + t.slice(1)}</button>`,
+            (t) =>
+              html`<button class="filter-btn" @click=${() => this.navigate(t)}>
+                ${t[0].toUpperCase() + t.slice(1)}
+              </button>`,
           )}
           <select
             @change=${(e: Event) => {
               const fy = (e.target as HTMLSelectElement).value;
-              this.dispatchEvent(new CustomEvent('fy-changed', { detail: { fy }, bubbles: true, composed: true }));
+              this.dispatchEvent(
+                new CustomEvent('fy-changed', {
+                  detail: { fy },
+                  bubbles: true,
+                  composed: true,
+                }),
+              );
             }}
           >
             ${fyOptions(this.fy).map((f) => html`<option value=${f} ?selected=${f === this.fy}>FY ${f}</option>`)}
@@ -202,7 +270,9 @@ export class WealthOrchestrator extends Base {
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
             <div class="section">
               <span>FY ${this.fy} total (context):</span>
-              <strong>${this.footerTotal == null ? '—' : formatAUD(this.footerTotal)}</strong>
+              <strong
+                >${this.footerTotal == null ? '—' : formatAUD(this.footerTotal)}</strong
+              >
             </div>
           </div>
         </div>
@@ -211,6 +281,12 @@ export class WealthOrchestrator extends Base {
   }
 }
 
-if (typeof customElements !== 'undefined' && !customElements.get('wealthflow-orchestrator')) {
-  customElements.define('wealthflow-orchestrator', WealthOrchestrator as unknown as CustomElementConstructor);
+if (
+  typeof customElements !== 'undefined' &&
+  !customElements.get('wealthflow-orchestrator')
+) {
+  customElements.define(
+    'wealthflow-orchestrator',
+    WealthOrchestrator as unknown as CustomElementConstructor,
+  );
 }

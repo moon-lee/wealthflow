@@ -1,65 +1,256 @@
 {
   "name": "wealthflow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
-    "activationEvents": ["onView:wealthflow"],
+    "activationEvents": [
+      "onView:wealthflow"
+    ],
     "contributions": {
-      "views": [{ "id": "wealthflow", "name": "Wealth Flow", "icon": "assets/icon.svg", "openCommand": "wealthflow.show-banks" }],
+      "views": [
+        {
+          "id": "wealthflow",
+          "name": "Wealth Flow",
+          "icon": "assets/icon.svg",
+          "openCommand": "wealthflow.show-banks"
+        }
+      ],
       "commands": [
-        { "id": "wealthflow.show-banks", "title": "Wealth Flow: Show Banks" },
-        { "id": "wealthflow.add-interest", "title": "Wealth Flow: Add Interest" },
-        { "id": "wealthflow.show-stocks", "title": "Wealth Flow: Show Stocks" },
-        { "id": "wealthflow.add-dividend", "title": "Wealth Flow: Add Dividend" },
-        { "id": "wealthflow.show-overview", "title": "Wealth Flow: Show Overview" }
+        {
+          "id": "wealthflow.show-banks",
+          "title": "Wealth Flow: Show Banks"
+        },
+        {
+          "id": "wealthflow.add-interest",
+          "title": "Wealth Flow: Add Interest"
+        },
+        {
+          "id": "wealthflow.show-stocks",
+          "title": "Wealth Flow: Show Stocks"
+        },
+        {
+          "id": "wealthflow.add-dividend",
+          "title": "Wealth Flow: Add Dividend"
+        },
+        {
+          "id": "wealthflow.show-overview",
+          "title": "Wealth Flow: Show Overview"
+        }
       ],
       "navigation": [
-        { "id": "wealthflow-banks", "label": "Banks", "command": "wealthflow.show-banks", "group": "Wealth" },
-        { "id": "wealthflow-add-interest", "label": "Add Interest", "command": "wealthflow.add-interest", "group": "Wealth" },
-        { "id": "wealthflow-stocks", "label": "Stocks", "command": "wealthflow.show-stocks", "group": "Wealth" },
-        { "id": "wealthflow-add-dividend", "label": "Add Dividend", "command": "wealthflow.add-dividend", "group": "Wealth" },
-        { "id": "wealthflow-overview", "label": "Overview", "command": "wealthflow.show-overview", "group": "Wealth" }
+        {
+          "id": "wealthflow-banks",
+          "label": "Banks",
+          "command": "wealthflow.show-banks",
+          "group": "Wealth"
+        },
+        {
+          "id": "wealthflow-add-interest",
+          "label": "Add Interest",
+          "command": "wealthflow.add-interest",
+          "group": "Wealth"
+        },
+        {
+          "id": "wealthflow-stocks",
+          "label": "Stocks",
+          "command": "wealthflow.show-stocks",
+          "group": "Wealth"
+        },
+        {
+          "id": "wealthflow-add-dividend",
+          "label": "Add Dividend",
+          "command": "wealthflow.add-dividend",
+          "group": "Wealth"
+        },
+        {
+          "id": "wealthflow-overview",
+          "label": "Overview",
+          "command": "wealthflow.show-overview",
+          "group": "Wealth"
+        }
       ],
       "configuration": [
-        { "key": "wealthflow.themeColor", "type": "string", "label": "Accent color for icons, topbar actions, and in-view highlights (hex).", "default": "#10B981", "pattern": "^#[0-9A-Fa-f]{6}$", "formatHint": "#RRGGBB", "placeholder": "#10B981" }
+        {
+          "key": "wealthflow.themeColor",
+          "type": "string",
+          "label": "Accent color for icons, topbar actions, and in-view highlights (hex).",
+          "default": "#10B981",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "formatHint": "#RRGGBB",
+          "placeholder": "#10B981"
+        }
       ],
-      "allowedCommands": ["wealthflow.show-banks", "wealthflow.add-interest", "wealthflow.show-stocks", "wealthflow.add-dividend", "wealthflow.show-overview"],
-      "allowedUiEvents": ["bank-create", "bank-edit", "bank-activate", "bank-deactivate", "interest-create", "interest-edit", "interest-delete", "stock-create", "stock-edit", "stock-activate", "stock-deactivate", "dividend-create", "dividend-edit", "dividend-delete", "fy-changed", "wealthflow-navigate"]
+      "allowedCommands": [
+        "wealthflow.show-banks",
+        "wealthflow.add-interest",
+        "wealthflow.show-stocks",
+        "wealthflow.add-dividend",
+        "wealthflow.show-overview"
+      ],
+      "allowedUiEvents": [
+        "bank-create",
+        "bank-edit",
+        "bank-activate",
+        "bank-deactivate",
+        "interest-create",
+        "interest-edit",
+        "interest-delete",
+        "stock-create",
+        "stock-edit",
+        "stock-activate",
+        "stock-deactivate",
+        "dividend-create",
+        "dividend-edit",
+        "dividend-delete",
+        "fy-changed",
+        "wealthflow-navigate"
+      ]
     },
     "tables": [
-      { "name": "wealthflow_banks", "columns": [
-        { "name": "name", "type": "text", "nullable": false },
-        { "name": "bsb", "type": "text", "nullable": true },
-        { "name": "account_number", "type": "text", "nullable": false },
-        { "name": "is_active", "type": "boolean", "nullable": false, "default": true },
-        { "name": "notes", "type": "text", "nullable": true } ] },
-      { "name": "wealthflow_interest_entries", "columns": [
-        { "name": "bank_id", "type": "integer", "nullable": false },
-        { "name": "date", "type": "date", "nullable": false },
-        { "name": "amount", "type": "real", "nullable": false, "min": 0 },
-        { "name": "finance_year", "type": "text", "nullable": false },
-        { "name": "notes", "type": "text", "nullable": true } ] },
-      { "name": "wealthflow_stocks", "columns": [
-        { "name": "code", "type": "text", "nullable": false },
-        { "name": "name", "type": "text", "nullable": false },
-        { "name": "shares", "type": "real", "nullable": false, "min": 0 },
-        { "name": "is_active", "type": "boolean", "nullable": false, "default": true },
-        { "name": "notes", "type": "text", "nullable": true } ] },
-      { "name": "wealthflow_dividends", "columns": [
-        { "name": "stock_id", "type": "integer", "nullable": false },
-        { "name": "date", "type": "date", "nullable": false },
-        { "name": "type", "type": "text", "nullable": false },
-        { "name": "gross", "type": "real", "nullable": false, "min": 0 },
-        { "name": "franking", "type": "real", "nullable": false, "min": 0, "default": 0 },
-        { "name": "finance_year", "type": "text", "nullable": false },
-        { "name": "notes", "type": "text", "nullable": true } ] }
+      {
+        "name": "wealthflow_banks",
+        "columns": [
+          {
+            "name": "name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "bsb",
+            "type": "text",
+            "nullable": true
+          },
+          {
+            "name": "account_number",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "is_active",
+            "type": "boolean",
+            "nullable": false,
+            "default": true
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_interest_entries",
+        "columns": [
+          {
+            "name": "bank_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "amount",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "finance_year",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_stocks",
+        "columns": [
+          {
+            "name": "code",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "name",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "shares",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "is_active",
+            "type": "boolean",
+            "nullable": false,
+            "default": true
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_dividends",
+        "columns": [
+          {
+            "name": "stock_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "type",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "gross",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "franking",
+            "type": "real",
+            "nullable": false,
+            "min": 0,
+            "default": 0
+          },
+          {
+            "name": "finance_year",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      }
     ],
     "main": "src/main.ts"
   },
@@ -70,6 +261,13 @@
     "version:bump": "node scripts/version-bump.mjs",
     "release": "node scripts/version-bump.mjs && node D:/finance_flow_ai/scripts/sdk/cli.mjs build ."
   },
-  "devDependencies": { "vite": "^5.4.0", "typescript": "^5.5.0", "vitest": "^2.1.0", "happy-dom": "^15.0.0" },
-  "dependencies": { "lit": "^3.1.0" }
+  "devDependencies": {
+    "vite": "^5.4.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0",
+    "happy-dom": "^15.0.0"
+  },
+  "dependencies": {
+    "lit": "^3.1.0"
+  }
 }

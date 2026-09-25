@@ -1,4 +1,7 @@
-const aud = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
+const aud = new Intl.NumberFormat('en-AU', {
+  style: 'currency',
+  currency: 'AUD',
+});
 
 /** Display-only AUD formatting; amounts are stored plain. */
 export function formatAUD(n: number): string {

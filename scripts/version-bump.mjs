@@ -17,7 +17,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 export function bumpVersion(version) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(version).trim());
   if (!match) {
-    throw new Error(`invalid version '${version}' — expected <major>.<minor>.<patch>`);
+    throw new Error(
+      `invalid version '${version}' — expected <major>.<minor>.<patch>`,
+    );
   }
   let major = Number(match[1]);
   let minor = Number(match[2]);
@@ -72,6 +74,7 @@ function main() {
 
 const invokedAsMain =
   process.argv[1] &&
-  fileURLToPath(import.meta.url) === fileURLToPath(pathToFileURL(process.argv[1]));
+  fileURLToPath(import.meta.url) ===
+    fileURLToPath(pathToFileURL(process.argv[1]));
 
 if (invokedAsMain) main();

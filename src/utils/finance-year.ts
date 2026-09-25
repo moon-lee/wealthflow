@@ -7,7 +7,10 @@ export function isValidIsoDate(s: string): boolean {
 }
 
 /** Compute the FY label (e.g. `'2025-2026'`) containing `date` for AU July-start years. */
-export function computeFinanceYear(date: string, fyStart: string): string | null {
+export function computeFinanceYear(
+  date: string,
+  fyStart: string,
+): string | null {
   const ts = Date.parse(date + 'T00:00:00Z');
   if (Number.isNaN(ts)) return null;
   const [mm, dd] = fyStart.split('-');
@@ -46,12 +49,27 @@ export function monthEnd(dateOrMonth: string): string {
 export function fyMonths(fy: string): string[] {
   const start = Number(fy.slice(0, 4));
   const out: string[] = [];
-  for (let m = 7; m <= 12; m++) out.push(`${start}-${String(m).padStart(2, '0')}`);
-  for (let m = 1; m <= 6; m++) out.push(`${start + 1}-${String(m).padStart(2, '0')}`);
+  for (let m = 7; m <= 12; m++)
+    out.push(`${start}-${String(m).padStart(2, '0')}`);
+  for (let m = 1; m <= 6; m++)
+    out.push(`${start + 1}-${String(m).padStart(2, '0')}`);
   return out;
 }
 
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
 
 /** Display label (`Jul 2025`) for a `YYYY-MM` key. */
 export function monthLabel(ym: string): string {
