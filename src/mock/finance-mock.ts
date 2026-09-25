@@ -11,7 +11,7 @@ export function createMockFinance(): import('finance').FinanceApi {
     return {
       find: async (filter = {}) => [...m.values()].filter(r => Object.entries(filter).every(([k,v]) => r[k]===v)),
       findOne: async (filter = {}) => [...m.values()].find(r => Object.entries(filter).every(([k,v])=> r[k]===v)) ?? null,
-      insert: async (row: any) => { const id = nextId++; const r = { id, ...row }; m.set(id, r); return { id }; },
+      insert: async (row: any) => { const id = nextId++; const r = { id, ...row }; m.set(id, r); return r; },
       update: async (filter: any, patch: any) => { let n=0; for (const [id,r] of m) if (Object.entries(filter).every(([k,v])=>r[k]===v)) { m.set(id,{...r,...patch}); n++; } return { affected: n }; },
       delete: async (filter: any) => { let n=0; for (const [id,r] of m) if (Object.entries(filter).every(([k,v])=>r[k]===v)) { m.delete(id); n++; } return { affected: n }; },
       count: async (filter = {}) => [...m.values()].filter(r => Object.entries(filter).every(([k,v])=>r[k]===v)).length,
