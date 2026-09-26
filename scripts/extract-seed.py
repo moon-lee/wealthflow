@@ -39,6 +39,13 @@ STOCK_NAMES = {
 
 BANKS = ['Macquarie', 'BOQ', 'ANZ', 'UBank']
 
+BANK_FULL_NAMES = {
+    'Macquarie': 'Macquarie Bank Limited',
+    'BOQ': 'Bank of Queensland Limited',
+    'ANZ': 'Australia and New Zealand Banking Group Limited',
+    'UBank': 'UBank (a division of National Australia Bank Limited)',
+}
+
 
 def iso(v):
     if isinstance(v, datetime.datetime):
@@ -98,10 +105,10 @@ def main():
     w("import { createDividend, listDividends } from '../dao/dividends.js';")
     w("import { monthKey } from '../utils/finance-year.js';")
     w('')
-    w('export interface SeedBank { name: string; bsb: string | null; account_number: string; notes: string | null }')
+    w('export interface SeedBank { name: string; full_name: string | null; bsb: string | null; account_number: string; notes: string | null }')
     w('export const SEED_BANKS: SeedBank[] = [')
     for b in BANKS:
-        w(f"  {{ name: '{b}', bsb: null, account_number: '00000000', notes: 'TODO: real BSB + account number' }},")
+        w(f"  {{ name: '{b}', full_name: '{BANK_FULL_NAMES[b]}', bsb: null, account_number: '00000000', notes: 'TODO: real BSB + account number' }},")
     w('];')
     w('')
     w('export interface SeedStock { code: string; name: string; shares: number; notes: string | null }')
