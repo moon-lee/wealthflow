@@ -13,12 +13,13 @@
 // Close the app first: it holds the database while running.
 //
 // Override the target with:  node scripts\apply-seed.mjs <path-to.db> --no-backup
-import { readFileSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { splitAuditStatements, isConsistencyCheck } from './sql-audit.mjs';
+import { pickDatabaseArg, findDatabase } from './db-target.mjs';
 
 const require = createRequire(import.meta.url);
 const here = dirname(fileURLToPath(import.meta.url));
@@ -57,25 +58,19 @@ function relaunchUnderElectron(loadError) {
   process.exit(res.status ?? 1);
 }
 
-/** The app's userData dir, i.e. %APPDATA%\<product>\finance.db. */
-function findDatabase(explicit) {
-  if (explicit) return resolve(explicit);
-  const appData = process.env.APPDATA;
-  if (!appData)
-    throw new Error('APPDATA is not set; pass the .db path as an argument');
-  const candidates = readdirSync(appData)
-    .filter((d) => d.toLowerCase().startsWith('finance flow'))
-    .map((d) => join(appData, d, 'finance.db'))
-    .filter((p) => existsSync(p));
-  if (candidates.length === 0) {
-    throw new Error(
-      `No finance.db under ${appData}\\Finance Flow*. Pass the path explicitly.`,
-    );
-  }
-  return candidates[0];
+/**
+ * The first non-flag argument, i.e. the database path. Reading argv[2] blindly
+ * would treat `apply-seed.mjs --no-backup` as a request to use a file named
+ * "--no-backup", and happily create one.
+ */
+let dbPath;
+try {
+  dbPath = findDatabase(pickDatabaseArg(process.argv));
+} catch (e) {
+  // A plain message: a stack trace here would bury the list of candidates.
+  console.error(`\n${e.message}\n`);
+  process.exit(1);
 }
-
-const dbPath = findDatabase(process.argv[2]);
 const skipBackup = process.argv.includes('--no-backup');
 
 if (!existsSync(SQL_PATH)) throw new Error(`missing ${SQL_PATH}`);
@@ -118,32 +113,57 @@ try {
   process.exit(1);
 }
 
+// In WAL mode a running app does not hold a write lock between transactions, so
+// the probe above cannot prove the app is closed. Say so rather than imply the
+// lock check was sufficient.
+if (db.pragma('journal_mode', { simple: true }) === 'wal') {
+  console.log('note:      WAL mode -- close the app before trusting this run');
+}
+
 if (!skipBackup) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backup = `${dbPath}.preseed-${stamp}.bak`;
-  copyFileSync(dbPath, backup);
+  // db.backup(), not copyFileSync: a WAL database keeps recent commits in the
+  // -wal sidecar, so copying the main file alone snapshots a stale database.
+  await db.backup(backup);
   console.log(`backup:   ${backup}`);
 }
 
-const before = {
-  banks: db.prepare('SELECT COUNT(*) c FROM wealthflow_banks').get().c,
-  stocks: db.prepare('SELECT COUNT(*) c FROM wealthflow_stocks').get().c,
-  interest: db
-    .prepare('SELECT COUNT(*) c FROM wealthflow_interest_entries')
-    .get().c,
-  dividends: db.prepare('SELECT COUNT(*) c FROM wealthflow_dividends').get().c,
+// A database the extension has never run in has no wealthflow_* tables yet; the
+// SQL creates them, so count what is there rather than assuming.
+const TABLES = {
+  banks: 'wealthflow_banks',
+  stocks: 'wealthflow_stocks',
+  interest: 'wealthflow_interest_entries',
+  dividends: 'wealthflow_dividends',
 };
+const countRows = () => {
+  const out = {};
+  for (const [key, table] of Object.entries(TABLES)) {
+    const present = db
+      .prepare(
+        "SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?",
+      )
+      .get(table);
+    out[key] = present.c
+      ? db.prepare(`SELECT COUNT(*) c FROM ${table}`).get().c
+      : 0;
+  }
+  return out;
+};
+
+const before = countRows();
+if (before.banks + before.stocks + before.interest + before.dividends === 0) {
+  console.log(
+    'note:      no wealthflow_* tables yet -- creating them from the SQL.\n' +
+      '           installing the extension in this app first is the better route,\n' +
+      '           so the app owns the schema.',
+  );
+}
 
 db.exec(applySql);
 
-const after = {
-  banks: db.prepare('SELECT COUNT(*) c FROM wealthflow_banks').get().c,
-  stocks: db.prepare('SELECT COUNT(*) c FROM wealthflow_stocks').get().c,
-  interest: db
-    .prepare('SELECT COUNT(*) c FROM wealthflow_interest_entries')
-    .get().c,
-  dividends: db.prepare('SELECT COUNT(*) c FROM wealthflow_dividends').get().c,
-};
+const after = countRows();
 
 console.log('\ninserted:');
 for (const t of ['banks', 'stocks', 'interest', 'dividends']) {

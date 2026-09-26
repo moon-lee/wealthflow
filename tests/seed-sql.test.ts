@@ -6,12 +6,13 @@
 // The SQL carries real account numbers, so this test asserts on counts and
 // totals and never prints a row's contents.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { readFileSync, rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import {
   splitAuditStatements,
   isConsistencyCheck,
 } from '../scripts/sql-audit.mjs';
+import { pickDatabaseArg, findDatabase } from '../scripts/db-target.mjs';
 
 const SQL_PATH = join(process.cwd(), 'src', 'seed', 'wealth-seed.sql');
 const TMP = join(process.cwd(), 'node_modules', '.cache', 'seed-sql-test.db');
@@ -51,6 +52,78 @@ beforeAll(async () => {
 
 afterAll(() => {
   rmSync(TMP, { force: true });
+});
+
+describe('choosing which database to write', () => {
+  // A dev and a production install both exist, and prod lives outside %APPDATA%,
+  // so this has to be explicit rather than convenient.
+  const fake = join(process.cwd(), 'node_modules', '.cache', 'fake-appdata');
+
+  afterAll(() => rmSync(fake, { recursive: true, force: true }));
+
+  const makeApp = (name: string) => {
+    const dir = join(fake, name);
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'finance.db'), '');
+    return join(dir, 'finance.db');
+  };
+
+  it('ignores flags when looking for the path argument', () => {
+    // Regression: argv[2] was read blindly, so `apply-seed.mjs --no-backup`
+    // used a file literally named "--no-backup" and created it.
+    expect(
+      pickDatabaseArg(['node', 'apply-seed.mjs', '--no-backup']),
+    ).toBeUndefined();
+    expect(
+      pickDatabaseArg(['node', 'apply-seed.mjs', '--no-backup', 'C:\\a.db']),
+    ).toBe('C:\\a.db');
+  });
+
+  it('prefers an explicit path over everything', () => {
+    expect(findDatabase('C:\\x.db', { APPDATA: 'C:\\nope' })).toBe(
+      resolve('C:\\x.db'),
+    );
+  });
+
+  it('honours WEALTHFLOW_DB', () => {
+    expect(
+      findDatabase(undefined, {
+        WEALTHFLOW_DB: 'C:\\env.db',
+        APPDATA: 'C:\\nope',
+      }),
+    ).toBe(resolve('C:\\env.db'));
+  });
+
+  it('uses the single match under APPDATA', () => {
+    rmSync(fake, { recursive: true, force: true });
+    const db = makeApp('Finance Flow AI Dev');
+    expect(findDatabase(undefined, { APPDATA: fake })).toBe(db);
+  });
+
+  it('refuses to guess between two databases, and lists them', () => {
+    rmSync(fake, { recursive: true, force: true });
+    const dev = makeApp('Finance Flow AI Dev');
+    const prod = makeApp('Finance Flow AI');
+    let message = '';
+    try {
+      findDatabase(undefined, { APPDATA: fake });
+    } catch (e: any) {
+      message = e.message;
+    }
+    expect(message).toContain('refusing to guess');
+    expect(message).toContain(dev);
+    expect(message).toContain(prod);
+  });
+
+  it('does not treat an unrelated folder as a candidate', () => {
+    rmSync(fake, { recursive: true, force: true });
+    const dir = join(fake, 'finance-flow-log-viewer');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'finance.db'), '');
+    expect(() => findDatabase(undefined, { APPDATA: fake })).toThrow(
+      /No finance.db/,
+    );
+  });
 });
 
 describe('seed SQL structure', () => {
