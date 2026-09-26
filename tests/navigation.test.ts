@@ -104,13 +104,11 @@ describe('orchestrator click navigation', () => {
 
   it('bank-list Edit reveals the inline edit row', async () => {
     const { finance } = await mount();
-    await finance.db
-      .table('wealthflow_banks')
-      .insert({
-        bank_code: 'BOQ',
-        account_number: '9',
-        is_active: true,
-      } as any);
+    await finance.db.table('wealthflow_banks').insert({
+      bank_code: 'BOQ',
+      account_number: '9',
+      is_active: true,
+    } as any);
     document.body.innerHTML = '';
     const list = document.createElement('bank-list') as any;
     document.body.appendChild(list);
@@ -127,5 +125,30 @@ describe('orchestrator click navigation', () => {
     await list.updateComplete;
     expect((list as any).renderRoot.querySelector('td input')).toBeTruthy();
     list.remove();
+  });
+
+  it('mount-update dispatched on #app (panel-bootstrap) retargets the open panel', async () => {
+    const { activate } = await import('../src/main.js');
+    const finance: any = (
+      await import('../src/mock/finance-mock.js')
+    ).createMockFinance();
+    finance.commands.registerCommand = () => {};
+    document.body.innerHTML = '<div id="app"></div>';
+    await activate(finance, { viewId: 'wealthflow' });
+    await new Promise((r) => setTimeout(r, 0));
+    const app = document.getElementById('app')!;
+    const orch = app.querySelector('wealthflow-orchestrator') as any;
+    expect(orch).toBeTruthy();
+    await orch.updateComplete;
+    expect(orch.tab).toBe('overview');
+    // Exactly what panel-bootstrap does on a warm-panel retarget.
+    app.dispatchEvent(
+      new CustomEvent('mount-update', { detail: { view: 'stocks' } }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    await orch.updateComplete;
+    expect(orch.tab).toBe('stocks');
+    expect(orch.renderRoot.querySelector('stock-list')).toBeTruthy();
+    document.body.innerHTML = '';
   });
 });

@@ -71,12 +71,16 @@ export async function activate(
           void el.setFinance(finance);
         else el.finance = finance;
       });
-      el.addEventListener('mount-update', (e: Event) => {
+      // Retargets of the open panel (sidebar nav while mounted) arrive as DOM
+      // 'mount-update' dispatched ON #app by panel-bootstrap — listen there,
+      // not on the orchestrator child (parent-dispatched events never reach children).
+      app.addEventListener('mount-update', (e: Event) => {
         const detail = (e as CustomEvent).detail as { view?: string } & Record<
           string,
           unknown
         >;
-        void el.init(finance, { view: detail.view ?? 'overview', ...detail });
+        if (typeof el.init === 'function')
+          void el.init(finance, { view: detail.view ?? 'overview', ...detail });
       });
     }
   }
