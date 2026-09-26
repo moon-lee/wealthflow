@@ -13,3 +13,11 @@ npm run build   # or: node D:/finance_flow_ai/scripts/sdk/cli.mjs build .
 ```
 
 Uses `src/styles/*` (tokens + layout) and `finance-logger` for consistent UI/logging.
+
+## Seed data into the app database
+```bash
+# close the app first, then:
+node scripts\apply-seed.mjs                                        # dev
+node scripts\apply-seed.mjs "D:\Finance Flow Product\data\finance.db"   # prod
+```
+Backs up, imports idempotently, then audits the result. See [docs/seed-import.md](docs/seed-import.md).
