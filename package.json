@@ -1,13 +1,13 @@
 {
   "name": "wealthflow",
-  "version": "0.1.3",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.1.3",
+    "version": "0.1.2",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
     "activationEvents": [
