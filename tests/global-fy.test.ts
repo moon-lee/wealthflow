@@ -7,7 +7,7 @@ import { createPublicWealthAdapter } from '../src/services/public-wealth-adapter
 describe('global FY', () => {
   it('different FYs give different totals (no drift)', async () => {
     const f: any = createMockFinance();
-    const b: any = await createBank(f, { name: 'M', account_number: '1' });
+    const b: any = await createBank(f, { bank_code: 'M', account_number: '1' });
     await createInterestEntry(
       f,
       {

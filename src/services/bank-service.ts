@@ -15,15 +15,15 @@ function round2(n: number): number {
 }
 
 export function sumInterestByBank(
-  banks: Pick<Bank, 'id' | 'name'>[],
+  banks: Pick<Bank, 'id' | 'bank_code'>[],
   entries: Pick<InterestEntry, 'bank_id' | 'amount'>[],
 ): {
   total: number;
-  byBank: { bankId: number; name: string; total: number }[];
+  byBank: { bankId: number; bank_code: string; total: number }[];
 } {
   const byBank = banks.map((b) => ({
     bankId: b.id,
-    name: b.name,
+    bank_code: b.bank_code,
     total: round2(
       entries
         .filter((e) => e.bank_id === b.id)
@@ -35,7 +35,7 @@ export function sumInterestByBank(
 
 export async function getInterestTotals(
   finance: FinanceApi,
-  banks: Pick<Bank, 'id' | 'name'>[],
+  banks: Pick<Bank, 'id' | 'bank_code'>[],
   financeYear: string,
 ): Promise<InterestSummary> {
   const entries = await listInterestEntries(finance, { financeYear });
@@ -45,7 +45,7 @@ export async function getInterestTotals(
 
 export function interestGridModel(
   fy: string,
-  banks: Pick<Bank, 'id' | 'name'>[],
+  banks: Pick<Bank, 'id' | 'bank_code'>[],
   entries: InterestEntry[],
 ): {
   months: string[];

@@ -16,7 +16,7 @@ export const DIVIDEND_TYPE_LABELS = {
 
 export function sumDividends(
   financialYear: string,
-  stocks: Pick<Stock, 'id' | 'code' | 'name'>[],
+  stocks: Pick<Stock, 'id' | 'stock_code' | 'stock_full_name'>[],
   entries: Pick<DividendEntry, 'stock_id' | 'type' | 'gross' | 'franking'>[],
 ): DividendSummary {
   const byType = {
@@ -33,8 +33,8 @@ export function sumDividends(
     const mine = entries.filter((e) => e.stock_id === s.id);
     return {
       stockId: s.id,
-      code: s.code,
-      name: s.name,
+      stock_code: s.stock_code,
+      stock_full_name: s.stock_full_name,
       gross: round2(mine.reduce((x, e) => x + Number(e.gross ?? 0), 0)),
       franking: round2(mine.reduce((x, e) => x + Number(e.franking ?? 0), 0)),
     };
@@ -50,7 +50,7 @@ export function sumDividends(
 
 export async function getDividendTotals(
   finance: FinanceApi,
-  stocks: Pick<Stock, 'id' | 'code' | 'name'>[],
+  stocks: Pick<Stock, 'id' | 'stock_code' | 'stock_full_name'>[],
   financeYear: string,
 ): Promise<DividendSummary> {
   const entries = await listDividends(finance, { financeYear });

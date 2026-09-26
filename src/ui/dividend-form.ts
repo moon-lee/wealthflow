@@ -199,7 +199,7 @@ export class DividendForm extends Base {
               }}
             >
               <option value="">— choose —</option>
-              ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockId === s.id}>${s.code}${s.is_active ? '' : ' (inactive)'}</option>`)}
+              ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockId === s.id}>${s.stock_code}${s.is_active ? '' : ' (inactive)'}</option>`)}
             </select>
           </label>
           <label

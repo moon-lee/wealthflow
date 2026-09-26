@@ -147,7 +147,7 @@ export class InterestGrid extends Base {
                   <thead>
                     <tr>
                       <th>Month</th>
-                      ${this.banks.map((b) => html`<th>${b.name}</th>`)}
+                      ${this.banks.map((b) => html`<th>${b.bank_code}</th>`)}
                       <th>Total</th>
                     </tr>
                   </thead>

@@ -11,7 +11,7 @@ const logger = new ExtensionLogger('wealthflow');
 
 export interface InterestSummaryByBank {
   bankId: number;
-  name: string;
+  bank_code: string;
   total: number;
 }
 export interface InterestSummary {
@@ -25,8 +25,8 @@ export interface DividendTypeSplit {
 }
 export interface DividendSummaryByStock {
   stockId: number;
-  code: string;
-  name: string;
+  stock_code: string;
+  stock_full_name: string;
   gross: number;
   franking: number;
 }

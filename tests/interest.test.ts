@@ -10,7 +10,7 @@ describe('interest once-per-month', () => {
   it('accepts first entry then rejects same bank-month', async () => {
     const f: any = createMockFinance();
     const b: any = await createBank(f, {
-      name: 'Macquarie',
+      bank_code: 'Macquarie',
       account_number: '111',
     });
     await createInterestEntry(
@@ -41,7 +41,10 @@ describe('interest once-per-month', () => {
   });
   it('rejects negative amount and inactive bank', async () => {
     const f: any = createMockFinance();
-    const b: any = await createBank(f, { name: 'ANZ', account_number: '222' });
+    const b: any = await createBank(f, {
+      bank_code: 'ANZ',
+      account_number: '222',
+    });
     await expect(
       createInterestEntry(
         f,

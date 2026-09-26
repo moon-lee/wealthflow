@@ -17,8 +17,8 @@ export class BankForm extends Base {
       ? ([sharedStyles, wealthflowStyles] as any)
       : [];
   finance: any = null;
-  name = '';
-  fullName = '';
+  bankCode = '';
+  bankFullName = '';
   bsb = '';
   account = '';
   notes = '';
@@ -35,7 +35,7 @@ export class BankForm extends Base {
 
   private get canSave(): boolean {
     return (
-      this.name.trim() !== '' &&
+      this.bankCode.trim() !== '' &&
       this.account.trim() !== '' &&
       this.bsbError === null &&
       !this.saving
@@ -49,8 +49,9 @@ export class BankForm extends Base {
     this.error = '';
     try {
       const row = await createBank(this.finance, {
-        name: this.name.trim(),
-        full_name: this.fullName.trim() === '' ? null : this.fullName.trim(),
+        bank_code: this.bankCode.trim(),
+        bank_full_name:
+          this.bankFullName.trim() === '' ? null : this.bankFullName.trim(),
         bsb: this.bsb.trim() === '' ? null : this.bsb.replace(/\D/g, ''),
         account_number: this.account.trim(),
         notes: this.notes.trim() === '' ? null : this.notes.trim(),
@@ -62,8 +63,8 @@ export class BankForm extends Base {
           composed: true,
         }),
       );
-      this.name = '';
-      this.fullName = '';
+      this.bankCode = '';
+      this.bankFullName = '';
       this.bsb = '';
       this.account = '';
       this.notes = '';
@@ -86,9 +87,9 @@ export class BankForm extends Base {
           <label
             >Name
             <input
-              .value=${this.name}
+              .value=${this.bankCode}
               @input=${(e: Event) => {
-                this.name = (e.target as HTMLInputElement).value;
+                this.bankCode = (e.target as HTMLInputElement).value;
                 (this as any).requestUpdate?.();
               }}
               required
@@ -96,9 +97,9 @@ export class BankForm extends Base {
           <label
             >Full name
             <input
-              .value=${this.fullName}
+              .value=${this.bankFullName}
               @input=${(e: Event) => {
-                this.fullName = (e.target as HTMLInputElement).value;
+                this.bankFullName = (e.target as HTMLInputElement).value;
                 (this as any).requestUpdate?.();
               }}
               placeholder="Macquarie Bank Limited"

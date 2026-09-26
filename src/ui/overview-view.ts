@@ -279,9 +279,9 @@ export class OverviewView extends Base {
                                           (b) =>
                                             html`<tr>
                                               <td>
-                                                <strong>${b.code}</strong>
+                                                <strong>${b.stock_code}</strong>
                                                 <span class="muted"
-                                                  >${b.name}</span
+                                                  >${b.stock_full_name}</span
                                                 >
                                               </td>
                                               <td class="num money">
@@ -343,7 +343,7 @@ export class OverviewView extends Base {
                             ${s.interest.byBank.map(
                               (b) =>
                                 html`<div class="stat">
-                                  <div class="stat-label">${b.name}</div>
+                                  <div class="stat-label">${b.bank_code}</div>
                                   <div class="stat-value">
                                     ${formatAUD(b.total)}
                                   </div>

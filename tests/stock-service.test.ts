@@ -4,8 +4,8 @@ import { sumDividends } from '../src/services/stock-service.js';
 describe('sumDividends', () => {
   it('splits franking by type and aggregates byStock', () => {
     const stocks: any = [
-      { id: 1, code: 'VAS', name: 'Vanguard' },
-      { id: 2, code: 'VHY', name: 'High Yield' },
+      { id: 1, stock_code: 'VAS', stock_full_name: 'Vanguard' },
+      { id: 2, stock_code: 'VHY', stock_full_name: 'High Yield' },
     ];
     const entries: any = [
       { stock_id: 1, type: 'non_trust', gross: 100, franking: 30 },
@@ -17,13 +17,13 @@ describe('sumDividends', () => {
     expect(s.franking).toBe(95);
     expect(s.byType.non_trust).toEqual({ gross: 300, franking: 90 });
     expect(s.byType.trust).toEqual({ gross: 50, franking: 5 });
-    expect(s.byStock.find((b) => b.code === 'VAS')?.gross).toBe(150);
+    expect(s.byStock.find((b) => b.stock_code === 'VAS')?.gross).toBe(150);
   });
   it('mirror-of-sheet: mixed VAS/VHY/FGX across types sums per type', () => {
     const stocks: any = [
-      { id: 1, code: 'VAS', name: 'V' },
-      { id: 2, code: 'VHY', name: 'H' },
-      { id: 3, code: 'FGX', name: 'F' },
+      { id: 1, stock_code: 'VAS', stock_full_name: 'V' },
+      { id: 2, stock_code: 'VHY', stock_full_name: 'H' },
+      { id: 3, stock_code: 'FGX', stock_full_name: 'F' },
     ];
     const entries: any = [
       { stock_id: 1, type: 'trust', gross: 120.5, franking: 10 },

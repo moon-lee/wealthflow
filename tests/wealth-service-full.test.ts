@@ -9,7 +9,10 @@ import { createPublicWealthAdapter } from '../src/services/public-wealth-adapter
 describe('full wealth service', () => {
   it('combines dividends + interest', async () => {
     const f: any = createMockFinance();
-    const b: any = await createBank(f, { name: 'UBank', account_number: '9' });
+    const b: any = await createBank(f, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
     await createInterestEntry(
       f,
       {
@@ -20,7 +23,11 @@ describe('full wealth service', () => {
       },
       '07-01',
     );
-    const s: any = await createStock(f, { code: 'VAS', name: 'V', shares: 5 });
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 5,
+    });
     await createDividend(
       f,
       {
@@ -37,7 +44,7 @@ describe('full wealth service', () => {
     const d: any = await svc.getDividendSummary('2025-2026');
     expect(d.gross).toBe(100);
     expect(d.byType.non_trust.franking).toBe(30);
-    expect(d.byStock[0].code).toBe('VAS');
+    expect(d.byStock[0].stock_code).toBe('VAS');
     const o: any = await svc.getOverviewSummary('2025-2026');
     expect(o.combined.gross).toBe(110);
     expect(o.combined.franking).toBe(30);

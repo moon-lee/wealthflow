@@ -6,7 +6,11 @@ import { createDividend, listDividends } from '../src/dao/dividends.js';
 describe('dividends dao', () => {
   it('accepts all 3 types, rejects bad type + negative gross', async () => {
     const f: any = createMockFinance();
-    const s: any = await createStock(f, { code: 'VAS', name: 'V', shares: 10 });
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 10,
+    });
     await createDividend(
       f,
       {

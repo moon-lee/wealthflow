@@ -8,7 +8,7 @@ describe('interest-form date picker + auto FY', () => {
   it('uses a date selector and stores the date-derived financial year', async () => {
     const finance: any = createMockFinance();
     const bank: any = await createBank(finance, {
-      name: 'UBank',
+      bank_code: 'UBank',
       account_number: '9',
     });
     const form = document.createElement('interest-form') as any;

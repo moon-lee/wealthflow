@@ -106,7 +106,11 @@ describe('orchestrator click navigation', () => {
     const { finance } = await mount();
     await finance.db
       .table('wealthflow_banks')
-      .insert({ name: 'BOQ', account_number: '9', is_active: true } as any);
+      .insert({
+        bank_code: 'BOQ',
+        account_number: '9',
+        is_active: true,
+      } as any);
     document.body.innerHTML = '';
     const list = document.createElement('bank-list') as any;
     document.body.appendChild(list);

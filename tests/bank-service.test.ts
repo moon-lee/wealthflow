@@ -7,8 +7,8 @@ import {
 describe('bank service', () => {
   it('sums by bank incl. inactive history', () => {
     const banks = [
-      { id: 1, name: 'Macquarie' },
-      { id: 2, name: 'BOQ' },
+      { id: 1, bank_code: 'Macquarie' },
+      { id: 2, bank_code: 'BOQ' },
     ];
     const entries = [
       { bank_id: 1, date: '2025-07-31', amount: 3.39 },
@@ -22,7 +22,7 @@ describe('bank service', () => {
   it('grid model maps 12 FY months', () => {
     const g = interestGridModel(
       '2025-2026',
-      [{ id: 1, name: 'M' }] as any,
+      [{ id: 1, bank_code: 'M' }] as any,
       [{ bank_id: 1, date: '2025-07-31', amount: 3.39 }] as any,
     );
     expect(g.months[0]).toBe('2025-07');

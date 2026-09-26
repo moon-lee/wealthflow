@@ -29,10 +29,10 @@ describe('manifest', () => {
       expect(fe.contributions.allowedCommands).toContain(id);
   });
 
-  it('declares full_name on wealthflow_banks', () => {
+  it('declares bank_bank_full_name on wealthflow_banks', () => {
     const fe: any = (pkg as any).financeExtension;
     const banks = fe.tables.find((t: any) => t.name === 'wealthflow_banks');
     expect(banks).toBeDefined();
-    expect(banks.columns.map((c: any) => c.name)).toContain('full_name');
+    expect(banks.columns.map((c: any) => c.name)).toContain('bank_full_name');
   });
 });

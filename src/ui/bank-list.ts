@@ -30,8 +30,8 @@ export class BankList extends Base {
   totals: Record<number, number> = {};
   statusFilter: StatusFilter = 'active';
   editingId: number | null = null;
-  editName = '';
-  editFullName = '';
+  editBankCode = '';
+  editBankFullName = '';
   editBsb = '';
   editAccount = '';
   error = '';
@@ -113,8 +113,8 @@ export class BankList extends Base {
 
   private startEdit(b: Bank): void {
     this.editingId = b.id;
-    this.editName = b.name;
-    this.editFullName = b.full_name ?? '';
+    this.editBankCode = b.bank_code;
+    this.editBankFullName = b.bank_full_name ?? '';
     this.editBsb = b.bsb ?? '';
     this.editAccount = b.account_number;
     this.error = '';
@@ -129,7 +129,7 @@ export class BankList extends Base {
   private async saveEdit(b: Bank): Promise<void> {
     const bsbErr = validateBsb(this.editBsb);
     if (
-      this.editName.trim() === '' ||
+      this.editBankCode.trim() === '' ||
       this.editAccount.trim() === '' ||
       bsbErr
     ) {
@@ -139,9 +139,11 @@ export class BankList extends Base {
     }
     try {
       await updateBank(this.finance, b.id, {
-        name: this.editName.trim(),
-        full_name:
-          this.editFullName.trim() === '' ? null : this.editFullName.trim(),
+        bank_code: this.editBankCode.trim(),
+        bank_full_name:
+          this.editBankFullName.trim() === ''
+            ? null
+            : this.editBankFullName.trim(),
         bsb:
           this.editBsb.trim() === '' ? null : this.editBsb.replace(/\D/g, ''),
         account_number: this.editAccount.trim(),
@@ -167,7 +169,7 @@ export class BankList extends Base {
     if (
       !toActive &&
       typeof confirm !== 'undefined' &&
-      !confirm(`Deactivate ${b.name}? Its history stays in all totals.`)
+      !confirm(`Deactivate ${b.bank_code}? Its history stays in all totals.`)
     )
       return;
     try {
@@ -238,9 +240,9 @@ export class BankList extends Base {
     return html`
       <tr class=${b.is_active ? '' : 'muted'}>
         <td>
-          ${b.name}
+          ${b.bank_code}
           ${b.is_active ? '' : html`<span class="badge">inactive</span>`}
-          ${b.full_name ? html`<div class="muted">${b.full_name}</div>` : ''}
+          ${b.bank_full_name ? html`<div class="muted">${b.bank_full_name}</div>` : ''}
         </td>
         <td>${formatBSB(b.bsb)} ${maskAccount(b.account_number)}</td>
         <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
@@ -262,9 +264,9 @@ export class BankList extends Base {
       <tr>
         <td>
           <input
-            .value=${this.editName}
+            .value=${this.editBankCode}
             @input=${(e: Event) => {
-              this.editName = (e.target as HTMLInputElement).value;
+              this.editBankCode = (e.target as HTMLInputElement).value;
               (this as any).requestUpdate?.();
             }}
             @keydown=${(e: KeyboardEvent) => {
@@ -273,9 +275,9 @@ export class BankList extends Base {
             }}
           />
           <input
-            .value=${this.editFullName}
+            .value=${this.editBankFullName}
             @input=${(e: Event) => {
-              this.editFullName = (e.target as HTMLInputElement).value;
+              this.editBankFullName = (e.target as HTMLInputElement).value;
               (this as any).requestUpdate?.();
             }}
             placeholder="Full name"

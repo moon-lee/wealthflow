@@ -2,8 +2,8 @@ import type { FinanceApi } from 'finance';
 
 export interface Bank {
   readonly id: number;
-  readonly name: string;
-  readonly full_name: string | null;
+  readonly bank_code: string;
+  readonly bank_full_name: string | null;
   readonly bsb: string | null;
   readonly account_number: string;
   readonly is_active: boolean;
@@ -13,8 +13,8 @@ export interface Bank {
 }
 
 export type BankInput = {
-  name: string;
-  full_name?: string | null;
+  bank_code: string;
+  bank_full_name?: string | null;
   bsb?: string | null;
   account_number: string;
   notes?: string | null;
@@ -34,8 +34,8 @@ export async function createBank(
   finance: FinanceApi,
   input: BankInput,
 ): Promise<Bank> {
-  const name = input.name.trim();
-  if (!name) throw new BankValidationError('name is required');
+  const bankCode = input.bank_code.trim();
+  if (!bankCode) throw new BankValidationError('bank_code is required');
   if (!input.account_number.trim())
     throw new BankValidationError('account_number is required');
   if (
@@ -45,8 +45,8 @@ export async function createBank(
   )
     throw new BankValidationError('bsb must be 6 digits');
   const row = (await finance.db.table(TABLE).insert({
-    name,
-    full_name: input.full_name?.trim() || null,
+    bank_code: bankCode,
+    bank_full_name: input.bank_full_name?.trim() || null,
     bsb: input.bsb?.replace(/\D/g, '') || null,
     account_number: input.account_number.trim(),
     notes: input.notes ?? null,
@@ -63,7 +63,7 @@ export async function listBanks(
   if ((opts.status ?? 'active') === 'active') q.is_active = true;
   else if (opts.status === 'inactive') q.is_active = false;
   const rows = (await finance.db.table(TABLE).find(q)) as unknown as Bank[];
-  return rows.slice().sort((a, b) => a.name.localeCompare(b.name));
+  return rows.slice().sort((a, b) => a.bank_code.localeCompare(b.bank_code));
 }
 
 export async function updateBank(
@@ -71,14 +71,14 @@ export async function updateBank(
   id: number,
   patch: Partial<BankInput>,
 ): Promise<number> {
-  if (patch.name !== undefined && !patch.name.trim())
-    throw new BankValidationError('name is required');
+  if (patch.bank_code !== undefined && !patch.bank_code.trim())
+    throw new BankValidationError('bank_code is required');
   const clean: Partial<BankInput> = { ...patch };
-  if (clean.full_name !== undefined)
-    clean.full_name =
-      clean.full_name == null || clean.full_name.trim() === ''
+  if (clean.bank_full_name !== undefined)
+    clean.bank_full_name =
+      clean.bank_full_name == null || clean.bank_full_name.trim() === ''
         ? null
-        : clean.full_name.trim();
+        : clean.bank_full_name.trim();
   return finance.db
     .table(TABLE)
     .update({ id }, clean as Record<string, unknown>);

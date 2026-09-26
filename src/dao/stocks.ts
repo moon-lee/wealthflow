@@ -2,16 +2,16 @@ import type { FinanceApi } from 'finance';
 
 export interface Stock {
   readonly id: number;
-  readonly code: string;
-  readonly name: string;
+  readonly stock_code: string;
+  readonly stock_full_name: string;
   readonly shares: number;
   readonly is_active: boolean;
   readonly notes: string | null;
 }
 
 export type StockInput = {
-  code: string;
-  name: string;
+  stock_code: string;
+  stock_full_name: string;
   shares: number;
   notes?: string | null;
 };
@@ -30,19 +30,20 @@ export async function createStock(
   finance: FinanceApi,
   input: StockInput,
 ): Promise<Stock> {
-  const code = input.code.trim().toUpperCase();
-  if (!code) throw new StockValidationError('code is required');
-  if (!input.name.trim()) throw new StockValidationError('name is required');
+  const stockCode = input.stock_code.trim().toUpperCase();
+  if (!stockCode) throw new StockValidationError('stock_code is required');
+  if (!input.stock_full_name.trim())
+    throw new StockValidationError('stock_full_name is required');
   if (!Number.isFinite(input.shares) || input.shares < 0)
     throw new StockValidationError('shares must be ≥ 0');
   const dup = (await finance.db.table(TABLE).find({})) as unknown as Stock[];
-  if (dup.some((r) => String(r.code).toUpperCase() === code))
+  if (dup.some((r) => String(r.stock_code).toUpperCase() === stockCode))
     throw new StockValidationError(
-      `Code ${code} already exists — reactivate it instead.`,
+      `Code ${stockCode} already exists — reactivate it instead.`,
     );
   return (await finance.db.table(TABLE).insert({
-    code,
-    name: input.name.trim(),
+    stock_code: stockCode,
+    stock_full_name: input.stock_full_name.trim(),
     shares: input.shares,
     notes: input.notes ?? null,
     is_active: true,
@@ -57,7 +58,7 @@ export async function listStocks(
   if ((opts.status ?? 'active') === 'active') q.is_active = true;
   else if (opts.status === 'inactive') q.is_active = false;
   const rows = (await finance.db.table(TABLE).find(q)) as unknown as Stock[];
-  return rows.slice().sort((a, b) => a.code.localeCompare(b.code));
+  return rows.slice().sort((a, b) => a.stock_code.localeCompare(b.stock_code));
 }
 
 export async function updateStock(
@@ -65,17 +66,24 @@ export async function updateStock(
   id: number,
   patch: Partial<StockInput>,
 ): Promise<number> {
-  if (patch.code !== undefined) {
-    const code = patch.code.trim().toUpperCase();
-    if (!code) throw new StockValidationError('code is required');
+  if (patch.stock_code !== undefined) {
+    const stockCode = patch.stock_code.trim().toUpperCase();
+    if (!stockCode) throw new StockValidationError('stock_code is required');
     const all = (await finance.db.table(TABLE).find({})) as unknown as Stock[];
-    if (all.some((r) => r.id !== id && String(r.code).toUpperCase() === code))
+    if (
+      all.some(
+        (r) => r.id !== id && String(r.stock_code).toUpperCase() === stockCode,
+      )
+    )
       throw new StockValidationError(
-        `Code ${code} already exists — reactivate it instead.`,
+        `Code ${stockCode} already exists — reactivate it instead.`,
       );
     return finance.db
       .table(TABLE)
-      .update({ id }, { ...patch, code } as Record<string, unknown>);
+      .update({ id }, { ...patch, stock_code: stockCode } as Record<
+        string,
+        unknown
+      >);
   }
   if (
     patch.shares !== undefined &&

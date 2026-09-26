@@ -15,7 +15,7 @@ describe('overview-view', () => {
   it('renders mortgage-style cards for seeded FY data', async () => {
     const finance: any = createMockFinance();
     const bank: any = await createBank(finance, {
-      name: 'UBank',
+      bank_code: 'UBank',
       account_number: '9',
     });
     await createInterestEntry(
@@ -29,8 +29,8 @@ describe('overview-view', () => {
       '07-01',
     );
     const stock: any = await createStock(finance, {
-      code: 'VAS',
-      name: 'Vanguard',
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard',
       shares: 5,
     });
     await createDividend(
@@ -75,8 +75,8 @@ describe('overview-view', () => {
     expect(el.summary.dividends.byStock).toEqual([
       {
         stockId: stock.id,
-        code: 'VAS',
-        name: 'Vanguard',
+        stock_code: 'VAS',
+        stock_full_name: 'Vanguard',
         gross: 100,
         franking: 30,
       },

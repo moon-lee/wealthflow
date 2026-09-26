@@ -118,12 +118,12 @@
         "name": "wealthflow_banks",
         "columns": [
           {
-            "name": "name",
+            "name": "bank_code",
             "type": "text",
             "nullable": false
           },
           {
-            "name": "full_name",
+            "name": "bank_full_name",
             "type": "text",
             "nullable": true
           },
@@ -185,12 +185,12 @@
         "name": "wealthflow_stocks",
         "columns": [
           {
-            "name": "code",
+            "name": "stock_code",
             "type": "text",
             "nullable": false
           },
           {
-            "name": "name",
+            "name": "stock_full_name",
             "type": "text",
             "nullable": false
           },

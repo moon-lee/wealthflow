@@ -32,10 +32,10 @@ export class StockList extends Base {
   franking: Record<number, number> = {};
   statusFilter: StatusFilter = 'active';
   editingId: number | null = null;
-  editName = '';
+  editStockName = '';
   editShares = '';
-  newCode = '';
-  newName = '';
+  newStockCode = '';
+  newStockName = '';
   newShares = '';
   error = '';
   formError = '';
@@ -115,7 +115,7 @@ export class StockList extends Base {
     e.preventDefault();
     this.formError = '';
     const shares = Number(this.newShares);
-    if (this.newCode.trim() === '' || this.newName.trim() === '') {
+    if (this.newStockCode.trim() === '' || this.newStockName.trim() === '') {
       this.formError = 'Code and name are required.';
       (this as any).requestUpdate?.();
       return;
@@ -127,8 +127,8 @@ export class StockList extends Base {
     }
     try {
       const row = await createStock(this.finance, {
-        code: this.newCode,
-        name: this.newName.trim(),
+        stock_code: this.newStockCode,
+        stock_full_name: this.newStockName.trim(),
         shares,
       });
       this.dispatchEvent(
@@ -138,8 +138,8 @@ export class StockList extends Base {
           composed: true,
         }),
       );
-      this.newCode = '';
-      this.newName = '';
+      this.newStockCode = '';
+      this.newStockName = '';
       this.newShares = '';
       await this.reload();
     } catch (err: any) {
@@ -151,7 +151,7 @@ export class StockList extends Base {
 
   private startEdit(s: Stock): void {
     this.editingId = s.id;
-    this.editName = s.name;
+    this.editStockName = s.stock_full_name;
     this.editShares = String(s.shares);
     this.error = '';
     (this as any).requestUpdate?.();
@@ -159,14 +159,18 @@ export class StockList extends Base {
 
   private async saveEdit(s: Stock): Promise<void> {
     const shares = Number(this.editShares);
-    if (this.editName.trim() === '' || !Number.isFinite(shares) || shares < 0) {
+    if (
+      this.editStockName.trim() === '' ||
+      !Number.isFinite(shares) ||
+      shares < 0
+    ) {
       this.error = 'Name is required and shares must be ≥ 0.';
       (this as any).requestUpdate?.();
       return;
     }
     try {
       await updateStock(this.finance, s.id, {
-        name: this.editName.trim(),
+        stock_full_name: this.editStockName.trim(),
         shares,
       });
       this.editingId = null;
@@ -190,7 +194,7 @@ export class StockList extends Base {
     if (
       !toActive &&
       typeof confirm !== 'undefined' &&
-      !confirm(`Deactivate ${s.code}? Its history stays in all totals.`)
+      !confirm(`Deactivate ${s.stock_code}? Its history stays in all totals.`)
     )
       return;
     try {
@@ -277,9 +281,9 @@ export class StockList extends Base {
           <label
             >Code
             <input
-              .value=${this.newCode}
+              .value=${this.newStockCode}
               @input=${(e: Event) => {
-                this.newCode = (
+                this.newStockCode = (
                   e.target as HTMLInputElement
                 ).value.toUpperCase();
                 (this as any).requestUpdate?.();
@@ -289,9 +293,9 @@ export class StockList extends Base {
           <label
             >Name
             <input
-              .value=${this.newName}
+              .value=${this.newStockName}
               @input=${(e: Event) => {
-                this.newName = (e.target as HTMLInputElement).value;
+                this.newStockName = (e.target as HTMLInputElement).value;
                 (this as any).requestUpdate?.();
               }}
               placeholder="Vanguard Australian Shares"
@@ -317,10 +321,10 @@ export class StockList extends Base {
     return html`
       <tr class=${s.is_active ? '' : 'muted'}>
         <td>
-          <strong>${s.code}</strong>
+          <strong>${s.stock_code}</strong>
           ${s.is_active ? '' : html`<span class="badge">inactive</span>`}
         </td>
-        <td>${s.name}</td>
+        <td>${s.stock_full_name}</td>
         <td>${s.shares} sh</td>
         <td>
           ${formatAUD(this.gross[s.id] ?? 0)} + fr
@@ -344,12 +348,12 @@ export class StockList extends Base {
   private editRow(s: Stock): unknown {
     return html`
       <tr>
-        <td><strong>${s.code}</strong></td>
+        <td><strong>${s.stock_code}</strong></td>
         <td>
           <input
-            .value=${this.editName}
+            .value=${this.editStockName}
             @input=${(e: Event) => {
-              this.editName = (e.target as HTMLInputElement).value;
+              this.editStockName = (e.target as HTMLInputElement).value;
               (this as any).requestUpdate?.();
             }}
             @keydown=${(e: KeyboardEvent) => {

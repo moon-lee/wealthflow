@@ -8,10 +8,13 @@ describe('getInterestSummary', () => {
   it('totals + byBank, includes deactivated history, empty→zeros, error→null', async () => {
     const f: any = createMockFinance();
     const a: any = await createBank(f, {
-      name: 'Macquarie',
+      bank_code: 'Macquarie',
       account_number: '1',
     });
-    const b: any = await createBank(f, { name: 'BOQ', account_number: '2' });
+    const b: any = await createBank(f, {
+      bank_code: 'BOQ',
+      account_number: '2',
+    });
     await createInterestEntry(
       f,
       {

@@ -40,25 +40,25 @@ describe('banks dao', () => {
   it('creates + lists active by default', async () => {
     const f: any = stub();
     const row: any = await createBank(f, {
-      name: 'Macquarie',
-      full_name: 'Macquarie Bank Limited',
+      bank_code: 'Macquarie',
+      bank_full_name: 'Macquarie Bank Limited',
       bsb: '012345',
       account_number: '1234567',
     });
     expect(row.id).toBeDefined();
-    expect(row.full_name).toBe('Macquarie Bank Limited');
+    expect(row.bank_full_name).toBe('Macquarie Bank Limited');
     expect(await listBanks(f, { status: 'active' })).toHaveLength(1);
   });
   it('rejects blank name/account', async () => {
     const f: any = stub();
     await expect(
-      createBank(f, { name: '', account_number: '1' }),
+      createBank(f, { bank_code: '', account_number: '1' }),
     ).rejects.toThrow();
   });
   it('deactivate hides from active filter but keeps row', async () => {
     const f: any = stub();
     const row: any = await createBank(f, {
-      name: 'BOQ',
+      bank_code: 'BOQ',
       account_number: '999',
     });
     await setBankActive(f, row.id, false);

@@ -179,7 +179,7 @@ export class InterestForm extends Base {
               }}
             >
               <option value="">— choose —</option>
-              ${this.banks.map((b) => html`<option value=${b.id} ?selected=${this.bankId === b.id}>${b.name}</option>`)}
+              ${this.banks.map((b) => html`<option value=${b.id} ?selected=${this.bankId === b.id}>${b.bank_code}</option>`)}
             </select>
           </label>
           <label

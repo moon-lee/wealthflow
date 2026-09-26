@@ -62,7 +62,7 @@ export class DividendLog extends Base {
   }
 
   private stockName(id: number): string {
-    return this.stocks.find((s) => s.id === id)?.code ?? `#${id}`;
+    return this.stocks.find((s) => s.id === id)?.stock_code ?? `#${id}`;
   }
 
   private async onDelete(entry: DividendEntry): Promise<void> {
@@ -136,7 +136,7 @@ export class DividendLog extends Base {
             }}
           >
             <option value="all">All stocks</option>
-            ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockFilter === s.id}>${s.code}${s.is_active ? '' : ' (inactive)'}</option>`)}
+            ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockFilter === s.id}>${s.stock_code}${s.is_active ? '' : ' (inactive)'}</option>`)}
           </select>
         </label>
         ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}

@@ -40,16 +40,16 @@ async function bankMustBeActive(
   const bank = (await finance.db
     .table('wealthflow_banks')
     .findOne({ id: bank_id })) as unknown as {
-    name: string;
+    bank_code: string;
     is_active: boolean;
   } | null;
   if (!bank)
     throw new InterestValidationError(`bank ${bank_id} does not exist`);
   if (!bank.is_active)
     throw new InterestValidationError(
-      `bank ${bank.name} is inactive — reactivate it to add entries`,
+      `bank ${bank.bank_code} is inactive — reactivate it to add entries`,
     );
-  return bank.name;
+  return bank.bank_code;
 }
 
 export async function createInterestEntry(
