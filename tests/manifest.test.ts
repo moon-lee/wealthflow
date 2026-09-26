@@ -29,6 +29,31 @@ describe('manifest', () => {
       expect(fe.contributions.allowedCommands).toContain(id);
   });
 
+  it('declares navigation in Overview, Banks, Stocks order with no add entries', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const nav = fe.contributions.navigation;
+    expect(nav.map((n: any) => n.label)).toEqual([
+      'Overview',
+      'Banks',
+      'Stocks',
+    ]);
+    expect(nav.map((n: any) => n.command)).toEqual([
+      'wealthflow.show-overview',
+      'wealthflow.show-banks',
+      'wealthflow.show-stocks',
+    ]);
+    const ids = fe.contributions.commands.map((c: any) => c.id);
+    for (const item of nav) {
+      expect(ids).toContain(item.command);
+      expect(fe.contributions.allowedCommands).toContain(item.command);
+    }
+    expect(nav.map((n: any) => n.id)).toEqual([
+      'wealthflow-overview',
+      'wealthflow-banks',
+      'wealthflow-stocks',
+    ]);
+  });
+
   it('declares bank_bank_full_name on wealthflow_banks', () => {
     const fe: any = (pkg as any).financeExtension;
     const banks = fe.tables.find((t: any) => t.name === 'wealthflow_banks');
