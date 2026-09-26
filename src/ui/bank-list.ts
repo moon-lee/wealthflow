@@ -246,10 +246,6 @@ export class BankList extends Base {
           <div class="section-header">
             <h3 class="section-title">Banks</h3>
             <div class="header-actions">
-              <span class="rate-badge"
-                >${this.banks.length}
-                ${this.banks.length === 1 ? 'bank' : 'banks'}</span
-              >
               <button
                 class="btn btn-secondary btn-small"
                 @click=${() => {

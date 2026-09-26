@@ -15,8 +15,11 @@ export async function activate(
 ): Promise<void> {
   _finance = finance;
   logger.info('activate wealthflow', { viewId: ctx.viewId });
-  const openView = (view: string) => async () => {
-    await finance.ui?.requestMount('wealthflow', { view });
+  const openView = (view: string, focus?: string) => async () => {
+    await finance.ui?.requestMount(
+      'wealthflow',
+      focus ? { view, focus } : { view },
+    );
   };
   finance.commands.registerCommand(
     'wealthflow.show-banks',
@@ -26,7 +29,7 @@ export async function activate(
   finance.commands.registerCommand(
     'wealthflow.add-interest',
     'Wealth Flow: Add Interest',
-    openView('overview'),
+    openView('overview', 'interest'),
   );
   finance.commands.registerCommand(
     'wealthflow.show-stocks',
@@ -36,7 +39,7 @@ export async function activate(
   finance.commands.registerCommand(
     'wealthflow.add-dividend',
     'Wealth Flow: Add Dividend',
-    openView('overview'),
+    openView('overview', 'dividend'),
   );
   finance.commands.registerCommand(
     'wealthflow.show-overview',

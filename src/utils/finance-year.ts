@@ -45,6 +45,30 @@ export function monthEnd(dateOrMonth: string): string {
   return `${ym}-${String(last).padStart(2, '0')}`;
 }
 
+/** The `YYYY-MM` month after an ISO date or `YYYY-MM` key, rolling the year. */
+export function nextMonthKey(dateOrMonth: string): string {
+  const ym = dateOrMonth.length === 7 ? dateOrMonth : dateOrMonth.slice(0, 7);
+  const year = Number(ym.slice(0, 4));
+  const month = Number(ym.slice(5, 7));
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return '';
+  const nextYear = month === 12 ? year + 1 : year;
+  const nextMonth = month === 12 ? 1 : month + 1;
+  return `${nextYear}-${String(nextMonth).padStart(2, '0')}`;
+}
+
+/**
+ * The same day one month on, clamped to the month's last day so a 31st entry
+ * lands on the 28th/29th instead of overflowing. Keeps a copied entry on the
+ * day the bank used, rather than snapping it to the grid's month-end.
+ */
+export function nextMonthSameDay(isoDate: string): string {
+  const ym = nextMonthKey(isoDate);
+  const day = Number(isoDate.slice(8, 10));
+  if (ym === '' || !Number.isInteger(day) || day < 1) return '';
+  const lastDay = Number(monthEnd(ym).slice(8, 10));
+  return `${ym}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
+
 /** The 12 `YYYY-MM` months of an AU financial year label. */
 export function fyMonths(fy: string): string[] {
   const start = Number(fy.slice(0, 4));

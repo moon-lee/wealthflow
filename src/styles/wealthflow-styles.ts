@@ -185,31 +185,121 @@ export const wealthflowStyles = css`
     gap: 8px 10px;
     align-items: end;
   }
+  .field-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .field-grid .span-3 {
+    grid-column: span 3;
+  }
   @media (max-width: 900px) {
-    .field-grid {
+    .field-grid,
+    .field-grid.cols-3 {
       grid-template-columns: repeat(2, 1fr);
+    }
+    .field-grid .span-3 {
+      grid-column: 1 / -1;
     }
   }
   @media (max-width: 560px) {
-    .field-grid {
+    .field-grid,
+    .field-grid.cols-3 {
       grid-template-columns: 1fr;
     }
+  }
+  /* Editable matrix cell: amount input keeps the full track, the per-entry
+     Edit button sits beside it so notes/date/bank stay reachable. */
+  .cell-edit {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .cell-edit input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .cell-edit .btn-small {
+    flex: 0 0 auto;
+  }
+  /* Filter strip above a log table. The 8px side padding is the table's own
+     cell padding (6px 8px), so the labels line up with the header text and the
+     badge stops short of the right-hand edge instead of touching it. The top
+     margin lives on the host below — this is the strip's first child, so a
+     margin here would sit inside the host's own spacing. */
+  .log-filters {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin: 0 0 12px;
+    padding: 0 8px;
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .log-filters label {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+  }
+  /* Widest label ("Stock") sets the track, so both selects start on one x. */
+  .log-filters label > span {
+    min-width: 40px;
+  }
+  .log-filters select {
+    min-width: 132px;
+    padding: 5px 10px;
+    font-size: 13px;
+  }
+  .log-filters .rate-badge {
+    margin-left: auto;
+    padding: 2px 10px;
+  }
+  /* The two log tables sit in a padded .section-body, so the 12px top margin
+     belongs on the host to separate the section header from the filter row.
+     Clearing the background is the other half: the vendored :host rule
+     (ext-layout.css:10) paints every component --ff-bg-base, which is darker
+     than the section, so the margin would read as a dark divider band rather
+     than as space. :host(tag) keeps this off the other components that share
+     this stylesheet. */
+  :host(dividend-log),
+  :host(interest-grid) {
+    display: block;
+    margin-top: 12px;
+    background: transparent;
   }
   .section-body form {
     margin-top: 0;
   }
+  /* A field is the label, its control, and — once touched — the message.
+     Grid keeps the markup as it was while putting the message on the label's
+     own line, right-aligned to the control below it, so a validation error
+     no longer shoves the control down. Column 1 is the label, column 2 takes
+     the message, and the control spans both. */
   .field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: baseline;
+    gap: 3px 8px;
     min-width: 0;
   }
   .field > span {
+    grid-row: 1;
+    grid-column: 1;
     font-size: var(--ff-font-sm, 12px);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.3px;
     color: var(--ff-text-muted, #858585);
+  }
+  /* Both row numbers are explicit: the message is the third child in the
+     markup, and auto-placement would push it below the control. */
+  .field > .field-error {
+    grid-row: 1;
+    grid-column: 2;
+    justify-self: end;
+    text-align: right;
+    margin: 0;
+    min-width: 0;
+    font-size: var(--ff-font-sm, 12px);
   }
   /* Required-field marker; the inputs keep the native required attribute
      for assistive tech, so the glyph itself is decorative. */
@@ -219,7 +309,10 @@ export const wealthflowStyles = css`
     margin-left: 3px;
   }
   .field input,
-  .field select {
+  .field select,
+  .field textarea {
+    grid-row: 2;
+    grid-column: 1 / -1;
     width: 100%;
   }
   .field-wide {
@@ -291,6 +384,19 @@ export const wealthflowStyles = css`
   }
   table.data-table tbody tr.inactive {
     opacity: 0.6;
+  }
+  /* Total row: the log's only place a subtotal belongs, so it reads as one. */
+  table.data-table tfoot td {
+    padding: 8px;
+    border-top: 1px solid var(--ff-border, #3e3e3e);
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 700;
+    color: var(--ff-text-strong, #fff);
+  }
+  /* The word that names the row picks up the accent, the way a badge does, so
+     the label and the figures read as two different things. */
+  table.data-table tfoot td.total-label {
+    color: var(--ff-accent, #007acc);
   }
   .row-code {
     font-weight: 700;
@@ -402,6 +508,12 @@ export const wealthflowStyles = css`
     text-align: center;
     color: var(--ff-text-muted, #858585);
   }
+  /* Outcome of a section-level action, stated once under the header. */
+  .notice {
+    margin: 0 0 10px;
+    font-size: var(--ff-font-sm, 12px);
+    color: var(--ff-text-muted, #858585);
+  }
 
   /* Mortgage-dialect cards: section-header/body, stat-grid, hist-table.
      Mirrors mortgage-overview-view.ts so cross-extension screens read as one app. */
@@ -452,8 +564,13 @@ export const wealthflowStyles = css`
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
   }
+  /* Two headline cards fill the width instead of hugging the left half. */
+  .stat-grid.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
   @media (max-width: 640px) {
-    .stat-grid {
+    .stat-grid,
+    .stat-grid.cols-2 {
       grid-template-columns: repeat(2, 1fr);
     }
   }
@@ -463,6 +580,13 @@ export const wealthflowStyles = css`
     border-radius: 6px;
     padding: 12px 14px;
     min-width: 0;
+  }
+  /* Caption inside a card, so a card carries its own "where this comes from"
+     instead of a footnote stranded under the grid. */
+  .stat-note {
+    margin-top: 6px;
+    font-size: var(--ff-font-sm, 12px);
+    color: var(--ff-text-muted, #858585);
   }
   .stat-label {
     font-size: var(--ff-font-sm, 12px);

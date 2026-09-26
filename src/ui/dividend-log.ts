@@ -5,6 +5,7 @@ import { ExtensionLogger } from 'finance-logger';
 import { formatAUD } from '../utils/format.js';
 import {
   DIVIDEND_LABELS,
+  DIVIDEND_TYPES,
   listDividends,
   deleteDividend,
   type DividendEntry,
@@ -17,6 +18,11 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
+/**
+ * Receipts table for one financial year. It renders no section chrome of its
+ * own — the host Overview section owns the header — so the FY heading and the
+ * gross total are stated exactly once per screen.
+ */
 export class DividendLog extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
@@ -27,6 +33,7 @@ export class DividendLog extends Base {
   stocks: Stock[] = [];
   entries: DividendEntry[] = [];
   stockFilter: number | 'all' = 'all';
+  typeFilter: string | 'all' = 'all';
   error = '';
 
   async setFinance(f: any): Promise<void> {
@@ -39,12 +46,11 @@ export class DividendLog extends Base {
     this.error = '';
     try {
       this.stocks = await listStocks(this.finance, { status: 'all' });
-      this.entries = await listDividends(
-        this.finance,
-        this.stockFilter === 'all'
-          ? { financeYear: this.fy || undefined }
-          : { stockId: this.stockFilter, financeYear: this.fy || undefined },
-      );
+      this.entries = await listDividends(this.finance, {
+        financeYear: this.fy || undefined,
+        ...(this.stockFilter === 'all' ? {} : { stockId: this.stockFilter }),
+        ...(this.typeFilter === 'all' ? {} : { type: this.typeFilter }),
+      });
     } catch (e: any) {
       logger.error('dividend log reload failed:', e);
       this.error = String(e?.message || e);
@@ -56,10 +62,27 @@ export class DividendLog extends Base {
     return this.stocks.find((s) => s.id === id)?.stock_code ?? `#${id}`;
   }
 
+  private stockFullName(id: number): string {
+    return this.stocks.find((s) => s.id === id)?.stock_full_name ?? '';
+  }
+
+  /** Editing happens in the host's collapsible form, which this asks to open. */
+  private requestEdit(entry: DividendEntry): void {
+    this.dispatchEvent(
+      new CustomEvent('dividend-edit-request', {
+        detail: { entry },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   private async onDelete(entry: DividendEntry): Promise<void> {
     if (
       typeof confirm !== 'undefined' &&
-      !confirm(`Delete this ${formatAUD(entry.gross)} dividend receipt?`)
+      !confirm(
+        `Delete ${this.stockName(entry.stock_id)} ${formatAUD(Number(entry.gross))} dividend on ${entry.date}?`,
+      )
     )
       return;
     try {
@@ -78,34 +101,10 @@ export class DividendLog extends Base {
     }
   }
 
-  override connectedCallback(): void {
-    (super.connectedCallback as (() => void) | undefined)?.call(this);
-    this.addEventListener(
-      'dividend-create',
-      this._onFormChanged as EventListener,
-    );
-    this.addEventListener(
-      'dividend-edit',
-      this._onFormChanged as EventListener,
-    );
-  }
-
-  override disconnectedCallback(): void {
-    this.removeEventListener(
-      'dividend-create',
-      this._onFormChanged as EventListener,
-    );
-    this.removeEventListener(
-      'dividend-edit',
-      this._onFormChanged as EventListener,
-    );
-    (super.disconnectedCallback as (() => void) | undefined)?.call(this);
-  }
-
-  private _onFormChanged = (e: Event): void => {
-    if ((e as CustomEvent).detail?.fromLog) return;
+  private onFilterChange(): void {
+    (this as any).requestUpdate?.();
     void this.reload();
-  };
+  }
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
@@ -114,69 +113,145 @@ export class DividendLog extends Base {
       (s, e) => s + Number(e.franking ?? 0),
       0,
     );
+    const filtered = this.stockFilter !== 'all' || this.typeFilter !== 'all';
     return html`
-      <div class="section">
-        <h3>Dividends — FY ${this.fy}</h3>
+      <div class="log-filters">
         <label
-          >Stock
+          ><span>Stock</span>
           <select
+            aria-label="Filter by stock"
             @change=${(e: Event) => {
               const v = (e.target as HTMLSelectElement).value;
               this.stockFilter = v === 'all' ? 'all' : Number(v);
-              void this.reload();
+              this.onFilterChange();
             }}
           >
             <option value="all">All stocks</option>
-            ${this.stocks.map((s) => html`<option value=${s.id} ?selected=${this.stockFilter === s.id}>${s.stock_code}${s.is_active ? '' : ' (inactive)'}</option>`)}
+            ${this.stocks.map(
+              (s) =>
+                html`<option
+                  value=${s.id}
+                  ?selected=${this.stockFilter === s.id}
+                >
+                  ${s.stock_code}${s.is_active ? '' : ' (inactive)'}
+                </option>`,
+            )}
           </select>
         </label>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        ${
-          this.entries.length === 0
-            ? html`<p>No receipts this FY — ${formatAUD(0)}. Log one below.</p>`
-            : html`<div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Stock</th>
-                      <th>Type</th>
-                      <th>Gross</th>
-                      <th>Franking</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${this.entries.map(
-                      (e) =>
-                        html`<tr>
-                          <td>${e.date}</td>
-                          <td>${this.stockName(e.stock_id)}</td>
-                          <td>${DIVIDEND_LABELS[e.type]}</td>
-                          <td>${formatAUD(Number(e.gross))}</td>
-                          <td>${formatAUD(Number(e.franking))}</td>
-                          <td>
-                            <button
-                              class="filter-btn"
-                              @click=${() => this.onDelete(e)}
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>`,
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colspan="3">Total</td>
-                      <td>${formatAUD(Math.round(gross * 100) / 100)}</td>
-                      <td>${formatAUD(Math.round(franking * 100) / 100)}</td>
-                      <td></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>`
-        }
+        <label
+          ><span>Type</span>
+          <select
+            aria-label="Filter by type"
+            @change=${(e: Event) => {
+              this.typeFilter = (e.target as HTMLSelectElement).value;
+              this.onFilterChange();
+            }}
+          >
+            <option value="all">All types</option>
+            ${DIVIDEND_TYPES.map(
+              (t) =>
+                html`<option value=${t} ?selected=${this.typeFilter === t}>
+                  ${DIVIDEND_LABELS[t]}
+                </option>`,
+            )}
+          </select>
+        </label>
+        <span class="rate-badge"
+          >${this.entries.length}
+          ${this.entries.length === 1 ? 'receipt' : 'receipts'}</span
+        >
+      </div>
+      ${
+        this.error
+          ? html`<p class="field-error" role="alert" aria-live="polite">
+              Error: ${this.error}
+            </p>`
+          : ''
+      }
+      ${
+        this.entries.length === 0
+          ? html`<p class="empty-state">
+              ${
+                filtered
+                  ? 'No receipts match this filter.'
+                  : 'No dividends logged this FY yet — use “Log dividend” to add the first one.'
+              }
+            </p>`
+          : this.renderTable(gross, franking, filtered)
+      }
+    `;
+  }
+
+  private renderTable(
+    gross: number,
+    franking: number,
+    filtered: boolean,
+  ): unknown {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    return html`
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Date</th>
+              <th scope="col">Holding</th>
+              <th scope="col">Type</th>
+              <th scope="col" class="num">Gross</th>
+              <th scope="col" class="num">Franking</th>
+              <th scope="col" class="num">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${this.entries.map(
+              (e) => html`
+                <tr>
+                  <td class="mono">${e.date}</td>
+                  <td>
+                    <span class="row-code">${this.stockName(e.stock_id)}</span>
+                    ${
+                      this.stockFullName(e.stock_id)
+                        ? html`<span class="row-sub"
+                            >${this.stockFullName(e.stock_id)}</span
+                          >`
+                        : ''
+                    }
+                  </td>
+                  <td>${DIVIDEND_LABELS[e.type]}</td>
+                  <td class="num">${formatAUD(Number(e.gross))}</td>
+                  <td class="num">${formatAUD(Number(e.franking))}</td>
+                  <td>
+                    <div class="row-actions">
+                      <button
+                        class="btn btn-secondary btn-small"
+                        aria-label="Edit ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                        @click=${() => this.requestEdit(e)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        class="btn btn-secondary btn-small"
+                        aria-label="Delete ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                        @click=${() => this.onDelete(e)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `,
+            )}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="3" class="total-label">
+                Total${filtered ? ' (filtered)' : ''}
+              </td>
+              <td class="num">${formatAUD(round2(gross))}</td>
+              <td class="num">${formatAUD(round2(franking))}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
     `;
   }

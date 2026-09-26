@@ -3,6 +3,7 @@ import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
 import { computeFinanceYear, isValidIsoDate } from '../utils/finance-year.js';
+import { formatAUD } from '../utils/format.js';
 import { listBanks, type Bank } from '../dao/banks.js';
 import {
   createInterestEntry,
@@ -17,6 +18,17 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
+function today(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * One form for both jobs: an empty one logs an entry, a pre-filled one edits an
+ * existing one (the monthly grid edits amounts in place; this covers date,
+ * bank, notes and deletion). The host section owns the toggle, so this element
+ * never renders its own show/hide chrome.
+ */
 export class InterestForm extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
@@ -31,6 +43,8 @@ export class InterestForm extends Base {
   notes = '';
   editId: number | null = null;
   error = '';
+  saving = false;
+  touched = false;
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -40,31 +54,47 @@ export class InterestForm extends Base {
   async reload(): Promise<void> {
     if (!this.finance?.db) return;
     try {
-      this.banks = await listBanks(this.finance, { status: 'active' });
-      if (this.date === '') {
-        const now = new Date();
-        this.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      }
+      // All banks, not just active ones: an entry logged before its bank was
+      // deactivated must still be editable.
+      this.banks = await listBanks(this.finance, { status: 'all' });
+      if (this.date === '') this.date = today();
     } catch (e: any) {
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
   }
 
-  /** Load an existing entry for correction; pass null to reset to create mode. */
-  editEntry(entry: InterestEntry | null): void {
-    if (!entry) {
-      this.editId = null;
-      this.notes = '';
-      this.amount = '';
-    } else {
-      this.editId = entry.id;
-      this.bankId = entry.bank_id;
-      this.date = entry.date;
-      this.amount = String(entry.amount);
-      this.notes = entry.notes ?? '';
-    }
-    (this as any).requestUpdate?.();
+  /* Per-field validation: the message renders under the offending control
+     instead of one lumped error above the form. */
+  private get bankError(): string | null {
+    return this.bankId == null ? 'Choose a bank.' : null;
+  }
+
+  private get dateError(): string | null {
+    return isValidIsoDate(this.date) ? null : 'Date must be YYYY-MM-DD.';
+  }
+
+  private get amountError(): string | null {
+    const text = this.amount.trim();
+    if (text === '') return 'Amount is required.';
+    const n = Number(text);
+    return Number.isFinite(n) && n >= 0 ? null : 'Amount must be ≥ 0.';
+  }
+
+  private get canSave(): boolean {
+    return (
+      this.bankError === null &&
+      this.dateError === null &&
+      this.amountError === null &&
+      !this.saving
+    );
+  }
+
+  /** The host section owns the toggle, so closing is a request, not a state. */
+  private closeForm(): void {
+    this.dispatchEvent(
+      new CustomEvent('interest-form-close', { bubbles: true, composed: true }),
+    );
   }
 
   /** Financial year derived from the log date — stored as-is, never edited. */
@@ -73,39 +103,68 @@ export class InterestForm extends Base {
     return computeFinanceYear(this.date, '07-01') ?? '';
   }
 
+  /** Errors stay hidden until a field is touched, so a freshly opened form is calm. */
+  private errorFor(e: string | null): string | null {
+    return e !== null && this.touched ? e : null;
+  }
+
+  /** Load an existing entry for correction; pass null for create mode. */
+  editEntry(entry: InterestEntry | null): void {
+    this.editId = entry?.id ?? null;
+    this.bankId = entry ? entry.bank_id : null;
+    this.date = entry ? entry.date : this.date || today();
+    this.amount = entry ? String(entry.amount) : '';
+    this.notes = entry ? (entry.notes ?? '') : '';
+    this.touched = false;
+    this.error = '';
+    (this as any).requestUpdate?.();
+    void this.focusFirst();
+  }
+
+  private async focusFirst(): Promise<void> {
+    try {
+      await (this as any).updateComplete;
+    } catch {
+      /* non-Lit */
+    }
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    root?.querySelector<HTMLSelectElement>('select')?.focus();
+  }
+
+  /** Cancel is a close: drop the edit and fold the form away. */
+  private cancel(): void {
+    this.editEntry(null);
+    this.closeForm();
+  }
+
+  private onKeyDown(e: KeyboardEvent): void {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.cancel();
+    }
+  }
+
   private async onSubmit(e: Event): Promise<void> {
     e.preventDefault();
     this.error = '';
-    const amount = Number(this.amount);
-    if (this.bankId == null) {
-      this.error = 'Choose a bank.';
+    this.touched = true;
+    if (!this.canSave) {
       (this as any).requestUpdate?.();
       return;
     }
-    if (!isValidIsoDate(this.date)) {
-      this.error = 'Date must be YYYY-MM-DD.';
-      (this as any).requestUpdate?.();
-      return;
-    }
-    if (!Number.isFinite(amount) || amount < 0) {
-      this.error = 'Amount must be ≥ 0.';
-      (this as any).requestUpdate?.();
-      return;
-    }
-    const fyForSave = this.autoFy;
+    const payload = {
+      bank_id: this.bankId as number,
+      date: this.date,
+      amount: Number(this.amount.trim()),
+      finance_year: this.autoFy,
+      notes: this.notes.trim() === '' ? null : this.notes.trim(),
+    };
+    this.saving = true;
+    (this as any).requestUpdate?.();
+    let saved = false;
     try {
       if (this.editId == null) {
-        const row = await createInterestEntry(
-          this.finance,
-          {
-            bank_id: this.bankId,
-            date: this.date,
-            amount,
-            finance_year: fyForSave,
-            notes: this.notes.trim() === '' ? null : this.notes.trim(),
-          },
-          '07-01',
-        );
+        const row = await createInterestEntry(this.finance, payload, '07-01');
         this.dispatchEvent(
           new CustomEvent('interest-create', {
             detail: { entry: row },
@@ -114,13 +173,7 @@ export class InterestForm extends Base {
           }),
         );
       } else {
-        await updateInterestEntry(this.finance, this.editId, {
-          bank_id: this.bankId,
-          date: this.date,
-          amount,
-          finance_year: fyForSave,
-          notes: this.notes.trim() === '' ? null : this.notes.trim(),
-        });
+        await updateInterestEntry(this.finance, this.editId, payload);
         this.dispatchEvent(
           new CustomEvent('interest-edit', {
             detail: { id: this.editId },
@@ -129,31 +182,51 @@ export class InterestForm extends Base {
           }),
         );
       }
+      saved = true;
       this.editEntry(null);
     } catch (err: any) {
       logger.error('interest save failed:', err);
       this.error = String(err?.message || err);
       (this as any).requestUpdate?.();
+    } finally {
+      this.saving = false;
+      (this as any).requestUpdate?.();
     }
+    if (saved) {
+      // Saved: fold the form away so the grid is the thing you look at next.
+      await this.reload();
+      this.closeForm();
+    }
+  }
+
+  private bankCode(id: number | null): string {
+    if (id == null) return '';
+    return this.banks.find((b) => b.id === id)?.bank_code ?? `#${id}`;
   }
 
   private async onDelete(): Promise<void> {
     if (this.editId == null) return;
+    const amount =
+      this.amount.trim() === '' ? '' : formatAUD(Number(this.amount));
     if (
       typeof confirm !== 'undefined' &&
-      !confirm('Delete this interest entry?')
+      !confirm(
+        `Delete ${this.bankCode(this.bankId)} ${amount} interest on ${this.date}?`,
+      )
     )
       return;
+    const id = this.editId;
     try {
-      await deleteInterestEntry(this.finance, this.editId);
+      await deleteInterestEntry(this.finance, id);
       this.dispatchEvent(
         new CustomEvent('interest-delete', {
-          detail: { id: this.editId },
+          detail: { id },
           bubbles: true,
           composed: true,
         }),
       );
       this.editEntry(null);
+      this.closeForm();
     } catch (e: any) {
       this.error = String(e?.message || e);
       (this as any).requestUpdate?.();
@@ -162,81 +235,140 @@ export class InterestForm extends Base {
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
+    const editing = this.editId != null;
     return html`
-      <div class="section">
-        <h3>
-          ${this.editId == null ? 'Log Interest (corrections)' : 'Edit Interest Entry'}
-        </h3>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        <form @submit=${this.onSubmit}>
-          <label
-            >Bank
-            <select
-              @change=${(e: Event) => {
-                this.bankId =
-                  Number((e.target as HTMLSelectElement).value) || null;
-                (this as any).requestUpdate?.();
-              }}
+      <div class="section flush">
+        <div class="section-header">
+          <h3 class="section-title">
+            ${editing ? 'Edit Interest' : 'Log Interest'}
+          </h3>
+          <div class="header-actions">
+            <span class="muted">FY ${this.autoFy || '—'} · auto</span>
+            <span class="muted"><em class="req">*</em> required</span>
+            <button
+              class="btn btn-primary btn-small"
+              type="submit"
+              form="interest-entry-form"
+              ?disabled=${!this.canSave}
             >
-              <option value="">— choose —</option>
-              ${this.banks.map((b) => html`<option value=${b.id} ?selected=${this.bankId === b.id}>${b.bank_code}</option>`)}
-            </select>
-          </label>
-          <label
-            >Date
-            <input
-              type="date"
-              .value=${this.date}
-              @input=${(e: Event) => {
-                this.date = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-            />
-          </label>
-          <p class="muted">Financial year (auto): ${this.autoFy || '—'}</p>
-          <label
-            >Amount (AUD)
-            <input
-              .value=${this.amount}
-              @input=${(e: Event) => {
-                this.amount = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              inputmode="decimal"
-              placeholder="0.00"
-            />
-          </label>
-          <label
-            >Notes
-            <input
-              .value=${this.notes}
-              @input=${(e: Event) => {
-                this.notes = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-          /></label>
-          <button class="btn-primary" type="submit">
-            ${this.editId == null ? 'Log Interest' : 'Save'}
-          </button>
+              ${this.saving ? 'Saving…' : editing ? 'Save' : 'Add'}
+            </button>
+            ${
+              editing
+                ? html`<button
+                      class="btn btn-secondary btn-small"
+                      type="button"
+                      @click=${() => this.cancel()}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      class="btn btn-secondary btn-small"
+                      type="button"
+                      @click=${() => this.onDelete()}
+                    >
+                      Delete
+                    </button>`
+                : ''
+            }
+          </div>
+        </div>
+        <div class="section-body">
           ${
-            this.editId != null
-              ? html`<button
-                    class="filter-btn"
-                    type="button"
-                    @click=${() => this.editEntry(null)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    class="filter-btn"
-                    type="button"
-                    @click=${() => this.onDelete()}
-                  >
-                    Delete
-                  </button>`
+            this.error
+              ? html`<p class="field-error" role="alert" aria-live="polite">
+                  Error: ${this.error}
+                </p>`
               : ''
           }
-        </form>
+          <form
+            id="interest-entry-form"
+            @submit=${this.onSubmit}
+            @keydown=${this.onKeyDown}
+          >
+            <div class="field-grid cols-3">
+              <label class="field"
+                ><span>Bank<em class="req">*</em></span>
+                <select
+                  aria-label="Bank"
+                  .value=${this.bankId == null ? '' : String(this.bankId)}
+                  @change=${(e: Event) => {
+                    const v = (e.target as HTMLSelectElement).value;
+                    this.bankId = v === '' ? null : Number(v);
+                    this.touched = true;
+                    (this as any).requestUpdate?.();
+                  }}
+                  required
+                >
+                  <option value="">— choose —</option>
+                  ${this.banks.map(
+                    (b) =>
+                      html`<option value=${b.id}>
+                        ${b.bank_code}${b.is_active ? '' : ' (inactive)'}
+                      </option>`,
+                  )}
+                </select>
+                ${
+                  this.errorFor(this.bankError)
+                    ? html`<p class="field-error">${this.bankError}</p>`
+                    : ''
+                }
+              </label>
+              <label class="field"
+                ><span>Date<em class="req">*</em></span>
+                <input
+                  type="date"
+                  aria-label="Date"
+                  .value=${this.date}
+                  @input=${(e: Event) => {
+                    this.date = (e.target as HTMLInputElement).value;
+                    this.touched = true;
+                    (this as any).requestUpdate?.();
+                  }}
+                  required
+                />
+                ${
+                  this.errorFor(this.dateError)
+                    ? html`<p class="field-error">${this.dateError}</p>`
+                    : ''
+                }
+              </label>
+              <label class="field"
+                ><span>Amount<em class="req">*</em></span>
+                <input
+                  aria-label="Amount"
+                  inputmode="decimal"
+                  .value=${this.amount}
+                  @input=${(e: Event) => {
+                    this.amount = (e.target as HTMLInputElement).value;
+                    this.touched = true;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="0.00"
+                  required
+                />
+                ${
+                  this.errorFor(this.amountError)
+                    ? html`<p class="field-error">${this.amountError}</p>`
+                    : ''
+                }
+              </label>
+              <label class="field field-wide"
+                ><span>Notes</span>
+                <input
+                  aria-label="Notes"
+                  .value=${this.notes}
+                  @input=${(e: Event) => {
+                    this.notes = (e.target as HTMLInputElement).value;
+                    this.touched = true;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="Optional"
+                />
+              </label>
+            </div>
+          </form>
+        </div>
       </div>
     `;
   }

@@ -37,6 +37,8 @@ export class WealthOrchestrator extends Base {
   tab: WealthTab = 'overview';
   fy = currentFy();
   error = '';
+  /** Set by the Add Interest / Add Dividend commands so the cursor lands ready to type. */
+  focusTarget: string | null = null;
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -47,7 +49,16 @@ export class WealthOrchestrator extends Base {
     this.finance = f;
     this.tab = viewForMount(mount);
     if (typeof mount.fy === 'string') this.fy = mount.fy as string;
+    const focus = typeof mount.focus === 'string' ? mount.focus : null;
     await this.pushFinance();
+    if (!focus) return;
+    // One-shot: a later navigate() must not re-grab the cursor.
+    this.focusTarget = null;
+    const c = this.child() as any;
+    if (focus === 'interest' && typeof c?.focusInterest === 'function')
+      await c.focusInterest();
+    else if (focus === 'dividend' && typeof c?.openDividendForm === 'function')
+      await c.openDividendForm();
   }
 
   navigate(tab: WealthTab): void {
@@ -99,6 +110,19 @@ export class WealthOrchestrator extends Base {
     this.addEventListener('host-navigate', this._onHostNav as EventListener);
   }
 
+  /**
+   * Lit commits a `<select>`'s `.value` binding before its `<option>` children
+   * exist, so the first render lands on the first option, and a user pick can
+   * drift from `fy` afterwards. Re-syncing here runs before paint and makes the
+   * control agree with state in both directions.
+   */
+  override updated(): void {
+    const sel = (this as any).renderRoot?.querySelector(
+      '.topbar select',
+    ) as HTMLSelectElement | null;
+    if (sel && sel.value !== this.fy) sel.value = this.fy;
+  }
+
   override disconnectedCallback(): void {
     this.removeEventListener('fy-changed', this._onFy as EventListener);
     this.removeEventListener(
@@ -137,17 +161,9 @@ export class WealthOrchestrator extends Base {
       <div class="view-scroll">
         <div class="topbar">
           <span class="crumb-current">Wealth Flow</span>
-          <div class="spacer"></div>
-          ${tabs.map(
-            (t) =>
-              html`<button
-                class="filter-btn${this.tab === t ? ' active' : ''}"
-                @click=${() => this.navigate(t)}
-              >
-                ${t[0].toUpperCase() + t.slice(1)}
-              </button>`,
-          )}
           <select
+            aria-label="Financial year"
+            .value=${this.fy}
             @change=${(e: Event) => {
               const fy = (e.target as HTMLSelectElement).value;
               this.dispatchEvent(
@@ -159,8 +175,20 @@ export class WealthOrchestrator extends Base {
               );
             }}
           >
-            ${fyOptions(this.fy).map((f) => html`<option value=${f} ?selected=${f === this.fy}>FY ${f}</option>`)}
+            ${fyOptions(this.fy).map(
+              (f) => html`<option value=${f}>FY ${f}</option>`,
+            )}
           </select>
+          <div class="spacer"></div>
+          ${tabs.map(
+            (t) =>
+              html`<button
+                class="filter-btn${this.tab === t ? ' active' : ''}"
+                @click=${() => this.navigate(t)}
+              >
+                ${t[0].toUpperCase() + t.slice(1)}
+              </button>`,
+          )}
         </div>
         <div class="view-container">
           <div class="view-container-inner">

@@ -270,10 +270,6 @@ export class StockList extends Base {
           <div class="section-header">
             <h3 class="section-title">Stocks</h3>
             <div class="header-actions">
-              <span class="rate-badge"
-                >${this.stocks.length}
-                ${this.stocks.length === 1 ? 'holding' : 'holdings'}</span
-              >
               <button
                 class="btn btn-secondary btn-small"
                 @click=${() => {
