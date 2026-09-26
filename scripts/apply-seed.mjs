@@ -3,17 +3,21 @@
 // PERSONAL-DATA ADJACENT: this script contains no data itself, it just runs the
 // gitignored SQL next to it, so it is safe to commit.
 //
-// better-sqlite3 in the app's node_modules is built against Electron's ABI, so
-// this must run under Electron's node, not a system node:
-//
-//   $env:ELECTRON_RUN_AS_NODE=1
 //   node scripts\apply-seed.mjs
+//
+// better-sqlite3 in the app's node_modules is compiled against Electron's ABI,
+// so a system node cannot load it. Rather than make you remember
+// ELECTRON_RUN_AS_NODE, this relaunches itself under Electron and carries on,
+// so the command above works as-is.
+//
+// Close the app first: it holds the database while running.
 //
 // Override the target with:  node scripts\apply-seed.mjs <path-to.db> --no-backup
 import { readFileSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { spawnSync } from 'node:child_process';
 import { splitAuditStatements, isConsistencyCheck } from './sql-audit.mjs';
 
 const require = createRequire(import.meta.url);
@@ -21,6 +25,37 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '..');
 const SQL_PATH = join(root, 'src', 'seed', 'wealth-seed.sql');
 const AUDIT_MARKER = '-- @@AUDITS@@';
+
+const APP_MODULES = 'D:/finance_flow_ai/node_modules';
+const RELAUNCH_FLAG = 'WEALTHFLOW_SEED_RELAUNCHED';
+
+/** Re-run this script under Electron's node, where better-sqlite3 loads. */
+function relaunchUnderElectron(loadError) {
+  if (process.env[RELAUNCH_FLAG] === '1') {
+    console.error(
+      "Could not load better-sqlite3, even under Electron's node.\n" +
+        "Reinstall the app's dependencies, or open the database in a SQLite\n" +
+        'client and run src/seed/wealth-seed.sql there instead.\n' +
+        `Original error: ${loadError.message}`,
+    );
+    process.exit(1);
+  }
+  const electron = `${APP_MODULES}/electron/dist/electron.exe`;
+  if (!existsSync(electron)) {
+    console.error(
+      `Found no Electron at ${electron}, so this cannot relaunch itself.\n` +
+        'Run the SQL in a SQLite client instead:\n' +
+        `  ${SQL_PATH}\n` +
+        `Original error: ${loadError.message}`,
+    );
+    process.exit(1);
+  }
+  const res = spawnSync(electron, process.argv.slice(1), {
+    stdio: 'inherit',
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', [RELAUNCH_FLAG]: '1' },
+  });
+  process.exit(res.status ?? 1);
+}
 
 /** The app's userData dir, i.e. %APPDATA%\<product>\finance.db. */
 function findDatabase(explicit) {
@@ -47,18 +82,17 @@ if (!existsSync(SQL_PATH)) throw new Error(`missing ${SQL_PATH}`);
 
 let Database;
 try {
-  ({
-    default: Database,
-  } = require('D:/finance_flow_ai/node_modules/better-sqlite3'));
+  // better-sqlite3 is CommonJS with `module.exports = Database`, so there is
+  // usually no `.default`; accept either shape. The native binding loads lazily
+  // inside the constructor, so an in-memory open is what actually proves the
+  // ABI matches -- requiring alone would pass and then fail later.
+  const mod = require(`${APP_MODULES}/better-sqlite3`);
+  const Candidate = mod?.default ?? mod;
+  if (typeof Candidate !== 'function') throw new Error('not a constructor');
+  new Candidate(':memory:').close();
+  Database = Candidate;
 } catch (e) {
-  console.error(
-    'Could not load better-sqlite3.\n' +
-      "It is built for Electron, so run this with Electron's node:\n" +
-      '  $env:ELECTRON_RUN_AS_NODE=1\n' +
-      '  node scripts\\apply-seed.mjs\n' +
-      `Original error: ${e.message}`,
-  );
-  process.exit(1);
+  relaunchUnderElectron(e);
 }
 
 const sql = readFileSync(SQL_PATH, 'utf8');

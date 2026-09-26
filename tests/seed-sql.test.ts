@@ -60,9 +60,44 @@ describe('seed SQL structure', () => {
     expect(statements).toHaveLength(5);
     for (const s of statements) {
       expect(s.sql, `statement must not be empty: ${s.label}`).not.toBe('');
-      // A leftover comment line would make prepare() throw `near "<word>"`.
+      // A prose fragment left over from a comment would make prepare() throw
+      // `near "<word>"`. Nothing but SQL may survive on the first line.
       expect(s.sql.split('\n')[0].trim()).not.toMatch(/^--/);
+      expect(s.sql).not.toMatch(/^\s*[a-z]+ (the|one|last|row|returns)\b/i);
     }
+  });
+
+  it('survives a semicolon inside a comment', () => {
+    // Regression: the audit header reads "Run after importing; the last one
+    // must return zero rows." Splitting on ';' before stripping comments cut
+    // that comment in half and the prose became SQL, so the runner died with
+    // `near "the": syntax error` after the import had already succeeded.
+    const sql = [
+      '-- header; with a semicolon inside it',
+      '',
+      '-- another comment',
+      'SELECT 1;',
+      'SELECT 2;',
+    ].join('\n');
+    const statements = splitAuditStatements(sql);
+    // The trailing ';' is kept; SQLite accepts it. What matters is that the
+    // prose half of the split comment is not mistaken for SQL, and that the
+    // blank line stops the header from becoming statement 1's label.
+    expect(statements).toHaveLength(2);
+    expect(statements[0].sql).not.toMatch(/header/);
+    expect(statements[1].sql).toBe('SELECT 2;');
+    expect(statements[0].label).toBe('another comment');
+  });
+
+  it('joins a multi-line comment block into one label', () => {
+    const sql = [
+      '-- 2. Interest per bank (expect MQL 1.46,',
+      '--    BOQ 3.23)',
+      'SELECT 1;',
+    ].join('\n');
+    expect(splitAuditStatements(sql)[0].label).toBe(
+      '2. Interest per bank (expect MQL 1.46, BOQ 3.23)',
+    );
   });
 
   it('keeps each audit label', () => {
@@ -221,6 +256,22 @@ describe.runIf(process.versions.node.split('.')[0] >= 22)(
       expect(
         db.prepare('SELECT COUNT(*) c FROM wealthflow_dividends').get().c,
       ).toBe(2);
+    });
+
+    it('prepares every audit statement, not just the checks', () => {
+      // The runner prints all five, so a report statement that cannot be
+      // prepared fails the import after the rows are already written. Only
+      // checking the two zero-row statements is how that slipped through.
+      if (!DatabaseSync) return;
+      open();
+      const statements = splitAuditStatements(auditSql);
+      expect(statements).toHaveLength(5);
+      for (const s of statements) {
+        const rows = db.prepare(s.sql).all();
+        // The two checks must be empty; the three reports must have data.
+        if (isConsistencyCheck(s.sql)) expect(rows, s.label).toEqual([]);
+        else expect(rows.length, s.label).toBeGreaterThan(0);
+      }
     });
 
     it('passes its own consistency and orphan checks', () => {
