@@ -28,8 +28,6 @@ export class InterestForm extends Base {
   bankId: number | null = null;
   date = '';
   amount = '';
-  financeYear = '';
-  financeYearTouched = false;
   notes = '';
   editId: number | null = null;
   error = '';
@@ -47,7 +45,6 @@ export class InterestForm extends Base {
         const now = new Date();
         this.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       }
-      this.autofillFy();
     } catch (e: any) {
       this.error = String(e?.message || e);
     }
@@ -60,33 +57,20 @@ export class InterestForm extends Base {
       this.editId = null;
       this.notes = '';
       this.amount = '';
-      this.financeYearTouched = false;
     } else {
       this.editId = entry.id;
       this.bankId = entry.bank_id;
       this.date = entry.date;
       this.amount = String(entry.amount);
-      this.financeYear = entry.finance_year;
-      this.financeYearTouched = false;
       this.notes = entry.notes ?? '';
     }
     (this as any).requestUpdate?.();
   }
 
-  private autofillFy(): void {
-    if (this.financeYearTouched) return;
-    const auto = isValidIsoDate(this.date)
-      ? computeFinanceYear(this.date, '07-01')
-      : null;
-    this.financeYear = auto ?? this.fy ?? '';
-  }
-
-  private get fyMismatch(): boolean {
-    if (!isValidIsoDate(this.date)) return false;
-    const auto = computeFinanceYear(this.date, '07-01');
-    return (
-      auto !== null && this.financeYear !== '' && this.financeYear !== auto
-    );
+  /** Financial year derived from the log date — stored as-is, never edited. */
+  private get autoFy(): string {
+    if (!isValidIsoDate(this.date)) return '';
+    return computeFinanceYear(this.date, '07-01') ?? '';
   }
 
   private async onSubmit(e: Event): Promise<void> {
@@ -108,6 +92,7 @@ export class InterestForm extends Base {
       (this as any).requestUpdate?.();
       return;
     }
+    const fyForSave = this.autoFy;
     try {
       if (this.editId == null) {
         const row = await createInterestEntry(
@@ -116,7 +101,7 @@ export class InterestForm extends Base {
             bank_id: this.bankId,
             date: this.date,
             amount,
-            finance_year: this.financeYear,
+            finance_year: fyForSave,
             notes: this.notes.trim() === '' ? null : this.notes.trim(),
           },
           '07-01',
@@ -133,7 +118,7 @@ export class InterestForm extends Base {
           bank_id: this.bankId,
           date: this.date,
           amount,
-          finance_year: this.financeYear,
+          finance_year: fyForSave,
           notes: this.notes.trim() === '' ? null : this.notes.trim(),
         });
         this.dispatchEvent(
@@ -200,15 +185,15 @@ export class InterestForm extends Base {
           <label
             >Date
             <input
+              type="date"
               .value=${this.date}
               @input=${(e: Event) => {
                 this.date = (e.target as HTMLInputElement).value;
-                this.autofillFy();
                 (this as any).requestUpdate?.();
               }}
-              placeholder="YYYY-MM-DD"
             />
           </label>
+          <p class="muted">Financial year (auto): ${this.autoFy || '—'}</p>
           <label
             >Amount (AUD)
             <input
@@ -221,18 +206,6 @@ export class InterestForm extends Base {
               placeholder="0.00"
             />
           </label>
-          <label
-            >Financial year
-            <input
-              .value=${this.financeYear}
-              @input=${(e: Event) => {
-                this.financeYear = (e.target as HTMLInputElement).value;
-                this.financeYearTouched = true;
-                (this as any).requestUpdate?.();
-              }}
-            />
-          </label>
-          ${this.fyMismatch ? html`<p class="callout-warn">FY differs from the date — kept as an override.</p>` : ''}
           <label
             >Notes
             <input

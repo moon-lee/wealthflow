@@ -65,6 +65,9 @@ export const wealthflowStyles = css`
     color: var(--ff-text-muted, #858585);
     opacity: 0.7;
   }
+  input[type='date']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
 
   .filter-btn {
     background: var(--ff-bg-input, #3c3c3c);

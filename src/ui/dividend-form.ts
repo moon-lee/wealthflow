@@ -32,8 +32,6 @@ export class DividendForm extends Base {
   type = 'non_trust';
   gross = '';
   franking = '';
-  financeYear = '';
-  financeYearTouched = false;
   notes = '';
   editId: number | null = null;
   error = '';
@@ -57,7 +55,6 @@ export class DividendForm extends Base {
         const now = new Date();
         this.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       }
-      this.autofillFy();
     } catch (e: any) {
       this.error = String(e?.message || e);
     }
@@ -70,7 +67,6 @@ export class DividendForm extends Base {
       this.gross = '';
       this.franking = '';
       this.notes = '';
-      this.financeYearTouched = false;
     } else {
       this.editId = entry.id;
       this.stockId = entry.stock_id;
@@ -78,27 +74,15 @@ export class DividendForm extends Base {
       this.type = entry.type;
       this.gross = String(entry.gross);
       this.franking = String(entry.franking);
-      this.financeYear = entry.finance_year;
-      this.financeYearTouched = false;
       this.notes = entry.notes ?? '';
     }
     (this as any).requestUpdate?.();
   }
 
-  private autofillFy(): void {
-    if (this.financeYearTouched) return;
-    const auto = isValidIsoDate(this.date)
-      ? computeFinanceYear(this.date, '07-01')
-      : null;
-    this.financeYear = auto ?? this.fy ?? '';
-  }
-
-  private get fyMismatch(): boolean {
-    if (!isValidIsoDate(this.date)) return false;
-    const auto = computeFinanceYear(this.date, '07-01');
-    return (
-      auto !== null && this.financeYear !== '' && this.financeYear !== auto
-    );
+  /** Financial year derived from the log date — stored as-is, never edited. */
+  private get autoFy(): string {
+    if (!isValidIsoDate(this.date)) return '';
+    return computeFinanceYear(this.date, '07-01') ?? '';
   }
 
   private async onSubmit(e: Event): Promise<void> {
@@ -126,6 +110,7 @@ export class DividendForm extends Base {
       (this as any).requestUpdate?.();
       return;
     }
+    const fyForSave = this.autoFy;
     try {
       if (this.editId == null) {
         const row = await createDividend(
@@ -136,7 +121,7 @@ export class DividendForm extends Base {
             type: this.type,
             gross,
             franking,
-            finance_year: this.financeYear,
+            finance_year: fyForSave,
             notes: this.notes.trim() === '' ? null : this.notes.trim(),
           },
           '07-01',
@@ -155,7 +140,7 @@ export class DividendForm extends Base {
           type: this.type,
           gross,
           franking,
-          finance_year: this.financeYear,
+          finance_year: fyForSave,
           notes: this.notes.trim() === '' ? null : this.notes.trim(),
         });
         this.dispatchEvent(
@@ -220,15 +205,15 @@ export class DividendForm extends Base {
           <label
             >Date
             <input
+              type="date"
               .value=${this.date}
               @input=${(e: Event) => {
                 this.date = (e.target as HTMLInputElement).value;
-                this.autofillFy();
                 (this as any).requestUpdate?.();
               }}
-              placeholder="YYYY-MM-DD"
             />
           </label>
+          <p class="muted">Financial year (auto): ${this.autoFy || '—'}</p>
           <label
             >Type
             <select
@@ -264,18 +249,6 @@ export class DividendForm extends Base {
               placeholder="0.00"
             />
           </label>
-          <label
-            >Financial year
-            <input
-              .value=${this.financeYear}
-              @input=${(e: Event) => {
-                this.financeYear = (e.target as HTMLInputElement).value;
-                this.financeYearTouched = true;
-                (this as any).requestUpdate?.();
-              }}
-            />
-          </label>
-          ${this.fyMismatch ? html`<p class="callout-warn">FY differs from the date — kept as an override.</p>` : ''}
           <label
             >Notes
             <input
