@@ -18,13 +18,27 @@ export interface NormalizedArgs {
 }
 
 export function normalizeArgs(...args: unknown[]): NormalizedArgs {
-  const message = args[0] instanceof Error ? args[0].message : String(args[0] ?? '');
+  const message =
+    args[0] instanceof Error ? args[0].message : String(args[0] ?? '');
   const errorArg = args.find((a) => a instanceof Error) as Error | undefined;
-  const contextArg = args.slice(1).find((a) => typeof a === 'string') as string | undefined;
-  const rest = args.slice(1).filter((a) => !(a instanceof Error) && typeof a !== 'string');
-  const restText = rest.length > 0 ? ' ' + rest.map((a) => {
-    try { return typeof a === 'string' ? a : JSON.stringify(a); } catch { return String(a); }
-  }).join(' ') : '';
+  const contextArg = args.slice(1).find((a) => typeof a === 'string') as
+    string | undefined;
+  const rest = args
+    .slice(1)
+    .filter((a) => !(a instanceof Error) && typeof a !== 'string');
+  const restText =
+    rest.length > 0
+      ? ' ' +
+        rest
+          .map((a) => {
+            try {
+              return typeof a === 'string' ? a : JSON.stringify(a);
+            } catch {
+              return String(a);
+            }
+          })
+          .join(' ')
+      : '';
   return {
     message: `${message}${restText}`,
     context: contextArg,
@@ -41,7 +55,9 @@ export function formatLine(entry: LogPayload): string {
   return `${ts} [${lvl}]${ctx} ${entry.message}${loc}`;
 }
 
-export function getCallerInfo(skipSuffixes: string[] = ['base-logger.ts', 'logger.ts']): { file: string; line: number } | null {
+export function getCallerInfo(
+  skipSuffixes: string[] = ['base-logger.ts', 'logger.ts'],
+): { file: string; line: number } | null {
   const stack = new Error().stack;
   if (!stack) return null;
   const lines = stack.split('\n').slice(2);
@@ -78,11 +94,20 @@ export abstract class BaseLogger {
   }
 
   protected shouldLog(level: LogLevel): boolean {
-    const order: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
+    const order: Record<LogLevel, number> = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3,
+    };
     return order[level] >= order[this.minLevel];
   }
 
-  protected abstract write(entry: LogPayload, line: string, errorArg?: Error): void;
+  protected abstract write(
+    entry: LogPayload,
+    line: string,
+    errorArg?: Error,
+  ): void;
 
   private emit(level: LogLevel, ...args: unknown[]): void {
     if (!this.shouldLog(level)) return;
@@ -100,9 +125,19 @@ export abstract class BaseLogger {
     this.write(entry, formatLine(entry), n.errorArg);
   }
 
-  log(...args: unknown[]): void { this.emit('info', ...args); }
-  info(...args: unknown[]): void { this.emit('info', ...args); }
-  warn(...args: unknown[]): void { this.emit('warn', ...args); }
-  error(...args: unknown[]): void { this.emit('error', ...args); }
-  debug(...args: unknown[]): void { this.emit('debug', ...args); }
+  log(...args: unknown[]): void {
+    this.emit('info', ...args);
+  }
+  info(...args: unknown[]): void {
+    this.emit('info', ...args);
+  }
+  warn(...args: unknown[]): void {
+    this.emit('warn', ...args);
+  }
+  error(...args: unknown[]): void {
+    this.emit('error', ...args);
+  }
+  debug(...args: unknown[]): void {
+    this.emit('debug', ...args);
+  }
 }
