@@ -3,3 +3,5 @@ dist/
 build/
 .DS_Store
 *.log
+# Personal seed data (real amounts, accounts) — never commit.
+src/seed/

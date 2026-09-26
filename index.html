@@ -45,6 +45,10 @@
       });
 
       const finance = createMockFinance();
+      // Dev console hook for the gitignored seed module:
+      //   const m = await import('/src/seed/wealth-seed.ts');
+      //   await m.seedWealthflow(window.__finance);
+      window.__finance = finance;
       let current = null;
 
       async function mountView(index) {
