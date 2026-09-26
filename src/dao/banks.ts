@@ -3,6 +3,7 @@ import type { FinanceApi } from 'finance';
 export interface Bank {
   readonly id: number;
   readonly name: string;
+  readonly full_name: string | null;
   readonly bsb: string | null;
   readonly account_number: string;
   readonly is_active: boolean;
@@ -13,6 +14,7 @@ export interface Bank {
 
 export type BankInput = {
   name: string;
+  full_name?: string | null;
   bsb?: string | null;
   account_number: string;
   notes?: string | null;
@@ -44,6 +46,7 @@ export async function createBank(
     throw new BankValidationError('bsb must be 6 digits');
   const row = (await finance.db.table(TABLE).insert({
     name,
+    full_name: input.full_name?.trim() || null,
     bsb: input.bsb?.replace(/\D/g, '') || null,
     account_number: input.account_number.trim(),
     notes: input.notes ?? null,
@@ -70,9 +73,15 @@ export async function updateBank(
 ): Promise<number> {
   if (patch.name !== undefined && !patch.name.trim())
     throw new BankValidationError('name is required');
+  const clean: Partial<BankInput> = { ...patch };
+  if (clean.full_name !== undefined)
+    clean.full_name =
+      clean.full_name == null || clean.full_name.trim() === ''
+        ? null
+        : clean.full_name.trim();
   return finance.db
     .table(TABLE)
-    .update({ id }, patch as Record<string, unknown>);
+    .update({ id }, clean as Record<string, unknown>);
 }
 
 export async function setBankActive(

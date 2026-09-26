@@ -31,6 +31,7 @@ export class BankList extends Base {
   statusFilter: StatusFilter = 'active';
   editingId: number | null = null;
   editName = '';
+  editFullName = '';
   editBsb = '';
   editAccount = '';
   error = '';
@@ -113,6 +114,7 @@ export class BankList extends Base {
   private startEdit(b: Bank): void {
     this.editingId = b.id;
     this.editName = b.name;
+    this.editFullName = b.full_name ?? '';
     this.editBsb = b.bsb ?? '';
     this.editAccount = b.account_number;
     this.error = '';
@@ -138,6 +140,8 @@ export class BankList extends Base {
     try {
       await updateBank(this.finance, b.id, {
         name: this.editName.trim(),
+        full_name:
+          this.editFullName.trim() === '' ? null : this.editFullName.trim(),
         bsb:
           this.editBsb.trim() === '' ? null : this.editBsb.replace(/\D/g, ''),
         account_number: this.editAccount.trim(),
@@ -236,6 +240,7 @@ export class BankList extends Base {
         <td>
           ${b.name}
           ${b.is_active ? '' : html`<span class="badge">inactive</span>`}
+          ${b.full_name ? html`<div class="muted">${b.full_name}</div>` : ''}
         </td>
         <td>${formatBSB(b.bsb)} ${maskAccount(b.account_number)}</td>
         <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
@@ -266,6 +271,14 @@ export class BankList extends Base {
               if (e.key === 'Enter') void this.saveEdit(b);
               if (e.key === 'Escape') this.cancelEdit();
             }}
+          />
+          <input
+            .value=${this.editFullName}
+            @input=${(e: Event) => {
+              this.editFullName = (e.target as HTMLInputElement).value;
+              (this as any).requestUpdate?.();
+            }}
+            placeholder="Full name"
           />
         </td>
         <td>

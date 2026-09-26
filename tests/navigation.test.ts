@@ -94,7 +94,7 @@ describe('orchestrator click navigation', () => {
       inputs[i].dispatchEvent(new Event('input', { bubbles: true }));
     };
     set(0, 'Macquarie');
-    set(2, '1234567');
+    set(3, '1234567');
     await form.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
     await form.updateComplete;

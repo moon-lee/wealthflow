@@ -18,6 +18,7 @@ export class BankForm extends Base {
       : [];
   finance: any = null;
   name = '';
+  fullName = '';
   bsb = '';
   account = '';
   notes = '';
@@ -49,6 +50,7 @@ export class BankForm extends Base {
     try {
       const row = await createBank(this.finance, {
         name: this.name.trim(),
+        full_name: this.fullName.trim() === '' ? null : this.fullName.trim(),
         bsb: this.bsb.trim() === '' ? null : this.bsb.replace(/\D/g, ''),
         account_number: this.account.trim(),
         notes: this.notes.trim() === '' ? null : this.notes.trim(),
@@ -61,6 +63,7 @@ export class BankForm extends Base {
         }),
       );
       this.name = '';
+      this.fullName = '';
       this.bsb = '';
       this.account = '';
       this.notes = '';
@@ -89,6 +92,16 @@ export class BankForm extends Base {
                 (this as any).requestUpdate?.();
               }}
               required
+          /></label>
+          <label
+            >Full name
+            <input
+              .value=${this.fullName}
+              @input=${(e: Event) => {
+                this.fullName = (e.target as HTMLInputElement).value;
+                (this as any).requestUpdate?.();
+              }}
+              placeholder="Macquarie Bank Limited"
           /></label>
           <label
             >BSB

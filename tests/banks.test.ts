@@ -41,10 +41,12 @@ describe('banks dao', () => {
     const f: any = stub();
     const row: any = await createBank(f, {
       name: 'Macquarie',
+      full_name: 'Macquarie Bank Limited',
       bsb: '012345',
       account_number: '1234567',
     });
     expect(row.id).toBeDefined();
+    expect(row.full_name).toBe('Macquarie Bank Limited');
     expect(await listBanks(f, { status: 'active' })).toHaveLength(1);
   });
   it('rejects blank name/account', async () => {
