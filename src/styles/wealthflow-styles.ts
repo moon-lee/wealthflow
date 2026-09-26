@@ -176,6 +176,55 @@ export const wealthflowStyles = css`
   form .filter-btn {
     align-self: flex-start;
   }
+  /* Labeled field grid — four fields on one row, notes full width below.
+     Used by the add forms so they read as the same screen as the table's
+     edit mode without spending a column on the submit button. */
+  .field-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px 10px;
+    align-items: end;
+  }
+  @media (max-width: 900px) {
+    .field-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 560px) {
+    .field-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .section-body form {
+    margin-top: 0;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .field > span {
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--ff-text-muted, #858585);
+  }
+  /* Required-field marker; the inputs keep the native required attribute
+     for assistive tech, so the glyph itself is decorative. */
+  .req {
+    font-style: normal;
+    color: var(--ff-danger, #f48771);
+    margin-left: 3px;
+  }
+  .field input,
+  .field select {
+    width: 100%;
+  }
+  .field-wide {
+    grid-column: 1 / -1;
+  }
   .btn-primary {
     padding: 6px 20px;
     border-radius: 3px;
@@ -185,6 +234,173 @@ export const wealthflowStyles = css`
   .btn-primary:disabled {
     opacity: 0.5;
     cursor: default;
+  }
+  /* Compact action button for table rows and section headers. Sits a step
+     below .btn/.btn-primary (14px) but keeps the 600 weight of the field
+     labels it shares a line with, so 12px text does not read thin. */
+  .btn-small {
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    padding: 2px 10px;
+  }
+
+  /* ===== Master-data list dialect (bank-list, stock-list) =====
+     Both master views are deliberately the same screen: a section header
+     with a count, an evenly-split table, a clickable status pill, and an
+     inline edit row that mirrors the add form. */
+  .order-stack {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Fixed layout with no colgroup splits the columns evenly. */
+  table.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  table.data-table th {
+    text-align: left;
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ff-text-muted, #858585);
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--ff-border, #3e3e3e);
+    white-space: nowrap;
+  }
+  table.data-table td {
+    padding: 8px;
+    border-bottom: 1px solid var(--ff-border, #3e3e3e);
+    vertical-align: middle;
+    font-size: var(--ff-font-base, 14px);
+  }
+  table.data-table th.num,
+  table.data-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  table.data-table tbody tr:hover {
+    background: var(--ff-bg-input-hover, #4a4a4a);
+  }
+  table.data-table tbody tr.editing {
+    background: var(--ff-bg-subpanel, #2a2a2a);
+  }
+  table.data-table tbody tr.editing td:first-child {
+    box-shadow: inset 3px 0 0 var(--ff-accent, #007acc);
+  }
+  table.data-table tbody tr.inactive {
+    opacity: 0.6;
+  }
+  .row-code {
+    font-weight: 700;
+    color: var(--ff-text-strong, #fff);
+    margin-right: 6px;
+  }
+  .row-sub {
+    display: block;
+    color: var(--ff-text-muted, #858585);
+    font-size: var(--ff-font-sm, 12px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mono {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.4px;
+  }
+  .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+  /* Clickable status badge — replaces the per-row Activate/Deactivate button. */
+  .status-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--ff-bg-input, #3c3c3c);
+    border: 1px solid var(--ff-border, #3e3e3e);
+    color: var(--ff-text-muted, #858585);
+    font-family: inherit;
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    vertical-align: middle;
+  }
+  .status-toggle::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ff-text-muted, #858585);
+  }
+  .status-toggle.on {
+    color: var(--ff-accent, #007acc);
+    border-color: var(--ff-accent, #007acc);
+  }
+  .status-toggle.on::before {
+    background: var(--ff-accent, #007acc);
+  }
+  .status-toggle:hover {
+    background: var(--ff-bg-input-hover, #4a4a4a);
+  }
+  .status-toggle:focus-visible,
+  .row-actions button:focus-visible {
+    outline: 1px solid var(--ff-accent, #007acc);
+    outline-offset: 1px;
+  }
+  /* Edit row mirrors the add form: the fields on one line, then notes and
+     the actions on a second line. One cell spanning the table keeps the
+     columns from fighting the grid. */
+  .edit-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px 10px;
+    align-items: end;
+  }
+  .edit-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  @media (max-width: 900px) {
+    .edit-grid,
+    .edit-grid.cols-3 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .edit-grid .edit-buttons,
+    .edit-grid.cols-3 .edit-buttons {
+      grid-column: 1 / -1;
+    }
+  }
+  /* Table cells right-align inputs by default; these are text fields. */
+  .edit-grid .field input {
+    width: 100%;
+    min-width: 0;
+    text-align: left;
+    font-variant-numeric: normal;
+  }
+  .edit-notes {
+    grid-column: 1 / span 2;
+  }
+  .edit-buttons {
+    grid-column: 3 / span 2;
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    padding-bottom: 1px;
+  }
+  .edit-grid.cols-3 .edit-buttons {
+    grid-column: 3 / span 1;
+  }
+  .empty-state {
+    padding: 20px 8px;
+    text-align: center;
+    color: var(--ff-text-muted, #858585);
   }
 
   /* Mortgage-dialect cards: section-header/body, stat-grid, hist-table.

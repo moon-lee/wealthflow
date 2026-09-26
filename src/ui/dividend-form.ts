@@ -45,12 +45,6 @@ export class DividendForm extends Base {
     if (!this.finance?.db) return;
     try {
       this.stocks = await listStocks(this.finance, { status: 'all' });
-      try {
-        const prefill = sessionStorage.getItem('wealthflow.prefillStock');
-        if (prefill && this.stockId == null) this.stockId = Number(prefill);
-      } catch {
-        /* non-browser */
-      }
       if (this.date === '') {
         const now = new Date();
         this.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;

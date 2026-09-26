@@ -4,6 +4,7 @@ import { BankForm } from './bank-form';
 import { InterestGrid } from './interest-grid';
 import { InterestForm } from './interest-form';
 import { StockList } from './stock-list';
+import { StockForm } from './stock-form';
 import { DividendLog } from './dividend-log';
 import { DividendForm } from './dividend-form';
 import { OverviewView } from './overview-view';
@@ -38,6 +39,11 @@ if (typeof customElements !== 'undefined') {
     customElements.define(
       'stock-list',
       StockList as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('stock-form'))
+    customElements.define(
+      'stock-form',
+      StockForm as unknown as CustomElementConstructor,
     );
   if (!customElements.get('dividend-log'))
     customElements.define(

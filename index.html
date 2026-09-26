@@ -51,6 +51,21 @@
       window.__finance = finance;
       let current = null;
 
+      // ---- ?seed (or ?seed=1) loads src/seed/wealth-seed.ts before mount ----
+      // The seed module is gitignored, so a missing file is not an error: the
+      // dev DB just stays empty. Applies to every view in the VIEWS dropdown.
+      if (/(?:^|[?&])seed(?:=1)?(?:&|$)/.test(location.search)) {
+        try {
+          const seed = await import(
+            /* @vite-ignore */ '/src/seed/wealth-seed.ts'
+          );
+          const done = await seed.seedWealthflow(finance);
+          console.info('[wealthflow] seeded', done);
+        } catch (e) {
+          console.warn('[wealthflow] seed skipped:', e?.message ?? e);
+        }
+      }
+
       async function mountView(index) {
         if (current) {
           current.remove();

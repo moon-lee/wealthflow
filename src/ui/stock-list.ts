@@ -2,11 +2,8 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
-import { formatAUD } from '../utils/format.js';
-import { getDividendTotals } from '../services/stock-service.js';
 import {
   listStocks,
-  createStock,
   updateStock,
   setStockActive,
   type Stock,
@@ -18,27 +15,24 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
-type StatusFilter = 'active' | 'inactive' | 'all';
-
 export class StockList extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
       ? ([sharedStyles, wealthflowStyles] as any)
       : [];
   finance: any = null;
+  /** Set by the orchestrator; this master-data list is FY-agnostic. */
   fy = '';
   stocks: Stock[] = [];
-  gross: Record<number, number> = {};
-  franking: Record<number, number> = {};
-  statusFilter: StatusFilter = 'active';
+  showForm = false;
   editingId: number | null = null;
+  editStockCode = '';
   editStockName = '';
   editShares = '';
-  newStockCode = '';
-  newStockName = '';
-  newShares = '';
+  editNotes = '';
+  editTouched = false;
+  savingEdit = false;
   error = '';
-  formError = '';
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -49,34 +43,48 @@ export class StockList extends Base {
     if (!this.finance?.db) return;
     this.error = '';
     try {
-      this.stocks = await listStocks(this.finance, {
-        status: this.statusFilter,
-      });
-      if (this.fy) {
-        const totals = await getDividendTotals(
-          this.finance,
-          this.stocks,
-          this.fy,
-        );
-        this.gross = Object.fromEntries(
-          totals.byStock.map((b) => [b.stockId, b.gross]),
-        );
-        this.franking = Object.fromEntries(
-          totals.byStock.map((b) => [b.stockId, b.franking]),
-        );
-      } else {
-        this.gross = {};
-        this.franking = {};
-      }
+      this.stocks = await listStocks(this.finance, { status: 'all' });
     } catch (e: any) {
       logger.error('stock list reload failed:', e);
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
+    await this.pushToChildren();
+  }
+
+  /** Forward finance to the embedded holding form. */
+  private async pushToChildren(): Promise<void> {
+    try {
+      await (this as any).updateComplete;
+    } catch {
+      /* non-Lit */
+    }
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    if (!root) return;
+    const el = root.querySelector('stock-form') as any;
+    if (!el) return;
+    el.finance = this.finance;
+    if (typeof el.setFinance === 'function') {
+      try {
+        await el.setFinance(this.finance);
+      } catch (e: any) {
+        this.error = String(e?.message || e);
+      }
+    } else if (typeof el.reload === 'function') {
+      try {
+        await el.reload();
+      } catch (e: any) {
+        this.error = String(e?.message || e);
+      }
+    }
   }
 
   override connectedCallback(): void {
     (super.connectedCallback as (() => void) | undefined)?.call(this);
+    this.addEventListener(
+      'stock-create',
+      this._onChildChanged as EventListener,
+    );
     this.addEventListener(
       'dividend-create',
       this._onDividendChanged as EventListener,
@@ -93,6 +101,10 @@ export class StockList extends Base {
 
   override disconnectedCallback(): void {
     this.removeEventListener(
+      'stock-create',
+      this._onChildChanged as EventListener,
+    );
+    this.removeEventListener(
       'dividend-create',
       this._onDividendChanged as EventListener,
     );
@@ -107,76 +119,109 @@ export class StockList extends Base {
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
+  private _onChildChanged = (): void => {
+    // stock-form creates bubble through here; refresh the rows.
+    void this.reload();
+  };
+
   private _onDividendChanged = (): void => {
     void this.reload();
   };
 
-  private async onCreate(e: Event): Promise<void> {
-    e.preventDefault();
-    this.formError = '';
-    const shares = Number(this.newShares);
-    if (this.newStockCode.trim() === '' || this.newStockName.trim() === '') {
-      this.formError = 'Code and name are required.';
-      (this as any).requestUpdate?.();
-      return;
-    }
-    if (!Number.isFinite(shares) || shares < 0) {
-      this.formError = 'Shares must be ≥ 0.';
-      (this as any).requestUpdate?.();
-      return;
-    }
+  /* Per-field validation: the message renders under the offending input. */
+  private get codeError(): string | null {
+    return this.editStockCode.trim() === '' ? 'Code is required.' : null;
+  }
+
+  private get nameError(): string | null {
+    return this.editStockName.trim() === '' ? 'Name is required.' : null;
+  }
+
+  private get sharesError(): string | null {
+    const text = this.editShares.trim();
+    if (text === '') return 'Shares are required.';
+    const n = Number(text);
+    return Number.isFinite(n) && n >= 0 ? null : 'Shares must be ≥ 0.';
+  }
+
+  private get canSaveEdit(): boolean {
+    return (
+      this.codeError === null &&
+      this.nameError === null &&
+      this.sharesError === null &&
+      !this.savingEdit
+    );
+  }
+
+  /** Errors stay hidden until a field is touched, so an untouched row is calm. */
+  private errorFor(e: string | null): string | null {
+    return e !== null && this.editTouched ? e : null;
+  }
+
+  private async startEdit(s: Stock): Promise<void> {
+    this.editingId = s.id;
+    this.editStockCode = s.stock_code;
+    this.editStockName = s.stock_full_name;
+    this.editShares = String(s.shares);
+    this.editNotes = s.notes ?? '';
+    this.editTouched = false;
+    this.savingEdit = false;
+    this.error = '';
+    (this as any).requestUpdate?.();
     try {
-      const row = await createStock(this.finance, {
-        stock_code: this.newStockCode,
-        stock_full_name: this.newStockName.trim(),
-        shares,
-      });
-      this.dispatchEvent(
-        new CustomEvent('stock-create', {
-          detail: { stock: row },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-      this.newStockCode = '';
-      this.newStockName = '';
-      this.newShares = '';
-      await this.reload();
-    } catch (err: any) {
-      logger.error('stock create failed:', err);
-      this.formError = String(err?.message || err);
-      (this as any).requestUpdate?.();
+      await (this as any).updateComplete;
+    } catch {
+      /* non-Lit */
+    }
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    root?.querySelector<HTMLInputElement>('tr.editing input')?.focus();
+  }
+
+  private cancelEdit(): void {
+    this.editingId = null;
+    this.editTouched = false;
+    (this as any).requestUpdate?.();
+  }
+
+  /** Enter saves, Escape cancels — shared by every field in the edit row. */
+  private onEditKey(s: Stock, e: KeyboardEvent): void {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void this.saveEdit(s);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      this.cancelEdit();
     }
   }
 
-  private startEdit(s: Stock): void {
-    this.editingId = s.id;
-    this.editStockName = s.stock_full_name;
-    this.editShares = String(s.shares);
-    this.error = '';
+  private onEditInput(setter: (v: string) => void, e: Event): void {
+    setter((e.target as HTMLInputElement).value);
+    this.editTouched = true;
     (this as any).requestUpdate?.();
   }
 
   private async saveEdit(s: Stock): Promise<void> {
-    const shares = Number(this.editShares);
-    if (
-      this.editStockName.trim() === '' ||
-      !Number.isFinite(shares) ||
-      shares < 0
-    ) {
-      this.error = 'Name is required and shares must be ≥ 0.';
+    this.editTouched = true;
+    const blocker = this.codeError ?? this.nameError ?? this.sharesError;
+    if (blocker !== null) {
+      this.error = blocker;
       (this as any).requestUpdate?.();
       return;
     }
+    if (this.savingEdit) return;
+    this.savingEdit = true;
+    (this as any).requestUpdate?.();
     try {
       await updateStock(this.finance, s.id, {
+        stock_code: this.editStockCode.trim(),
         stock_full_name: this.editStockName.trim(),
-        shares,
+        shares: Number(this.editShares.trim()),
+        notes: this.editNotes.trim() === '' ? null : this.editNotes.trim(),
       });
       this.editingId = null;
       this.dispatchEvent(
         new CustomEvent('stock-edit', {
-          detail: { id: s.id },
+          detail: { id: s.id, fromList: true },
           bubbles: true,
           composed: true,
         }),
@@ -185,6 +230,9 @@ export class StockList extends Base {
     } catch (e: any) {
       logger.error('stock edit failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
+    } finally {
+      this.savingEdit = false;
       (this as any).requestUpdate?.();
     }
   }
@@ -214,184 +262,184 @@ export class StockList extends Base {
     }
   }
 
-  private addDividend(s: Stock): void {
-    this.dispatchEvent(
-      new CustomEvent('wealthflow-navigate', {
-        detail: { view: 'overview' },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-    // The dividend form picks up the stock via its dropdown; stash a hint.
-    try {
-      sessionStorage.setItem('wealthflow.prefillStock', String(s.id));
-    } catch {
-      /* non-browser */
-    }
-  }
-
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
-    const filters: StatusFilter[] = ['active', 'inactive', 'all'];
     return html`
-      <div class="section">
-        <h3>Stocks</h3>
-        <div>
-          ${filters.map(
-            (f) =>
-              html`<label
-                ><input
-                  type="radio"
-                  name="stock-status"
-                  .checked=${this.statusFilter === f}
-                  @change=${() => {
-                    this.statusFilter = f;
-                    void this.reload();
-                  }}
-                />${f[0].toUpperCase() + f.slice(1)}</label
-              >`,
-          )}
+      <div class="order-stack">
+        <div class="section flush">
+          <div class="section-header">
+            <h3 class="section-title">Stocks</h3>
+            <div class="header-actions">
+              <span class="rate-badge"
+                >${this.stocks.length}
+                ${this.stocks.length === 1 ? 'holding' : 'holdings'}</span
+              >
+              <button
+                class="btn btn-secondary btn-small"
+                @click=${() => {
+                  this.showForm = !this.showForm;
+                  (this as any).requestUpdate?.();
+                  if (this.showForm) void this.pushToChildren();
+                }}
+              >
+                ${this.showForm ? 'Hide add form' : '+ Add holding'}
+              </button>
+            </div>
+          </div>
+          <div class="section-body">
+            ${
+              this.error
+                ? html`<p class="field-error" role="alert" aria-live="polite">
+                    Error: ${this.error}
+                  </p>`
+                : ''
+            }
+            ${this.renderTable()}
+          </div>
         </div>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        ${
-          this.stocks.length === 0
-            ? html`<p>No holdings yet — add your first holding below.</p>`
-            : html`<div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Code</th>
-                      <th>Name</th>
-                      <th>Shares</th>
-                      <th>FY ${this.fy}</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${this.stocks.map((s) => (this.editingId === s.id ? this.editRow(s) : this.viewRow(s)))}
-                  </tbody>
-                </table>
-              </div>`
-        }
+        ${this.showForm ? html`<stock-form></stock-form>` : ''}
       </div>
-      <div class="section">
-        <h3>Add Holding</h3>
-        ${this.formError ? html`<p class="field-error">Error: ${this.formError}</p>` : ''}
-        <form @submit=${this.onCreate}>
-          <label
-            >Code
-            <input
-              .value=${this.newStockCode}
-              @input=${(e: Event) => {
-                this.newStockCode = (
-                  e.target as HTMLInputElement
-                ).value.toUpperCase();
-                (this as any).requestUpdate?.();
-              }}
-              placeholder="VAS"
-          /></label>
-          <label
-            >Name
-            <input
-              .value=${this.newStockName}
-              @input=${(e: Event) => {
-                this.newStockName = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              placeholder="Vanguard Australian Shares"
-          /></label>
-          <label
-            >Shares
-            <input
-              .value=${this.newShares}
-              @input=${(e: Event) => {
-                this.newShares = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              inputmode="decimal"
-              placeholder="120"
-          /></label>
-          <button class="btn-primary" type="submit">Add Holding</button>
-        </form>
+    `;
+  }
+
+  private renderTable(): unknown {
+    if (this.stocks.length === 0)
+      return html`<p class="empty-state">
+        No holdings yet — use “+ Add holding” to add one.
+      </p>`;
+    return html`
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Code</th>
+              <th scope="col" class="num">Shares</th>
+              <th scope="col" class="num">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${this.stocks.map((s) =>
+              this.editingId === s.id ? this.editRow(s) : this.viewRow(s),
+            )}
+          </tbody>
+        </table>
       </div>
     `;
   }
 
   private viewRow(s: Stock): unknown {
     return html`
-      <tr class=${s.is_active ? '' : 'muted'}>
+      <tr class=${s.is_active ? '' : 'inactive'}>
         <td>
-          <strong>${s.stock_code}</strong>
-          ${s.is_active ? '' : html`<span class="badge">inactive</span>`}
+          <span class="row-code">${s.stock_code}</span>
+          <button
+            class="status-toggle ${s.is_active ? 'on' : ''}"
+            aria-pressed=${s.is_active}
+            aria-label="${s.is_active ? 'Deactivate' : 'Activate'}
+              ${s.stock_code}"
+            title="${s.is_active ? 'Deactivate' : 'Activate'} — history stays
+              in all totals"
+            @click=${() => this.toggleActive(s)}
+          >
+            ${s.is_active ? 'Active' : 'Inactive'}
+          </button>
+          <span class="row-sub">${s.stock_full_name}</span>
         </td>
-        <td>${s.stock_full_name}</td>
-        <td>${s.shares} sh</td>
+        <td class="num">${s.shares}</td>
         <td>
-          ${formatAUD(this.gross[s.id] ?? 0)} + fr
-          ${formatAUD(this.franking[s.id] ?? 0)}
-        </td>
-        <td>
-          <button class="filter-btn" @click=${() => this.addDividend(s)}>
-            Add dividend
-          </button>
-          <button class="filter-btn" @click=${() => this.startEdit(s)}>
-            Edit
-          </button>
-          <button class="filter-btn" @click=${() => this.toggleActive(s)}>
-            ${s.is_active ? 'Deactivate' : 'Activate'}
-          </button>
+          <div class="row-actions">
+            <button
+              class="btn btn-secondary btn-small"
+              aria-label="Edit ${s.stock_code}"
+              @click=${() => this.startEdit(s)}
+            >
+              Edit
+            </button>
+          </div>
         </td>
       </tr>
     `;
   }
 
   private editRow(s: Stock): unknown {
+    const blocker = this.codeError ?? this.nameError ?? this.sharesError;
     return html`
-      <tr>
-        <td><strong>${s.stock_code}</strong></td>
-        <td>
-          <input
-            .value=${this.editStockName}
-            @input=${(e: Event) => {
-              this.editStockName = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === 'Enter') void this.saveEdit(s);
-              if (e.key === 'Escape') {
-                this.editingId = null;
-                (this as any).requestUpdate?.();
+      <tr class="editing">
+        <td colspan="3">
+          <div class="edit-grid cols-3">
+            <label class="field"
+              ><span>Code<em class="req">*</em></span>
+              <input
+                aria-label="Code"
+                .value=${this.editStockCode}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editStockCode = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(s, e)}
+              />
+              ${
+                this.errorFor(this.codeError)
+                  ? html`<p class="field-error">${this.codeError}</p>`
+                  : ''
               }
-            }}
-          />
-        </td>
-        <td>
-          <input
-            .value=${this.editShares}
-            @input=${(e: Event) => {
-              this.editShares = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            inputmode="decimal"
-          />
-        </td>
-        <td>
-          ${formatAUD(this.gross[s.id] ?? 0)} + fr
-          ${formatAUD(this.franking[s.id] ?? 0)}
-        </td>
-        <td>
-          <button class="btn-primary" @click=${() => this.saveEdit(s)}>
-            Save
-          </button>
-          <button
-            class="filter-btn"
-            @click=${() => {
-              this.editingId = null;
-              (this as any).requestUpdate?.();
-            }}
-          >
-            Cancel
-          </button>
+            </label>
+            <label class="field"
+              ><span>Name<em class="req">*</em></span>
+              <input
+                aria-label="Name"
+                .value=${this.editStockName}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editStockName = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(s, e)}
+              />
+              ${
+                this.errorFor(this.nameError)
+                  ? html`<p class="field-error">${this.nameError}</p>`
+                  : ''
+              }
+            </label>
+            <label class="field"
+              ><span>Shares<em class="req">*</em></span>
+              <input
+                aria-label="Shares"
+                inputmode="decimal"
+                .value=${this.editShares}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editShares = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(s, e)}
+              />
+              ${
+                this.errorFor(this.sharesError)
+                  ? html`<p class="field-error">${this.sharesError}</p>`
+                  : ''
+              }
+            </label>
+            <label class="field edit-notes"
+              ><span>Notes</span>
+              <input
+                aria-label="Notes"
+                .value=${this.editNotes}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editNotes = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(s, e)}
+                placeholder="Optional"
+            /></label>
+            <div class="edit-buttons">
+              <button
+                class="btn btn-primary btn-small"
+                ?disabled=${!this.canSaveEdit}
+                title=${blocker ?? 'Save changes'}
+                @click=${() => this.saveEdit(s)}
+              >
+                ${this.savingEdit ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                class="btn btn-secondary btn-small"
+                @click=${() => this.cancelEdit()}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </td>
       </tr>
     `;

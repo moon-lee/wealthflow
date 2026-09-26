@@ -2,8 +2,8 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
-import { formatAUD, maskAccount, formatBSB } from '../utils/format.js';
-import { validateBsb, getInterestTotals } from '../services/bank-service.js';
+import { maskAccount, formatBSB } from '../utils/format.js';
+import { validateBsb } from '../services/bank-service.js';
 import {
   listBanks,
   updateBank,
@@ -17,23 +17,24 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
-type StatusFilter = 'active' | 'inactive' | 'all';
-
 export class BankList extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
       ? ([sharedStyles, wealthflowStyles] as any)
       : [];
   finance: any = null;
+  /** Set by the orchestrator; this master-data list is FY-agnostic. */
   fy = '';
   banks: Bank[] = [];
-  totals: Record<number, number> = {};
-  statusFilter: StatusFilter = 'active';
+  showForm = false;
   editingId: number | null = null;
   editBankCode = '';
   editBankFullName = '';
   editBsb = '';
   editAccount = '';
+  editNotes = '';
+  editTouched = false;
+  savingEdit = false;
   error = '';
 
   async setFinance(f: any): Promise<void> {
@@ -45,19 +46,7 @@ export class BankList extends Base {
     if (!this.finance?.db) return;
     this.error = '';
     try {
-      this.banks = await listBanks(this.finance, { status: this.statusFilter });
-      if (this.fy) {
-        const { byBank } = await getInterestTotals(
-          this.finance,
-          this.banks,
-          this.fy,
-        );
-        this.totals = Object.fromEntries(
-          byBank.map((b) => [b.bankId, b.total]),
-        );
-      } else {
-        this.totals = {};
-      }
+      this.banks = await listBanks(this.finance, { status: 'all' });
     } catch (e: any) {
       logger.error('bank list reload failed:', e);
       this.error = String(e?.message || e);
@@ -111,32 +100,88 @@ export class BankList extends Base {
     void this.reload();
   };
 
-  private startEdit(b: Bank): void {
+  /* Per-field validation: the message renders under the offending input
+     instead of one lumped error in the actions cell. */
+  private get nameError(): string | null {
+    return this.editBankCode.trim() === '' ? 'Name is required.' : null;
+  }
+
+  private get accountError(): string | null {
+    return this.editAccount.trim() === '' ? 'Account is required.' : null;
+  }
+
+  private get bsbError(): string | null {
+    return validateBsb(this.editBsb);
+  }
+
+  private get canSaveEdit(): boolean {
+    return (
+      this.nameError === null &&
+      this.accountError === null &&
+      this.bsbError === null &&
+      !this.savingEdit
+    );
+  }
+
+  /** Errors stay hidden until a field is touched, so an untouched row is calm. */
+  private errorFor(e: string | null): string | null {
+    return e !== null && this.editTouched ? e : null;
+  }
+
+  private async startEdit(b: Bank): Promise<void> {
     this.editingId = b.id;
     this.editBankCode = b.bank_code;
     this.editBankFullName = b.bank_full_name ?? '';
     this.editBsb = b.bsb ?? '';
     this.editAccount = b.account_number;
+    this.editNotes = b.notes ?? '';
+    this.editTouched = false;
+    this.savingEdit = false;
     this.error = '';
     (this as any).requestUpdate?.();
+    try {
+      await (this as any).updateComplete;
+    } catch {
+      /* non-Lit */
+    }
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    root?.querySelector<HTMLInputElement>('tr.editing input')?.focus();
   }
 
   private cancelEdit(): void {
     this.editingId = null;
+    this.editTouched = false;
+    (this as any).requestUpdate?.();
+  }
+
+  /** Enter saves, Escape cancels — shared by every field in the edit row. */
+  private onEditKey(b: Bank, e: KeyboardEvent): void {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void this.saveEdit(b);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      this.cancelEdit();
+    }
+  }
+
+  private onEditInput(setter: (v: string) => void, e: Event): void {
+    setter((e.target as HTMLInputElement).value);
+    this.editTouched = true;
     (this as any).requestUpdate?.();
   }
 
   private async saveEdit(b: Bank): Promise<void> {
-    const bsbErr = validateBsb(this.editBsb);
-    if (
-      this.editBankCode.trim() === '' ||
-      this.editAccount.trim() === '' ||
-      bsbErr
-    ) {
-      this.error = bsbErr ?? 'Name and account are required.';
+    this.editTouched = true;
+    const blocker = this.nameError ?? this.accountError ?? this.bsbError;
+    if (blocker !== null) {
+      this.error = blocker;
       (this as any).requestUpdate?.();
       return;
     }
+    if (this.savingEdit) return;
+    this.savingEdit = true;
+    (this as any).requestUpdate?.();
     try {
       await updateBank(this.finance, b.id, {
         bank_code: this.editBankCode.trim(),
@@ -147,6 +192,7 @@ export class BankList extends Base {
         bsb:
           this.editBsb.trim() === '' ? null : this.editBsb.replace(/\D/g, ''),
         account_number: this.editAccount.trim(),
+        notes: this.editNotes.trim() === '' ? null : this.editNotes.trim(),
       });
       this.editingId = null;
       this.dispatchEvent(
@@ -160,6 +206,9 @@ export class BankList extends Base {
     } catch (e: any) {
       logger.error('bank edit failed:', e);
       this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
+    } finally {
+      this.savingEdit = false;
       (this as any).requestUpdate?.();
     }
   }
@@ -191,125 +240,208 @@ export class BankList extends Base {
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
-    const filters: StatusFilter[] = ['active', 'inactive', 'all'];
     return html`
-      <div class="section">
-        <h3>Banks</h3>
-        <div>
-          ${filters.map(
-            (f) =>
-              html`<label
-                ><input
-                  type="radio"
-                  name="bank-status"
-                  .checked=${this.statusFilter === f}
-                  @change=${() => {
-                    this.statusFilter = f;
-                    void this.reload();
-                  }}
-                />${f[0].toUpperCase() + f.slice(1)}</label
-              >`,
-          )}
+      <div class="order-stack">
+        <div class="section flush">
+          <div class="section-header">
+            <h3 class="section-title">Banks</h3>
+            <div class="header-actions">
+              <span class="rate-badge"
+                >${this.banks.length}
+                ${this.banks.length === 1 ? 'bank' : 'banks'}</span
+              >
+              <button
+                class="btn btn-secondary btn-small"
+                @click=${() => {
+                  this.showForm = !this.showForm;
+                  (this as any).requestUpdate?.();
+                  if (this.showForm) void this.pushToChildren();
+                }}
+              >
+                ${this.showForm ? 'Hide add form' : '+ Add bank'}
+              </button>
+            </div>
+          </div>
+          <div class="section-body">
+            ${
+              this.error
+                ? html`<p class="field-error" role="alert" aria-live="polite">
+                    Error: ${this.error}
+                  </p>`
+                : ''
+            }
+            ${this.renderTable()}
+          </div>
         </div>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        ${
-          this.banks.length === 0
-            ? html`<p>Add your first bank below to start tracking interest.</p>`
-            : html`<div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Bank</th>
-                      <th>BSB / Account</th>
-                      <th>FY ${this.fy}</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${this.banks.map((b) => (this.editingId === b.id ? this.editRow(b) : this.viewRow(b)))}
-                  </tbody>
-                </table>
-              </div>`
-        }
+        ${this.showForm ? html`<bank-form></bank-form>` : ''}
       </div>
-      <bank-form></bank-form>
+    `;
+  }
+
+  private renderTable(): unknown {
+    if (this.banks.length === 0)
+      return html`<p class="empty-state">
+        No banks yet — use “+ Add bank” to add one.
+      </p>`;
+    return html`
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Bank</th>
+              <th scope="col" class="num">BSB / Account</th>
+              <th scope="col" class="num">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${this.banks.map((b) =>
+              this.editingId === b.id ? this.editRow(b) : this.viewRow(b),
+            )}
+          </tbody>
+        </table>
+      </div>
     `;
   }
 
   private viewRow(b: Bank): unknown {
     return html`
-      <tr class=${b.is_active ? '' : 'muted'}>
+      <tr class=${b.is_active ? '' : 'inactive'}>
         <td>
-          ${b.bank_code}
-          ${b.is_active ? '' : html`<span class="badge">inactive</span>`}
-          ${b.bank_full_name ? html`<div class="muted">${b.bank_full_name}</div>` : ''}
+          <span class="row-code">${b.bank_code}</span>
+          <button
+            class="status-toggle ${b.is_active ? 'on' : ''}"
+            aria-pressed=${b.is_active}
+            aria-label="${b.is_active ? 'Deactivate' : 'Activate'}
+              ${b.bank_code}"
+            title="${b.is_active ? 'Deactivate' : 'Activate'} — history stays
+              in all totals"
+            @click=${() => this.toggleActive(b)}
+          >
+            ${b.is_active ? 'Active' : 'Inactive'}
+          </button>
+          ${
+            b.bank_full_name
+              ? html`<span class="row-sub">${b.bank_full_name}</span>`
+              : ''
+          }
         </td>
-        <td>${formatBSB(b.bsb)} ${maskAccount(b.account_number)}</td>
-        <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
+        <td class="mono num">
+          ${
+            b.bsb
+              ? html`${formatBSB(b.bsb)}
+                  <span class="muted">${maskAccount(b.account_number)}</span>`
+              : html`<span class="muted"
+                  >no BSB · ${maskAccount(b.account_number)}</span
+                >`
+          }
+        </td>
         <td>
-          <button class="filter-btn" @click=${() => this.startEdit(b)}>
-            Edit
-          </button>
-          <button class="filter-btn" @click=${() => this.toggleActive(b)}>
-            ${b.is_active ? 'Deactivate' : 'Activate'}
-          </button>
+          <div class="row-actions">
+            <button
+              class="btn btn-secondary btn-small"
+              aria-label="Edit ${b.bank_code}"
+              @click=${() => this.startEdit(b)}
+            >
+              Edit
+            </button>
+          </div>
         </td>
       </tr>
     `;
   }
 
   private editRow(b: Bank): unknown {
-    const bsbErr = validateBsb(this.editBsb);
+    const blocker = this.nameError ?? this.accountError ?? this.bsbError;
     return html`
-      <tr>
-        <td>
-          <input
-            .value=${this.editBankCode}
-            @input=${(e: Event) => {
-              this.editBankCode = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === 'Enter') void this.saveEdit(b);
-              if (e.key === 'Escape') this.cancelEdit();
-            }}
-          />
-          <input
-            .value=${this.editBankFullName}
-            @input=${(e: Event) => {
-              this.editBankFullName = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            placeholder="Full name"
-          />
-        </td>
-        <td>
-          <input
-            .value=${this.editBsb}
-            @input=${(e: Event) => {
-              this.editBsb = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            placeholder="BSB"
-          />
-          <input
-            .value=${this.editAccount}
-            @input=${(e: Event) => {
-              this.editAccount = (e.target as HTMLInputElement).value;
-              (this as any).requestUpdate?.();
-            }}
-            placeholder="Account"
-          />
-          ${bsbErr ? html`<p class="field-error">${bsbErr}</p>` : ''}
-        </td>
-        <td>${formatAUD(this.totals[b.id] ?? 0)}</td>
-        <td>
-          <button class="btn-primary" @click=${() => this.saveEdit(b)}>
-            Save
-          </button>
-          <button class="filter-btn" @click=${() => this.cancelEdit()}>
-            Cancel
-          </button>
+      <tr class="editing">
+        <td colspan="3">
+          <div class="edit-grid">
+            <label class="field"
+              ><span>Name<em class="req">*</em></span>
+              <input
+                aria-label="Bank name"
+                .value=${this.editBankCode}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editBankCode = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(b, e)}
+              />
+              ${
+                this.errorFor(this.nameError)
+                  ? html`<p class="field-error">${this.nameError}</p>`
+                  : ''
+              }
+            </label>
+            <label class="field"
+              ><span>Full name</span>
+              <input
+                aria-label="Full bank name"
+                .value=${this.editBankFullName}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editBankFullName = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(b, e)}
+                placeholder="Macquarie Bank Limited"
+            /></label>
+            <label class="field"
+              ><span>BSB</span>
+              <input
+                aria-label="BSB"
+                inputmode="numeric"
+                maxlength="6"
+                .value=${this.editBsb}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editBsb = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(b, e)}
+                placeholder="012345"
+              />
+              ${
+                this.errorFor(this.bsbError)
+                  ? html`<p class="field-error">${this.bsbError}</p>`
+                  : ''
+              }
+            </label>
+            <label class="field"
+              ><span>Account<em class="req">*</em></span>
+              <input
+                aria-label="Account number"
+                .value=${this.editAccount}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editAccount = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(b, e)}
+                placeholder="Account"
+              />
+              ${
+                this.errorFor(this.accountError)
+                  ? html`<p class="field-error">${this.accountError}</p>`
+                  : ''
+              }
+            </label>
+            <label class="field edit-notes"
+              ><span>Notes</span>
+              <input
+                aria-label="Notes"
+                .value=${this.editNotes}
+                @input=${(e: Event) =>
+                  this.onEditInput((v) => (this.editNotes = v), e)}
+                @keydown=${(e: KeyboardEvent) => this.onEditKey(b, e)}
+                placeholder="Optional"
+            /></label>
+            <div class="edit-buttons">
+              <button
+                class="btn btn-primary btn-small"
+                ?disabled=${!this.canSaveEdit}
+                title=${blocker ?? 'Save changes'}
+                @click=${() => this.saveEdit(b)}
+              >
+                ${this.savingEdit ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                class="btn btn-secondary btn-small"
+                @click=${() => this.cancelEdit()}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </td>
       </tr>
     `;

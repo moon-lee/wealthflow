@@ -38,15 +38,6 @@ export class DividendLog extends Base {
     if (!this.finance?.db) return;
     this.error = '';
     try {
-      try {
-        const prefill = sessionStorage.getItem('wealthflow.prefillStock');
-        if (prefill) {
-          this.stockFilter = Number(prefill);
-          sessionStorage.removeItem('wealthflow.prefillStock');
-        }
-      } catch {
-        /* non-browser */
-      }
       this.stocks = await listStocks(this.finance, { status: 'all' });
       this.entries = await listDividends(
         this.finance,

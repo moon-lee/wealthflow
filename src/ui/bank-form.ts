@@ -80,64 +80,87 @@ export class BankForm extends Base {
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
     return html`
-      <div class="section">
-        <h3>Add Bank</h3>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
-        <form @submit=${this.onSubmit}>
-          <label
-            >Name
-            <input
-              .value=${this.bankCode}
-              @input=${(e: Event) => {
-                this.bankCode = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              required
-          /></label>
-          <label
-            >Full name
-            <input
-              .value=${this.bankFullName}
-              @input=${(e: Event) => {
-                this.bankFullName = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              placeholder="Macquarie Bank Limited"
-          /></label>
-          <label
-            >BSB
-            <input
-              .value=${this.bsb}
-              @input=${(e: Event) => {
-                this.bsb = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              placeholder="012345"
-          /></label>
-          ${this.bsbError ? html`<p class="field-error">${this.bsbError}</p>` : ''}
-          <label
-            >Account
-            <input
-              .value=${this.account}
-              @input=${(e: Event) => {
-                this.account = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-              required
-          /></label>
-          <label
-            >Notes
-            <input
-              .value=${this.notes}
-              @input=${(e: Event) => {
-                this.notes = (e.target as HTMLInputElement).value;
-                (this as any).requestUpdate?.();
-              }}
-          /></label>
-          <button class="btn-primary" type="submit" ?disabled=${!this.canSave}>
-            Add Bank
-          </button>
-        </form>
+      <div class="section flush">
+        <div class="section-header">
+          <h3 class="section-title">Add Bank</h3>
+          <div class="header-actions">
+            <span class="muted"><em class="req">*</em> required</span>
+            <button
+              class="btn btn-primary btn-small"
+              type="submit"
+              form="bank-add-form"
+              ?disabled=${!this.canSave}
+            >
+              ${this.saving ? 'Adding…' : 'Add Bank'}
+            </button>
+          </div>
+        </div>
+        <div class="section-body">
+          ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
+          <form id="bank-add-form" @submit=${this.onSubmit}>
+            <div class="field-grid">
+              <label class="field"
+                ><span>Name<em class="req">*</em></span>
+                <input
+                  aria-label="Name"
+                  .value=${this.bankCode}
+                  @input=${(e: Event) => {
+                    this.bankCode = (e.target as HTMLInputElement).value;
+                    (this as any).requestUpdate?.();
+                  }}
+                  required
+              /></label>
+              <label class="field"
+                ><span>Full name</span>
+                <input
+                  aria-label="Full name"
+                  .value=${this.bankFullName}
+                  @input=${(e: Event) => {
+                    this.bankFullName = (e.target as HTMLInputElement).value;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="Macquarie Bank Limited"
+              /></label>
+              <label class="field"
+                ><span>BSB</span>
+                <input
+                  aria-label="BSB"
+                  inputmode="numeric"
+                  maxlength="6"
+                  .value=${this.bsb}
+                  @input=${(e: Event) => {
+                    this.bsb = (e.target as HTMLInputElement).value;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="012345"
+                />
+                ${this.bsbError ? html`<p class="field-error">${this.bsbError}</p>` : ''}
+              </label>
+              <label class="field"
+                ><span>Account<em class="req">*</em></span>
+                <input
+                  aria-label="Account"
+                  .value=${this.account}
+                  @input=${(e: Event) => {
+                    this.account = (e.target as HTMLInputElement).value;
+                    (this as any).requestUpdate?.();
+                  }}
+                  required
+              /></label>
+              <label class="field field-wide"
+                ><span>Notes</span>
+                <input
+                  aria-label="Notes"
+                  .value=${this.notes}
+                  @input=${(e: Event) => {
+                    this.notes = (e.target as HTMLInputElement).value;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="Optional"
+              /></label>
+            </div>
+          </form>
+        </div>
       </div>
     `;
   }

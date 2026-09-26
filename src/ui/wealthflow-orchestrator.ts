@@ -1,7 +1,6 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
-import { formatAUD } from '../utils/format.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -37,7 +36,6 @@ export class WealthOrchestrator extends Base {
   finance: any = null;
   tab: WealthTab = 'overview';
   fy = currentFy();
-  footerTotal: number | null = null;
   error = '';
 
   async setFinance(f: any): Promise<void> {
@@ -70,7 +68,6 @@ export class WealthOrchestrator extends Base {
     } catch {
       /* non-Lit context */
     }
-    await this.refreshFooter();
     const c = this.child() as any;
     if (c && this.finance) {
       c.finance = this.finance;
@@ -95,72 +92,11 @@ export class WealthOrchestrator extends Base {
     }
   }
 
-  /** Footer sums the same DAO queries as the grid/log — single totals source. */
-  private async refreshFooter(): Promise<void> {
-    if (!this.finance?.db) return;
-    try {
-      const { listBanks } = await import('../dao/banks.js');
-      const { getInterestTotals } = await import('../services/bank-service.js');
-      const banks = await listBanks(this.finance, { status: 'all' });
-      const { total } = await getInterestTotals(this.finance, banks, this.fy);
-      let combined = total;
-      try {
-        // Variable specifier keeps tsc quiet until the stock milestone lands (Tasks 11-13).
-        const stocksMod: string = '../dao/stocks.js';
-        const stockSvcMod: string = '../services/stock-service.js';
-        const { listStocks } = (await import(
-          /* @vite-ignore */ stocksMod
-        )) as typeof import('../dao/banks.js') & {
-          listStocks: any;
-        };
-        const { getDividendTotals } = (await import(
-          /* @vite-ignore */ stockSvcMod
-        )) as { getDividendTotals: any };
-        const stocks = await listStocks(this.finance, { status: 'all' });
-        const div = await getDividendTotals(this.finance, stocks, this.fy);
-        combined = Math.round((total + div.gross) * 100) / 100;
-      } catch {
-        /* stock module not built yet — interest-only footer */
-      }
-      this.footerTotal = combined;
-    } catch (e: any) {
-      this.error = String(e?.message || e);
-    }
-  }
-
   override connectedCallback(): void {
     (super.connectedCallback as (() => void) | undefined)?.call(this);
     this.addEventListener('fy-changed', this._onFy as EventListener);
     this.addEventListener('wealthflow-navigate', this._onNav as EventListener);
     this.addEventListener('host-navigate', this._onHostNav as EventListener);
-    this.addEventListener('bank-create', this._onDataChanged as EventListener);
-    this.addEventListener('bank-edit', this._onDataChanged as EventListener);
-    this.addEventListener(
-      'interest-create',
-      this._onDataChanged as EventListener,
-    );
-    this.addEventListener(
-      'interest-edit',
-      this._onDataChanged as EventListener,
-    );
-    this.addEventListener(
-      'interest-delete',
-      this._onDataChanged as EventListener,
-    );
-    this.addEventListener('stock-create', this._onDataChanged as EventListener);
-    this.addEventListener('stock-edit', this._onDataChanged as EventListener);
-    this.addEventListener(
-      'dividend-create',
-      this._onDataChanged as EventListener,
-    );
-    this.addEventListener(
-      'dividend-edit',
-      this._onDataChanged as EventListener,
-    );
-    this.addEventListener(
-      'dividend-delete',
-      this._onDataChanged as EventListener,
-    );
   }
 
   override disconnectedCallback(): void {
@@ -170,43 +106,6 @@ export class WealthOrchestrator extends Base {
       this._onNav as EventListener,
     );
     this.removeEventListener('host-navigate', this._onHostNav as EventListener);
-    this.removeEventListener(
-      'bank-create',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener('bank-edit', this._onDataChanged as EventListener);
-    this.removeEventListener(
-      'interest-create',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'interest-edit',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'interest-delete',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'stock-create',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'stock-edit',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'dividend-create',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'dividend-edit',
-      this._onDataChanged as EventListener,
-    );
-    this.removeEventListener(
-      'dividend-delete',
-      this._onDataChanged as EventListener,
-    );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
@@ -229,10 +128,6 @@ export class WealthOrchestrator extends Base {
       mountData?: Record<string, unknown>;
     };
     void this.init(this.finance, { view: d.view, ...(d.mountData ?? {}) });
-  };
-
-  private _onDataChanged = (): void => {
-    void this.refreshFooter().then(() => (this as any).requestUpdate?.());
   };
 
   override render(): unknown {
@@ -273,12 +168,6 @@ export class WealthOrchestrator extends Base {
             ${this.tab === 'banks' ? html`<bank-list id="child"></bank-list>` : ''}
             ${this.tab === 'stocks' ? html`<stock-list id="child"></stock-list>` : ''}
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
-            <div class="section">
-              <span>FY ${this.fy} total (context):</span>
-              <strong
-                >${this.footerTotal == null ? '—' : formatAUD(this.footerTotal)}</strong
-              >
-            </div>
           </div>
         </div>
       </div>
