@@ -183,4 +183,134 @@ export const wealthflowStyles = css`
     opacity: 0.5;
     cursor: default;
   }
+
+  /* Mortgage-dialect cards: section-header/body, stat-grid, hist-table.
+     Mirrors mortgage-overview-view.ts so cross-extension screens read as one app. */
+  .section.flush {
+    padding: 0;
+    overflow: hidden;
+  }
+  .section-header {
+    background: var(--ff-bg-subpanel, #2a2a2a);
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--ff-border, #3e3e3e);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 42px;
+  }
+  .section-header h3 {
+    margin-bottom: 0;
+  }
+  .section-body {
+    padding: 16px;
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .header-actions .btn {
+    padding: 2px 12px;
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .rate-badge {
+    display: inline-block;
+    font-weight: 800;
+    font-size: var(--ff-font-sm, 12px);
+    letter-spacing: 0.3px;
+    color: var(--ff-accent, #007acc);
+    background: var(--ff-bg-input, #3c3c3c);
+    border: 1px solid var(--ff-accent, #007acc);
+    border-radius: 12px;
+    padding: 1px 10px;
+    white-space: nowrap;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  @media (max-width: 640px) {
+    .stat-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  .stat {
+    background: var(--ff-bg-subpanel, #2a2a2a);
+    border: 1px solid var(--ff-border, #3e3e3e);
+    border-radius: 6px;
+    padding: 12px 14px;
+    min-width: 0;
+  }
+  .stat-label {
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--ff-text-muted, #858585);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .stat-value {
+    font-size: var(--ff-font-xl, 17px);
+    font-weight: 600;
+    color: var(--ff-text-strong, #fff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-variant-numeric: tabular-nums;
+  }
+  .hist-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  .hist-table thead th {
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--ff-text-muted, #858585);
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--ff-border, #3e3e3e);
+    white-space: nowrap;
+  }
+  .hist-table thead th.num {
+    text-align: right;
+  }
+  .hist-table tbody td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--ff-border, #3e3e3e);
+    font-size: var(--ff-font-base, 14px);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hist-table tbody tr:nth-child(even) {
+    background: var(--ff-bg-subpanel, #2a2a2a);
+  }
+  .hist-table tbody tr:hover {
+    background: var(--ff-bg-input-hover, #4a4a4a);
+  }
+  .hist-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .hist-table td.money {
+    font-weight: 700;
+    color: var(--ff-text-strong, #fff);
+  }
+  .muted {
+    color: var(--ff-text-muted, #858585);
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .order-stack {
+    display: flex;
+    flex-direction: column;
+  }
 `;

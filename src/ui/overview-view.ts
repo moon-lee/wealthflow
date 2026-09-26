@@ -21,6 +21,8 @@ export class OverviewView extends Base {
   fy = '';
   summary: OverviewSummary | null = null;
   error = '';
+  showDividendForm = false;
+  showInterestForm = false;
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -72,12 +74,107 @@ export class OverviewView extends Base {
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
+    await this.pushToForms();
   }
 
-  private goBanks(): void {
+  /** Forward finance + fy to the embedded toggleable log forms. */
+  private async pushToForms(): Promise<void> {
+    try {
+      await (this as any).updateComplete;
+    } catch {
+      /* non-Lit */
+    }
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    if (!root || !this.finance) return;
+    for (const sel of ['dividend-form', 'interest-form']) {
+      const el = root.querySelector(sel) as any;
+      if (!el || typeof el.setFinance !== 'function') continue;
+      el.finance = this.finance;
+      try {
+        el.fy = this.fy;
+      } catch {
+        /* ignore */
+      }
+      try {
+        await el.setFinance(this.finance);
+      } catch {
+        /* form surfaces its own errors */
+      }
+    }
+  }
+
+  private toggleForm(which: 'dividends' | 'interest'): void {
+    if (which === 'dividends') this.showDividendForm = !this.showDividendForm;
+    else this.showInterestForm = !this.showInterestForm;
+    (this as any).requestUpdate?.();
+    void this.pushToForms();
+  }
+
+  override connectedCallback(): void {
+    (super.connectedCallback as (() => void) | undefined)?.call(this);
+    this.addEventListener(
+      'dividend-create',
+      this._onFormChanged as EventListener,
+    );
+    this.addEventListener(
+      'dividend-edit',
+      this._onFormChanged as EventListener,
+    );
+    this.addEventListener(
+      'dividend-delete',
+      this._onFormChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-create',
+      this._onFormChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-edit',
+      this._onFormChanged as EventListener,
+    );
+    this.addEventListener(
+      'interest-delete',
+      this._onFormChanged as EventListener,
+    );
+  }
+
+  override disconnectedCallback(): void {
+    this.removeEventListener(
+      'dividend-create',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'dividend-edit',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'dividend-delete',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-create',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-edit',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'interest-delete',
+      this._onFormChanged as EventListener,
+    );
+    (super.disconnectedCallback as (() => void) | undefined)?.call(this);
+  }
+
+  private _onFormChanged = (): void => {
+    // Embedded log forms bubble their writes; refresh cards (footer refreshes via orchestrator).
+    void this.reload();
+  };
+
+  private go(view: string): void {
     this.dispatchEvent(
       new CustomEvent('wealthflow-navigate', {
-        detail: { view: 'banks' },
+        detail: { view },
         bubbles: true,
         composed: true,
       }),
@@ -88,68 +185,208 @@ export class OverviewView extends Base {
     if (typeof HTMLElement === 'undefined') return html``;
     const s = this.summary;
     return html`
-      <div class="section">
-        <h3>Overview — FY ${this.fy}</h3>
-        ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
+      <div class="order-stack">
+        ${
+          this.error
+            ? html`<div class="section flush">
+                <div class="section-body">
+                  <p class="field-error">Error: ${this.error}</p>
+                </div>
+              </div>`
+            : ''
+        }
         ${
           !s
-            ? html`<p>Loading…</p>`
+            ? html`<div class="section flush">
+                <div class="section-body"><p class="muted">Loading…</p></div>
+              </div>`
             : html`
-                <div class="section">
-                  <h4>Dividends</h4>
-                  ${
-                    s.dividends.gross === 0 && s.dividends.franking === 0
-                      ? html`<p>
-                          No dividends logged this FY yet — add a holding and
-                          log its receipts.
-                        </p>`
-                      : html`
-                          <p>
-                            Gross ${formatAUD(s.dividends.gross)} · Franking
-                            ${formatAUD(s.dividends.franking)}
-                          </p>
-                          <ul>
-                            ${(
-                              Object.keys(
-                                DIVIDEND_TYPE_LABELS,
-                              ) as (keyof typeof DIVIDEND_TYPE_LABELS)[]
-                            ).map(
-                              (t) =>
-                                html`<li>
-                                  ${DIVIDEND_TYPE_LABELS[t]}:
-                                  ${formatAUD(s.dividends.byType[t].gross)} + fr
-                                  ${formatAUD(s.dividends.byType[t].franking)}
-                                </li>`,
+                <!-- Dividends -->
+                <div class="section flush">
+                  <div class="section-header">
+                    <h3 class="section-title">Dividends — FY ${this.fy}</h3>
+                    <div class="header-actions">
+                      <span class="rate-badge"
+                        >Gross ${formatAUD(s.dividends.gross)}</span
+                      >
+                      <button
+                        class="btn btn-secondary"
+                        @click=${() => this.toggleForm('dividends')}
+                      >
+                        ${this.showDividendForm ? 'Hide form' : 'Log dividend'}
+                      </button>
+                      <button
+                        class="btn btn-secondary"
+                        @click=${() => this.go('dividends')}
+                      >
+                        → Dividends
+                      </button>
+                    </div>
+                  </div>
+                  <div class="section-body">
+                    ${
+                      s.dividends.gross === 0 && s.dividends.franking === 0
+                        ? html`<p class="muted">
+                            No dividends logged this FY yet — add a holding and
+                            log its receipts.
+                          </p>`
+                        : html`
+                            <div class="stat-grid">
+                              <div class="stat">
+                                <div class="stat-label">Gross</div>
+                                <div class="stat-value">
+                                  ${formatAUD(s.dividends.gross)}
+                                </div>
+                              </div>
+                              <div class="stat">
+                                <div class="stat-label">Franking</div>
+                                <div class="stat-value">
+                                  ${formatAUD(s.dividends.franking)}
+                                </div>
+                              </div>
+                              ${(
+                                Object.keys(
+                                  DIVIDEND_TYPE_LABELS,
+                                ) as (keyof typeof DIVIDEND_TYPE_LABELS)[]
+                              ).map(
+                                (t) =>
+                                  html`<div class="stat">
+                                    <div class="stat-label">
+                                      ${DIVIDEND_TYPE_LABELS[t]} · fr
+                                      ${formatAUD(s.dividends.byType[t].franking)}
+                                    </div>
+                                    <div class="stat-value">
+                                      ${formatAUD(s.dividends.byType[t].gross)}
+                                    </div>
+                                  </div>`,
+                              )}
+                            </div>
+                            ${
+                              s.dividends.byStock.length > 0
+                                ? html`<div
+                                    class="table-wrap"
+                                    style="margin-top:12px"
+                                  >
+                                    <table class="hist-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Stock</th>
+                                          <th class="num">Gross</th>
+                                          <th class="num">Franking</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        ${s.dividends.byStock.map(
+                                          (b) =>
+                                            html`<tr>
+                                              <td>
+                                                <strong>${b.code}</strong>
+                                                <span class="muted"
+                                                  >${b.name}</span
+                                                >
+                                              </td>
+                                              <td class="num money">
+                                                ${formatAUD(b.gross)}
+                                              </td>
+                                              <td class="num">
+                                                ${formatAUD(b.franking)}
+                                              </td>
+                                            </tr>`,
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>`
+                                : ''
+                            }
+                          `
+                    }
+                    ${this.showDividendForm ? html`<dividend-form></dividend-form>` : ''}
+                  </div>
+                </div>
+
+                <!-- Interest -->
+                <div class="section flush">
+                  <div class="section-header">
+                    <h3 class="section-title">Interest — FY ${this.fy}</h3>
+                    <div class="header-actions">
+                      <span class="rate-badge"
+                        >Total ${formatAUD(s.interest.total)}</span
+                      >
+                      <button
+                        class="btn btn-secondary"
+                        @click=${() => this.toggleForm('interest')}
+                      >
+                        ${this.showInterestForm ? 'Hide form' : 'Log interest'}
+                      </button>
+                      <button
+                        class="btn btn-secondary"
+                        @click=${() => this.go('banks')}
+                      >
+                        → Banks
+                      </button>
+                    </div>
+                  </div>
+                  <div class="section-body">
+                    ${
+                      s.interest.total === 0
+                        ? html`<p class="muted">
+                            No interest logged this FY yet — add a bank and fill
+                            the monthly grid.
+                          </p>`
+                        : html`<div class="stat-grid">
+                            <div class="stat">
+                              <div class="stat-label">Total</div>
+                              <div class="stat-value">
+                                ${formatAUD(s.interest.total)}
+                              </div>
+                            </div>
+                            ${s.interest.byBank.map(
+                              (b) =>
+                                html`<div class="stat">
+                                  <div class="stat-label">${b.name}</div>
+                                  <div class="stat-value">
+                                    ${formatAUD(b.total)}
+                                  </div>
+                                </div>`,
                             )}
-                          </ul>
-                        `
-                  }
+                          </div>`
+                    }
+                    ${this.showInterestForm ? html`<interest-form></interest-form>` : ''}
+                  </div>
                 </div>
-                <div class="section">
-                  <h4>Interest</h4>
-                  ${
-                    s.interest.total === 0
-                      ? html`<p>
-                          No interest logged this FY yet — add a bank and fill
-                          the monthly grid.
-                        </p>`
-                      : html`<p>
-                          ${formatAUD(s.interest.total)}
-                          <button
-                            class="filter-btn"
-                            @click=${() => this.goBanks()}
-                          >
-                            → Banks
-                          </button>
-                        </p>`
-                  }
-                </div>
-                <div class="section">
-                  <h4>Combined</h4>
-                  <p>
-                    Gross ${formatAUD(s.combined.gross)} · Franking
-                    ${formatAUD(s.combined.franking)}
-                  </p>
+
+                <!-- Combined -->
+                <div class="section flush">
+                  <div class="section-header">
+                    <h3 class="section-title">
+                      Combined taxable — FY ${this.fy}
+                    </h3>
+                    <div class="header-actions">
+                      <span class="rate-badge"
+                        >Gross ${formatAUD(s.combined.gross)}</span
+                      >
+                    </div>
+                  </div>
+                  <div class="section-body">
+                    <div class="stat-grid">
+                      <div class="stat">
+                        <div class="stat-label">Taxable gross</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.combined.gross)}
+                        </div>
+                      </div>
+                      <div class="stat">
+                        <div class="stat-label">Franking credits</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.combined.franking)}
+                        </div>
+                      </div>
+                    </div>
+                    <p class="muted">
+                      Interest carries no franking — credits come from dividends
+                      only.
+                    </p>
+                  </div>
                 </div>
               `
         }
