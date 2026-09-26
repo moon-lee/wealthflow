@@ -26,7 +26,7 @@ export async function activate(
   finance.commands.registerCommand(
     'wealthflow.add-interest',
     'Wealth Flow: Add Interest',
-    openView('banks'),
+    openView('overview'),
   );
   finance.commands.registerCommand(
     'wealthflow.show-stocks',
@@ -36,7 +36,7 @@ export async function activate(
   finance.commands.registerCommand(
     'wealthflow.add-dividend',
     'Wealth Flow: Add Dividend',
-    openView('dividends'),
+    openView('overview'),
   );
   finance.commands.registerCommand(
     'wealthflow.show-overview',

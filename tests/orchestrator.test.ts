@@ -8,6 +8,7 @@ describe('orchestrator mapping', () => {
     expect(viewForMount({ view: 'banks' })).toBe('banks');
     expect(viewForMount({})).toBe('overview');
     expect(viewForMount({ view: 'nope' })).toBe('overview');
+    expect(viewForMount({ view: 'dividends' })).toBe('overview');
     expect(typeof WealthOrchestrator).toBe('function');
   });
 });

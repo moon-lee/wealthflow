@@ -74,11 +74,11 @@ export class OverviewView extends Base {
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
-    await this.pushToForms();
+    await this.pushToChildren();
   }
 
-  /** Forward finance + fy to the embedded toggleable log forms. */
-  private async pushToForms(): Promise<void> {
+  /** Forward finance + fy to embedded grids, logs, and toggleable forms. */
+  private async pushToChildren(): Promise<void> {
     try {
       await (this as any).updateComplete;
     } catch {
@@ -86,7 +86,12 @@ export class OverviewView extends Base {
     }
     const root = (this as any).renderRoot as ShadowRoot | undefined;
     if (!root || !this.finance) return;
-    for (const sel of ['dividend-form', 'interest-form']) {
+    for (const sel of [
+      'dividend-form',
+      'interest-form',
+      'interest-grid',
+      'dividend-log',
+    ]) {
       const el = root.querySelector(sel) as any;
       if (!el || typeof el.setFinance !== 'function') continue;
       el.finance = this.finance;
@@ -98,7 +103,7 @@ export class OverviewView extends Base {
       try {
         await el.setFinance(this.finance);
       } catch {
-        /* form surfaces its own errors */
+        /* child surfaces its own errors */
       }
     }
   }
@@ -107,7 +112,7 @@ export class OverviewView extends Base {
     if (which === 'dividends') this.showDividendForm = !this.showDividendForm;
     else this.showInterestForm = !this.showInterestForm;
     (this as any).requestUpdate?.();
-    void this.pushToForms();
+    void this.pushToChildren();
   }
 
   override connectedCallback(): void {
@@ -215,12 +220,6 @@ export class OverviewView extends Base {
                       >
                         ${this.showDividendForm ? 'Hide form' : 'Log dividend'}
                       </button>
-                      <button
-                        class="btn btn-secondary"
-                        @click=${() => this.go('dividends')}
-                      >
-                        → Dividends
-                      </button>
                     </div>
                   </div>
                   <div class="section-body">
@@ -300,6 +299,7 @@ export class OverviewView extends Base {
                             }
                           `
                     }
+                    <dividend-log></dividend-log>
                     ${this.showDividendForm ? html`<dividend-form></dividend-form>` : ''}
                   </div>
                 </div>
@@ -351,6 +351,7 @@ export class OverviewView extends Base {
                             )}
                           </div>`
                     }
+                    <interest-grid></interest-grid>
                     ${this.showInterestForm ? html`<interest-form></interest-form>` : ''}
                   </div>
                 </div>

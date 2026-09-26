@@ -8,14 +8,13 @@ const Base =
     ? LitElement
     : (class {} as unknown as typeof LitElement);
 
-export type WealthTab = 'banks' | 'stocks' | 'dividends' | 'overview';
+export type WealthTab = 'banks' | 'stocks' | 'overview';
 
 export function viewForMount(mount: Record<string, unknown> = {}): WealthTab {
   const v = (mount.view ?? mount.viewId) as string | undefined;
   if (v === 'banks' || v === 'bank-list') return 'banks';
   if (v === 'stocks' || v === 'stock-list') return 'stocks';
-  if (v === 'dividends' || v === 'dividend-log') return 'dividends';
-  if (v === 'overview' || v === 'overview-view') return 'overview';
+  // Legacy Dividends tab now lives inside Overview.
   return 'overview';
 }
 
@@ -238,7 +237,7 @@ export class WealthOrchestrator extends Base {
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
-    const tabs: WealthTab[] = ['banks', 'stocks', 'dividends', 'overview'];
+    const tabs: WealthTab[] = ['banks', 'stocks', 'overview'];
     return html`
       <div class="view-scroll">
         <div class="topbar">
@@ -273,7 +272,6 @@ export class WealthOrchestrator extends Base {
             ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
             ${this.tab === 'banks' ? html`<bank-list id="child"></bank-list>` : ''}
             ${this.tab === 'stocks' ? html`<stock-list id="child"></stock-list>` : ''}
-            ${this.tab === 'dividends' ? html`<dividend-log id="child"></dividend-log>` : ''}
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
             <div class="section">
               <span>FY ${this.fy} total (context):</span>

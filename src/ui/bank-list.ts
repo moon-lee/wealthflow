@@ -65,7 +65,7 @@ export class BankList extends Base {
     await this.pushToChildren();
   }
 
-  /** Forward finance + fy to embedded grid/form children. */
+  /** Forward finance to the embedded bank form. */
   private async pushToChildren(): Promise<void> {
     try {
       await (this as any).updateComplete;
@@ -74,29 +74,20 @@ export class BankList extends Base {
     }
     const root = (this as any).renderRoot as ShadowRoot | undefined;
     if (!root) return;
-    for (const sel of ['interest-grid', 'interest-form', 'bank-form']) {
-      const el = root.querySelector(sel) as any;
-      if (!el) continue;
-      el.finance = this.finance;
-      if ('fy' in el || sel !== 'bank-form') {
-        try {
-          el.fy = this.fy;
-        } catch {
-          /* ignore */
-        }
+    const el = root.querySelector('bank-form') as any;
+    if (!el) return;
+    el.finance = this.finance;
+    if (typeof el.setFinance === 'function') {
+      try {
+        await el.setFinance(this.finance);
+      } catch (e: any) {
+        this.error = String(e?.message || e);
       }
-      if (typeof el.setFinance === 'function') {
-        try {
-          await el.setFinance(this.finance);
-        } catch (e: any) {
-          this.error = String(e?.message || e);
-        }
-      } else if (typeof el.reload === 'function') {
-        try {
-          await el.reload();
-        } catch (e: any) {
-          this.error = String(e?.message || e);
-        }
+    } else if (typeof el.reload === 'function') {
+      try {
+        await el.reload();
+      } catch (e: any) {
+        this.error = String(e?.message || e);
       }
     }
   }
@@ -104,18 +95,6 @@ export class BankList extends Base {
   override connectedCallback(): void {
     (super.connectedCallback as (() => void) | undefined)?.call(this);
     this.addEventListener('bank-create', this._onChildChanged as EventListener);
-    this.addEventListener(
-      'interest-create',
-      this._onChildChanged as EventListener,
-    );
-    this.addEventListener(
-      'interest-edit',
-      this._onChildChanged as EventListener,
-    );
-    this.addEventListener(
-      'interest-delete',
-      this._onChildChanged as EventListener,
-    );
   }
 
   override disconnectedCallback(): void {
@@ -123,25 +102,11 @@ export class BankList extends Base {
       'bank-create',
       this._onChildChanged as EventListener,
     );
-    this.removeEventListener(
-      'interest-create',
-      this._onChildChanged as EventListener,
-    );
-    this.removeEventListener(
-      'interest-edit',
-      this._onChildChanged as EventListener,
-    );
-    this.removeEventListener(
-      'interest-delete',
-      this._onChildChanged as EventListener,
-    );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
-  private _onChildChanged = (e: Event): void => {
-    // Grid/form writes bubble through here; refresh per-row FY figures.
-    // Stop double-handling of our own row edits (handled inline).
-    if ((e as CustomEvent).detail?.fromList) return;
+  private _onChildChanged = (): void => {
+    // Bank-form creates bubble through here; refresh the rows.
     void this.reload();
   };
 
@@ -262,8 +227,6 @@ export class BankList extends Base {
         }
       </div>
       <bank-form></bank-form>
-      <interest-grid></interest-grid>
-      <interest-form></interest-form>
     `;
   }
 

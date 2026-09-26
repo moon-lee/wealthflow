@@ -213,7 +213,7 @@ export class StockList extends Base {
   private addDividend(s: Stock): void {
     this.dispatchEvent(
       new CustomEvent('wealthflow-navigate', {
-        detail: { view: 'dividends' },
+        detail: { view: 'overview' },
         bubbles: true,
         composed: true,
       }),

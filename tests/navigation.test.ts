@@ -19,9 +19,7 @@ function tabButtons(el: WealthOrchestrator): HTMLButtonElement[] {
   return [
     ...(el as any).renderRoot.querySelectorAll('.topbar .filter-btn'),
   ].filter((b: any) =>
-    ['Banks', 'Stocks', 'Dividends', 'Overview'].includes(
-      b.textContent?.trim(),
-    ),
+    ['Banks', 'Stocks', 'Overview'].includes(b.textContent?.trim()),
   ) as HTMLButtonElement[];
 }
 
@@ -29,9 +27,9 @@ describe('orchestrator click navigation', () => {
   it('clicking Stocks switches the visible child', async () => {
     const { el } = await mount();
     expect((el as any).renderRoot.querySelector('bank-list')).toBeTruthy();
+    expect(tabButtons(el)).toHaveLength(3);
     for (const [label, tag] of [
       ['Stocks', 'stock-list'],
-      ['Dividends', 'dividend-log'],
       ['Overview', 'overview-view'],
       ['Banks', 'bank-list'],
     ] as const) {
@@ -50,14 +48,29 @@ describe('orchestrator click navigation', () => {
     const { el } = await mount();
     el.dispatchEvent(
       new CustomEvent('wealthflow-navigate', {
+        detail: { view: 'stocks' },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await (el as any).updateComplete;
+    expect(el.tab).toBe('stocks');
+    expect((el as any).renderRoot.querySelector('stock-list')).toBeTruthy();
+    el.remove();
+  });
+
+  it('legacy dividends target lands on overview', async () => {
+    const { el } = await mount();
+    el.dispatchEvent(
+      new CustomEvent('wealthflow-navigate', {
         detail: { view: 'dividends' },
         bubbles: true,
         composed: true,
       }),
     );
     await (el as any).updateComplete;
-    expect(el.tab).toBe('dividends');
-    expect((el as any).renderRoot.querySelector('dividend-log')).toBeTruthy();
+    expect(el.tab).toBe('overview');
+    expect((el as any).renderRoot.querySelector('overview-view')).toBeTruthy();
     el.remove();
   });
 

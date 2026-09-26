@@ -59,32 +59,6 @@ export class DividendLog extends Base {
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
-    await this.pushToForm();
-  }
-
-  private async pushToForm(): Promise<void> {
-    try {
-      await (this as any).updateComplete;
-    } catch {
-      /* non-Lit */
-    }
-    const root = (this as any).renderRoot as ShadowRoot | undefined;
-    const form = root?.querySelector('dividend-form') as any;
-    if (form && this.finance) {
-      form.finance = this.finance;
-      try {
-        form.fy = this.fy;
-      } catch {
-        /* ignore */
-      }
-      if (typeof form.setFinance === 'function') {
-        try {
-          await form.setFinance(this.finance);
-        } catch {
-          /* form surfaces its own errors */
-        }
-      }
-    }
   }
 
   private stockName(id: number): string {
@@ -213,7 +187,6 @@ export class DividendLog extends Base {
               </div>`
         }
       </div>
-      <dividend-form></dividend-form>
     `;
   }
 }
