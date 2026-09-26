@@ -49,6 +49,12 @@
       //   const m = await import('/src/seed/wealth-seed.ts');
       //   await m.seedWealthflow(window.__finance);
       window.__finance = finance;
+      // Dev console helper for the public domain service, so a cross-extension
+      // consumer can be exercised without a second extension in the page.
+      // Params go in as an array because the host spreads them positionally:
+      //   await __svc('getOverviewSummary', '2026-2027')
+      window.__svc = (method, ...args) =>
+        finance.services.invoke('wealthflow', method, args);
       let current = null;
 
       // ---- ?seed (or ?seed=1) loads src/seed/wealth-seed.ts before mount ----

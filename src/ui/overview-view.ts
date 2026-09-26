@@ -47,14 +47,19 @@ export class OverviewView extends Base {
       // Prefer the public service surface (what Tax/dashboard consume); fall back to direct DAO aggregation.
       let summary: OverviewSummary | null = null;
       try {
+        // Params go as an array: the host spreads them into positional args, so
+        // a bare string would arrive as one character per argument.
         summary = (await this.finance.services?.invoke(
           'wealthflow',
           'getOverviewSummary',
-          this.fy,
+          [this.fy],
         )) as OverviewSummary | null;
       } catch {
         summary = null;
       }
+      // A summary for a different year means the call was mis-shaped, and its
+      // zeros would look like an empty year. Fall through and aggregate direct.
+      if (summary && summary.financialYear !== this.fy) summary = null;
       if (!summary) {
         const { listBanks } = await import('../dao/banks.js');
         const { getInterestTotals } =

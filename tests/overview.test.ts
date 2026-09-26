@@ -695,4 +695,109 @@ describe('overview-view', () => {
     expect((await rows()).find((r) => r.id === entry.id)).toBeUndefined();
     el.remove();
   });
+
+  // The card above only proves the DAO fallback, because no test registered the
+  // public service. Once the service is live the view must pass its args in the
+  // shape the host expects, or it reads a bogus year and silently shows zeros.
+  it('shows Combined totals when the public service is registered', async () => {
+    const { createPublicWealthAdapter } =
+      await import('../src/services/public-wealth-adapter.js');
+    const finance: any = createMockFinance();
+    const bank: any = await createBank(finance, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
+    await createInterestEntry(
+      finance,
+      {
+        bank_id: bank.id,
+        date: '2025-07-31',
+        amount: 10,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    const stock: any = await createStock(finance, {
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard',
+      shares: 5,
+    });
+    await createDividend(
+      finance,
+      {
+        stock_id: stock.id,
+        date: '2025-08-01',
+        type: 'non_trust',
+        gross: 100,
+        franking: 30,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    finance.services.register('wealthflow', createPublicWealthAdapter(finance));
+    const g: any = globalThis as any;
+    try {
+      const el = document.createElement('overview-view') as any;
+      document.body.appendChild(el);
+      el.fy = '2025-2026';
+      await el.setFinance(finance);
+      await el.updateComplete;
+      await new Promise((r) => setTimeout(r, 0));
+      await el.updateComplete;
+
+      // Took the service path, not the fallback.
+      expect(el.summary.financialYear).toBe('2025-2026');
+      expect(el.summary.combined.gross).toBe(110);
+      expect(el.summary.combined.franking).toBe(30);
+      const text = (el.renderRoot as ShadowRoot).textContent ?? '';
+      expect(text).toContain('$110.00');
+      expect(text).toContain('$30.00');
+      el.remove();
+    } finally {
+      g.__mockServices?.delete('wealthflow');
+    }
+  });
+
+  it('falls back to direct aggregation if the service answers for another year', async () => {
+    const finance: any = createMockFinance();
+    const bank: any = await createBank(finance, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
+    await createInterestEntry(
+      finance,
+      {
+        bank_id: bank.id,
+        date: '2025-07-31',
+        amount: 10,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    // A mis-shaped call yields a well-formed summary for the wrong year: all
+    // zeros, no error. Reject it rather than render an empty year as fact.
+    finance.services.register('wealthflow', {
+      getOverviewSummary: async () => ({
+        financialYear: '2',
+        dividends: { gross: 0, franking: 0 },
+        interest: { total: 0, byBank: [] },
+        combined: { gross: 0, franking: 0 },
+      }),
+    });
+    const g: any = globalThis as any;
+    try {
+      const el = document.createElement('overview-view') as any;
+      document.body.appendChild(el);
+      el.fy = '2025-2026';
+      await el.setFinance(finance);
+      await el.updateComplete;
+      await new Promise((r) => setTimeout(r, 0));
+      await el.updateComplete;
+      expect(el.summary.financialYear).toBe('2025-2026');
+      expect(el.summary.combined.gross).toBe(10);
+      el.remove();
+    } finally {
+      g.__mockServices?.delete('wealthflow');
+    }
+  });
 });

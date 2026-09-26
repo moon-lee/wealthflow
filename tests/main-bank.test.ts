@@ -10,12 +10,20 @@ describe('main bank wiring', () => {
     await activate(f, { viewId: 'wealthflow' });
     expect(cmds).toContain('wealthflow.show-banks');
     expect(cmds).toContain('wealthflow.add-interest');
-    expect(
-      await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026'),
-    ).toBeTruthy();
+    // Params as an array: the host spreads them positionally, so a bare string
+    // would reach the method one character at a time.
+    const live: any = await f.services.invoke(
+      'wealthflow',
+      'getInterestSummary',
+      ['2025-2026'],
+    );
+    expect(live).toBeTruthy();
+    expect(live.financialYear).toBe('2025-2026');
     deactivate();
     expect(
-      await f.services.invoke('wealthflow', 'getInterestSummary', '2025-2026'),
+      await f.services.invoke('wealthflow', 'getInterestSummary', [
+        '2025-2026',
+      ]),
     ).toBeNull();
   });
 });
