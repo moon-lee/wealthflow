@@ -71,8 +71,9 @@ export function createMockFinance(): import('finance').FinanceApi {
       invoke: async (name: string, method: string, params?: unknown) => {
         const svc = servicesRegistry.get(name);
         if (!svc || typeof svc[method] !== 'function') return null;
-        // Mirror the host: params are spread as positional args, so callers
-        // must pass an array. See D:\finance_flow_ai\src\main\services\
+        // Mirror the host exactly (host.js invoke): the method is extracted
+        // then called, so `this` is undefined. Services must be `this`-free.
+        // See D:\finance_flow_ai\src\main\services\
         // domain-service-registry.ts:38 and extension-host\api\services.ts:36.
         const args =
           params === undefined || params === null
@@ -80,7 +81,8 @@ export function createMockFinance(): import('finance').FinanceApi {
             : Array.isArray(params)
               ? params
               : Object.values(params as object);
-        return await (svc[method] as (...a: unknown[]) => unknown)(...args);
+        const fn = svc[method] as (...a: unknown[]) => unknown;
+        return await fn(...args);
       },
     },
     ui: {

@@ -64,69 +64,77 @@ export interface PublicWealthService {
 export function createPublicWealthAdapter(
   finance: FinanceApi,
 ): PublicWealthService {
+  // Named closures (never `this.`): cross-extension `invoke` dispatches the
+  // method unbound, so `this` is undefined at the call site.
+  const getInterestSummary = async (
+    financialYear: string,
+  ): Promise<InterestSummary | null> => {
+    try {
+      const banks = await listBanks(finance, { status: 'all' });
+      const entries = await listInterestEntries(finance, {
+        financeYear: financialYear,
+      });
+      const { total, byBank } = sumInterestByBank(banks, entries);
+      return { financialYear, total, byBank };
+    } catch (err) {
+      logger.error('getInterestSummary failed:', err);
+      return null;
+    }
+  };
+  const getDividendSummary = async (
+    financialYear: string,
+  ): Promise<DividendSummary | null> => {
+    try {
+      const stocks = await listStocks(finance, { status: 'all' });
+      const entries = await listDividends(finance, {
+        financeYear: financialYear,
+      });
+      return sumDividends(financialYear, stocks, entries);
+    } catch (err) {
+      logger.error('getDividendSummary failed:', err);
+      return null;
+    }
+  };
+  const getSuperSummary = async (
+    financialYear: string,
+  ): Promise<SuperSummary | null> => {
+    try {
+      return await getSuperTotals(finance, financialYear);
+    } catch (err) {
+      logger.error('getSuperSummary failed:', err);
+      return null;
+    }
+  };
+  const getOverviewSummary = async (
+    financialYear: string,
+  ): Promise<OverviewSummary | null> => {
+    try {
+      const [dividends, interest, super_] = await Promise.all([
+        getDividendSummary(financialYear),
+        getInterestSummary(financialYear),
+        getSuperSummary(financialYear),
+      ]);
+      if (!dividends || !interest || !super_) return null;
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      return {
+        financialYear: financialYear,
+        dividends,
+        interest,
+        super: super_,
+        combined: {
+          gross: round2(dividends.gross + interest.total),
+          franking: round2(dividends.franking),
+        },
+      };
+    } catch (err) {
+      logger.error('getOverviewSummary failed:', err);
+      return null;
+    }
+  };
   return {
-    async getInterestSummary(
-      financialYear: string,
-    ): Promise<InterestSummary | null> {
-      try {
-        const banks = await listBanks(finance, { status: 'all' });
-        const entries = await listInterestEntries(finance, {
-          financeYear: financialYear,
-        });
-        const { total, byBank } = sumInterestByBank(banks, entries);
-        return { financialYear, total, byBank };
-      } catch (err) {
-        logger.error('getInterestSummary failed:', err);
-        return null;
-      }
-    },
-    async getDividendSummary(
-      financialYear: string,
-    ): Promise<DividendSummary | null> {
-      try {
-        const stocks = await listStocks(finance, { status: 'all' });
-        const entries = await listDividends(finance, {
-          financeYear: financialYear,
-        });
-        return sumDividends(financialYear, stocks, entries);
-      } catch (err) {
-        logger.error('getDividendSummary failed:', err);
-        return null;
-      }
-    },
-    async getOverviewSummary(
-      financialYear: string,
-    ): Promise<OverviewSummary | null> {
-      try {
-        const [dividends, interest, super_] = await Promise.all([
-          this.getDividendSummary(financialYear),
-          this.getInterestSummary(financialYear),
-          this.getSuperSummary(financialYear),
-        ]);
-        if (!dividends || !interest || !super_) return null;
-        const round2 = (n: number) => Math.round(n * 100) / 100;
-        return {
-          financialYear: financialYear,
-          dividends,
-          interest,
-          super: super_,
-          combined: {
-            gross: round2(dividends.gross + interest.total),
-            franking: round2(dividends.franking),
-          },
-        };
-      } catch (err) {
-        logger.error('getOverviewSummary failed:', err);
-        return null;
-      }
-    },
-    async getSuperSummary(financialYear: string): Promise<SuperSummary | null> {
-      try {
-        return await getSuperTotals(finance, financialYear);
-      } catch (err) {
-        logger.error('getSuperSummary failed:', err);
-        return null;
-      }
-    },
+    getInterestSummary,
+    getDividendSummary,
+    getOverviewSummary,
+    getSuperSummary,
   };
 }

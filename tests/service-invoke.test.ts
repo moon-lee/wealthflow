@@ -135,6 +135,17 @@ describe('public adapter over the mock transport', () => {
     }
   });
 
+  it('survives the host unbound dispatch (no `this`)', async () => {
+    // Production crash 2026-09-27: host.js invoke does `let e = a[r]; e(...)`,
+    // so adapter methods must work with `this === undefined`.
+    const f = await seed();
+    const adapter: any = createPublicWealthAdapter(f);
+    const fn = adapter.getOverviewSummary;
+    const res: any = await fn('2025-2026');
+    expect(res?.combined?.gross).toBe(110);
+    expect(res?.combined?.franking).toBe(30);
+  });
+
   it('reports the financial year it was given, not a wrapped value', async () => {
     const f = await seed();
     f.services.register('wealthflow', createPublicWealthAdapter(f));
