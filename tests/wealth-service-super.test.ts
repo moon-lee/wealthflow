@@ -27,6 +27,9 @@ describe('getSuperSummary', () => {
     const later: any = await svc.getSuperSummary('2030-2031');
     expect(later.balance).toEqual({ amount: 100000, date: '2025-08-15' });
     expect(later.contributions).toEqual({ total: 0, count: 0 });
+    const o: any = await svc.getOverviewSummary('2025-2026');
+    expect(o.super.contributions.total).toBe(1000);
+    expect(o.super.balance).toEqual({ amount: 100000, date: '2025-08-15' });
     const broken: any = {
       ...f,
       db: {

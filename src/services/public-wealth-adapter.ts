@@ -46,6 +46,7 @@ export interface OverviewSummary {
   financialYear: string;
   dividends: DividendSummary;
   interest: InterestSummary;
+  super: SuperSummary;
   combined: { gross: number; franking: number };
 }
 export interface SuperSummary {
@@ -97,16 +98,18 @@ export function createPublicWealthAdapter(
       financialYear: string,
     ): Promise<OverviewSummary | null> {
       try {
-        const [dividends, interest] = await Promise.all([
+        const [dividends, interest, super_] = await Promise.all([
           this.getDividendSummary(financialYear),
           this.getInterestSummary(financialYear),
+          this.getSuperSummary(financialYear),
         ]);
-        if (!dividends || !interest) return null;
+        if (!dividends || !interest || !super_) return null;
         const round2 = (n: number) => Math.round(n * 100) / 100;
         return {
           financialYear: financialYear,
           dividends,
           interest,
+          super: super_,
           combined: {
             gross: round2(dividends.gross + interest.total),
             franking: round2(dividends.franking),

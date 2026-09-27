@@ -6,9 +6,11 @@ import { formatAUD } from '../utils/format.js';
 import { monthLabel } from '../utils/finance-year.js';
 import type { DividendEntry } from '../dao/dividends.js';
 import type { InterestEntry } from '../dao/interest-entries.js';
+import type { SuperEntry } from '../dao/super-entries.js';
 import type { DividendForm } from './dividend-form.js';
 import type { InterestForm } from './interest-form.js';
 import type { InterestGrid } from './interest-grid.js';
+import type { SuperForm } from './super-form.js';
 import type { OverviewSummary } from '../services/public-wealth-adapter.js';
 import type {
   InterestRepeatOutcome,
@@ -31,6 +33,8 @@ export class OverviewView extends Base {
   error = '';
   showDividendForm = false;
   showInterestForm = false;
+  showSuperForm = false;
+  superEntries: SuperEntry[] = [];
   /** Outcome of the last "copy from last month" run, stated in the section. */
   copyNotice = '';
   copying = false;
@@ -67,22 +71,34 @@ export class OverviewView extends Base {
         const { listStocks } = await import('../dao/stocks.js');
         const { getDividendTotals } =
           await import('../services/stock-service.js');
+        const { listSuperEntries } = await import('../dao/super-entries.js');
+        const { getSuperTotals } = await import('../services/super-service.js');
         const banks = await listBanks(this.finance, { status: 'all' });
         const stocks = await listStocks(this.finance, { status: 'all' });
-        const [interest, dividends] = await Promise.all([
+        const [interest, dividends, super_] = await Promise.all([
           getInterestTotals(this.finance, banks, this.fy),
           getDividendTotals(this.finance, stocks, this.fy),
+          getSuperTotals(this.finance, this.fy),
         ]);
         const round2 = (n: number) => Math.round(n * 100) / 100;
         summary = {
           financialYear: this.fy,
           dividends,
           interest,
+          super: super_,
           combined: {
             gross: round2(dividends.gross + interest.total),
             franking: round2(dividends.franking),
           },
         };
+        this.superEntries = await listSuperEntries(this.finance, {
+          financeYear: this.fy,
+        });
+      } else {
+        const { listSuperEntries } = await import('../dao/super-entries.js');
+        this.superEntries = await listSuperEntries(this.finance, {
+          financeYear: this.fy,
+        });
       }
       this.summary = summary;
     } catch (e: any) {
@@ -105,6 +121,7 @@ export class OverviewView extends Base {
     for (const sel of [
       'dividend-form',
       'interest-form',
+      'super-form',
       'interest-grid',
       'dividend-log',
     ]) {
@@ -124,11 +141,17 @@ export class OverviewView extends Base {
     }
   }
 
-  private toggleForm(which: 'dividends' | 'interest'): void {
+  private toggleForm(which: 'dividends' | 'interest' | 'super'): void {
     if (which === 'dividends') {
       this.showDividendForm = !this.showDividendForm;
       (this as any).requestUpdate?.();
       if (this.showDividendForm) void this.openForm('dividend-form');
+      return;
+    }
+    if (which === 'super') {
+      this.showSuperForm = !this.showSuperForm;
+      (this as any).requestUpdate?.();
+      if (this.showSuperForm) void this.openForm('super-form');
       return;
     }
     this.showInterestForm = !this.showInterestForm;
@@ -211,8 +234,8 @@ export class OverviewView extends Base {
    * element exists, otherwise a just-toggled form has no banks/stocks to offer.
    */
   private async openForm(
-    tag: 'dividend-form' | 'interest-form',
-    entry: DividendEntry | InterestEntry | null = null,
+    tag: 'dividend-form' | 'interest-form' | 'super-form',
+    entry: DividendEntry | InterestEntry | SuperEntry | null = null,
   ): Promise<void> {
     try {
       await (this as any).updateComplete;
@@ -221,18 +244,18 @@ export class OverviewView extends Base {
     }
     await this.pushToChildren();
     const form = (this as any).renderRoot?.querySelector(tag) as
-      DividendForm | InterestForm | null;
+      DividendForm | InterestForm | SuperForm | null;
     form?.editEntry(entry as never);
   }
 
   /** A row asked to be edited: open that section's form on that record. */
   private editRequestHandler(
-    tag: 'dividend-form' | 'interest-form',
-    flag: 'showDividendForm' | 'showInterestForm',
+    tag: 'dividend-form' | 'interest-form' | 'super-form',
+    flag: 'showDividendForm' | 'showInterestForm' | 'showSuperForm',
   ): (e: Event) => Promise<void> {
     return async (e: Event): Promise<void> => {
       const entry = (e as CustomEvent).detail?.entry as
-        DividendEntry | InterestEntry | undefined;
+        DividendEntry | InterestEntry | SuperEntry | undefined;
       if (!entry) return;
       this[flag] = true;
       (this as any).requestUpdate?.();
@@ -247,6 +270,10 @@ export class OverviewView extends Base {
   private readonly _onInterestEditRequest = this.editRequestHandler(
     'interest-form',
     'showInterestForm',
+  );
+  private readonly _onSuperEditRequest = this.editRequestHandler(
+    'super-form',
+    'showSuperForm',
   );
 
   /** `wealthflow.add-interest` lands the cursor on this month's cell. */
@@ -280,6 +307,10 @@ export class OverviewView extends Base {
       this._onInterestEditRequest as EventListener,
     );
     this.addEventListener(
+      'super-edit-request',
+      this._onSuperEditRequest as EventListener,
+    );
+    this.addEventListener(
       'dividend-create',
       this._onFormChanged as EventListener,
     );
@@ -303,6 +334,9 @@ export class OverviewView extends Base {
       'interest-delete',
       this._onFormChanged as EventListener,
     );
+    this.addEventListener('super-create', this._onFormChanged as EventListener);
+    this.addEventListener('super-edit', this._onFormChanged as EventListener);
+    this.addEventListener('super-delete', this._onFormChanged as EventListener);
     this.addEventListener(
       'interest-form-close',
       this._onInterestFormClose as EventListener,
@@ -310,6 +344,10 @@ export class OverviewView extends Base {
     this.addEventListener(
       'dividend-form-close',
       this._onDividendFormClose as EventListener,
+    );
+    this.addEventListener(
+      'super-form-close',
+      this._onSuperFormClose as EventListener,
     );
   }
 
@@ -323,6 +361,10 @@ export class OverviewView extends Base {
       this._onInterestEditRequest as EventListener,
     );
     this.removeEventListener(
+      'super-edit-request',
+      this._onSuperEditRequest as EventListener,
+    );
+    this.removeEventListener(
       'dividend-create',
       this._onFormChanged as EventListener,
     );
@@ -347,12 +389,28 @@ export class OverviewView extends Base {
       this._onFormChanged as EventListener,
     );
     this.removeEventListener(
+      'super-create',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'super-edit',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
+      'super-delete',
+      this._onFormChanged as EventListener,
+    );
+    this.removeEventListener(
       'interest-form-close',
       this._onInterestFormClose as EventListener,
     );
     this.removeEventListener(
       'dividend-form-close',
       this._onDividendFormClose as EventListener,
+    );
+    this.removeEventListener(
+      'super-form-close',
+      this._onSuperFormClose as EventListener,
     );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
@@ -375,6 +433,50 @@ export class OverviewView extends Base {
     this.showInterestForm = false;
     (this as any).requestUpdate?.();
   };
+
+  /** The super form is done with itself — save or delete — so fold it away. */
+  private _onSuperFormClose = (): void => {
+    if (!this.showSuperForm) return;
+    this.showSuperForm = false;
+    (this as any).requestUpdate?.();
+  };
+
+  /** Editing happens in the collapsible super form, which this asks to open. */
+  private requestSuperEdit(entry: SuperEntry): void {
+    this.dispatchEvent(
+      new CustomEvent('super-edit-request', {
+        detail: { entry },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private async deleteSuperEntry(entry: SuperEntry): Promise<void> {
+    if (
+      typeof confirm !== 'undefined' &&
+      !confirm(
+        `Delete ${entry.kind === 'contribution' ? 'private contribution' : 'balance'} ${formatAUD(Number(entry.amount))} on ${entry.date}?`,
+      )
+    )
+      return;
+    try {
+      const { deleteSuperEntry } = await import('../dao/super-entries.js');
+      await deleteSuperEntry(this.finance, entry.id);
+      this.dispatchEvent(
+        new CustomEvent('super-delete', {
+          detail: { id: entry.id },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+      await this.reload();
+    } catch (e: any) {
+      logger.error('super delete failed:', e);
+      this.error = String(e?.message || e);
+      (this as any).requestUpdate?.();
+    }
+  }
 
   private go(view: string): void {
     this.dispatchEvent(
@@ -496,6 +598,98 @@ export class OverviewView extends Base {
                         : ''
                     }
                     <interest-grid></interest-grid>
+                  </div>
+                </div>
+
+                <!-- Superannuation -->
+                <div class="section flush">
+                  <div class="section-header">
+                    <h3 class="section-title">
+                      Superannuation — FY ${this.fy}
+                    </h3>
+                    <div class="header-actions">
+                      <button
+                        class="btn btn-secondary btn-small"
+                        @click=${() => this.toggleForm('super')}
+                      >
+                        ${this.showSuperForm ? 'Hide form' : 'Log super'}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="section-body">
+                    ${
+                      s.super.balance
+                        ? html`<p class="muted">
+                            Latest balance ${formatAUD(s.super.balance.amount)}
+                            as at ${s.super.balance.date}
+                          </p>`
+                        : ''
+                    }
+                    ${
+                      this.superEntries.length === 0
+                        ? html`<p class="muted">
+                            No super entries this FY yet — log a balance or a
+                            private contribution.
+                          </p>`
+                        : html`<div class="table-wrap" style="margin-top:12px">
+                            <table class="hist-table">
+                              <thead>
+                                <tr>
+                                  <th scope="col">Date</th>
+                                  <th scope="col">Entry</th>
+                                  <th scope="col" class="num">Amount</th>
+                                  <th scope="col" class="num">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                ${this.superEntries.map(
+                                  (e) =>
+                                    html`<tr>
+                                      <td>${e.date}</td>
+                                      <td>
+                                        ${
+                                          e.kind === 'contribution'
+                                            ? 'Private contribution'
+                                            : 'Balance'
+                                        }
+                                      </td>
+                                      <td class="num money">
+                                        ${formatAUD(Number(e.amount))}
+                                      </td>
+                                      <td class="actions">
+                                        <button
+                                          class="btn btn-secondary btn-small"
+                                          type="button"
+                                          @click=${() => this.requestSuperEdit(e)}
+                                        >
+                                          Edit
+                                        </button>
+                                        <button
+                                          class="btn btn-secondary btn-small"
+                                          type="button"
+                                          @click=${() => this.deleteSuperEntry(e)}
+                                        >
+                                          Delete
+                                        </button>
+                                      </td>
+                                    </tr>`,
+                                )}
+                              </tbody>
+                              <tfoot>
+                                <tr>
+                                  <td colspan="2">
+                                    Private contributions (FY)
+                                  </td>
+                                  <td class="num money">
+                                    ${formatAUD(s.super.contributions.total)}
+                                  </td>
+                                  <td></td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>`
+                    }
+                    ${this.showSuperForm ? html`<super-form></super-form>` : ''}
                   </div>
                 </div>
               `

@@ -78,7 +78,8 @@ describe('overview-view', () => {
     const intSection = root.querySelectorAll('.section.flush')[2];
     expect(intSection.querySelector('.stat-grid')).toBeNull();
     expect(intSection.querySelector('interest-grid')).toBeTruthy();
-    // Combined taxable leads: it is the FY answer the other two add up to.
+    // Combined taxable leads: it is the FY answer the others feed.
+    // Superannuation trails Interest: activity together, answer first.
     const sections = [...root.querySelectorAll('.section.flush')].map((el) =>
       (el.querySelector('.section-title')?.textContent ?? '').trim(),
     );
@@ -86,6 +87,7 @@ describe('overview-view', () => {
       'Combined taxable — FY 2025-2026',
       'Dividends — FY 2025-2026',
       'Interest — FY 2025-2026',
+      'Superannuation — FY 2025-2026',
     ]);
     // Per-stock breakdown is asserted at the data contract level: happy-dom
     // drops conditionally-rendered nested <table> parts (verified with an

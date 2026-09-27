@@ -7,6 +7,7 @@ import { StockList } from './stock-list';
 import { StockForm } from './stock-form';
 import { DividendLog } from './dividend-log';
 import { DividendForm } from './dividend-form';
+import { SuperForm } from './super-form';
 import { OverviewView } from './overview-view';
 
 if (typeof customElements !== 'undefined') {
@@ -54,6 +55,11 @@ if (typeof customElements !== 'undefined') {
     customElements.define(
       'dividend-form',
       DividendForm as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('super-form'))
+    customElements.define(
+      'super-form',
+      SuperForm as unknown as CustomElementConstructor,
     );
   if (!customElements.get('overview-view'))
     customElements.define(
