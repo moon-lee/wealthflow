@@ -101,6 +101,9 @@
         "dividend-delete",
         "dividend-edit-request",
         "dividend-form-close",
+        "super-create",
+        "super-edit",
+        "super-delete",
         "fy-changed",
         "wealthflow-navigate"
       ]
@@ -235,6 +238,37 @@
             "nullable": false,
             "min": 0,
             "default": 0
+          },
+          {
+            "name": "finance_year",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_super_entries",
+        "columns": [
+          {
+            "name": "date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "kind",
+            "type": "text",
+            "nullable": false
+          },
+          {
+            "name": "amount",
+            "type": "real",
+            "nullable": false,
+            "min": 0
           },
           {
             "name": "finance_year",

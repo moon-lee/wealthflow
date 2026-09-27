@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 5 commands, 4 tables', () => {
+  it('declares single view, 5 commands, 5 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -23,6 +23,7 @@ describe('manifest', () => {
         'wealthflow_dividends',
         'wealthflow_interest_entries',
         'wealthflow_stocks',
+        'wealthflow_super_entries',
       ].sort(),
     );
     for (const id of ids)
@@ -59,5 +60,18 @@ describe('manifest', () => {
     const banks = fe.tables.find((t: any) => t.name === 'wealthflow_banks');
     expect(banks).toBeDefined();
     expect(banks.columns.map((c: any) => c.name)).toContain('bank_full_name');
+  });
+
+  it('declares wealthflow_super_entries with kind/amount columns', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const table = fe.tables.find(
+      (t: any) => t.name === 'wealthflow_super_entries',
+    );
+    expect(table).toBeDefined();
+    expect(table.columns.map((c: any) => c.name).sort()).toEqual(
+      ['amount', 'date', 'finance_year', 'kind', 'notes'].sort(),
+    );
+    for (const evt of ['super-create', 'super-edit', 'super-delete'])
+      expect(fe.contributions.allowedUiEvents).toContain(evt);
   });
 });

@@ -100,3 +100,9 @@ export function monthLabel(ym: string): string {
   const [y, m] = ym.split('-').map(Number);
   return `${MONTH_NAMES[m - 1]} ${y}`;
 }
+
+/** Last day (`YYYY-MM-DD`) of an AU financial year label, e.g. `'2026-06-30'`. */
+export function fyEndDate(fy: string): string {
+  const endYear = Number(fy.slice(5, 9));
+  return `${endYear}-06-30`;
+}

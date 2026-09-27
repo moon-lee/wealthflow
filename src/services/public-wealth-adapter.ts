@@ -6,6 +6,7 @@ import { listStocks } from '../dao/stocks.js';
 import { listDividends } from '../dao/dividends.js';
 import { sumInterestByBank } from './bank-service.js';
 import { sumDividends } from './stock-service.js';
+import { getSuperTotals } from './super-service.js';
 
 const logger = new ExtensionLogger('wealthflow');
 
@@ -47,10 +48,16 @@ export interface OverviewSummary {
   interest: InterestSummary;
   combined: { gross: number; franking: number };
 }
+export interface SuperSummary {
+  financialYear: string;
+  balance: { amount: number; date: string } | null;
+  contributions: { total: number; count: number };
+}
 export interface PublicWealthService {
   getInterestSummary(financialYear: string): Promise<InterestSummary | null>;
   getDividendSummary(financialYear: string): Promise<DividendSummary | null>;
   getOverviewSummary(financialYear: string): Promise<OverviewSummary | null>;
+  getSuperSummary(financialYear: string): Promise<SuperSummary | null>;
 }
 
 export function createPublicWealthAdapter(
@@ -107,6 +114,14 @@ export function createPublicWealthAdapter(
         };
       } catch (err) {
         logger.error('getOverviewSummary failed:', err);
+        return null;
+      }
+    },
+    async getSuperSummary(financialYear: string): Promise<SuperSummary | null> {
+      try {
+        return await getSuperTotals(finance, financialYear);
+      } catch (err) {
+        logger.error('getSuperSummary failed:', err);
         return null;
       }
     },
