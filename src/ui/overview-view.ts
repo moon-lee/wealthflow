@@ -421,9 +421,14 @@ export class OverviewView extends Base {
       /* non-Lit */
     }
     await this.pushToChildren();
-    const form = (this as any).renderRoot?.querySelector(tag) as
-      DividendForm | InterestForm | SuperForm | null;
-    form?.editEntry(entry as never);
+    // Only the one method this needs, and guarded: `form?.editEntry(...)` still
+    // throws on a tag that is present but not upgraded yet, and toggleForm fires
+    // this without awaiting, so the throw would surface as an unhandled
+    // rejection rather than a visible failure.
+    const form = (this as any).renderRoot?.querySelector(tag) as {
+      editEntry?: (row: unknown) => void;
+    } | null;
+    form?.editEntry?.(entry);
   }
 
   /** A row asked to be edited: open that section's form on that record. */
@@ -690,23 +695,34 @@ export class OverviewView extends Base {
               </div>`
             : html`
                 <!-- Combined: the FY answer, so it leads; the two sections
-                     below are where its parts come from. -->
+                     below are where its parts come from. Four cards, so the
+                     two that make up the gross sit beside the gross itself
+                     rather than being repeated inside its caption. -->
                 <div class="section flush">
                   <div class="section-header">
                     <h3 class="section-title">
                       Combined taxable — FY ${this.fy}
                     </h3>
                   </div>
-                  <div class="section-body">
-                    <div class="stat-grid cols-2">
+                  <div class="section-summary">
+                    <div class="stat-grid cols-4">
                       <div class="stat">
                         <div class="stat-label">Taxable gross</div>
                         <div class="stat-value">
                           ${formatAUD(s.combined.gross)}
                         </div>
+                        <div class="stat-note">dividends + interest</div>
+                      </div>
+                      <div class="stat">
+                        <div class="stat-label">Dividends</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.dividends.gross)}
+                        </div>
                         <div class="stat-note">
-                          Dividends ${formatAUD(s.dividends.gross)} + interest
-                          ${formatAUD(s.interest.total)}
+                          ${(() => {
+                            const n = s.dividends.byStock?.length ?? 0;
+                            return n === 1 ? '1 holding' : `${n} holdings`;
+                          })()}
                         </div>
                       </div>
                       <div class="stat">
@@ -714,8 +730,18 @@ export class OverviewView extends Base {
                         <div class="stat-value">
                           ${formatAUD(s.combined.franking)}
                         </div>
+                        <div class="stat-note">Dividends only</div>
+                      </div>
+                      <div class="stat">
+                        <div class="stat-label">Interest</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.interest.total)}
+                        </div>
                         <div class="stat-note">
-                          Dividends only — interest carries no franking
+                          ${(() => {
+                            const n = s.interest.byBank?.length ?? 0;
+                            return n === 1 ? '1 bank' : `${n} banks`;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -833,18 +859,63 @@ export class OverviewView extends Base {
                       </button>
                     </div>
                   </div>
+                  <!-- The position, not the log. It sits inside the section but
+                       outside the foldable body, so the three figures stay
+                       readable however far the entries below are folded away. -->
+                  <div class="section-summary">
+                    <div class="stat-grid cols-3">
+                      <div class="stat">
+                        <div class="stat-label">Latest super balance</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.super.balance?.amount ?? 0)}
+                        </div>
+                        <div class="stat-note">
+                          ${
+                            s.super.balance
+                              ? `as at ${s.super.balance.date}`
+                              : 'no balance logged'
+                          }
+                        </div>
+                      </div>
+                      <div class="stat">
+                        <div class="stat-label">Private contributions</div>
+                        <div class="stat-value">
+                          ${formatAUD(s.super.contributions.total)}
+                        </div>
+                        <div class="stat-note">
+                          ${
+                            s.super.contributions.count === 1
+                              ? '1 entry — tax deductible'
+                              : `${s.super.contributions.count} entries — tax deductible`
+                          }
+                        </div>
+                      </div>
+                      <div class="stat">
+                        <div class="stat-label">SG contributions</div>
+                        <div class="stat-value">${formatAUD(sgTotal)}</div>
+                        <div class="stat-note">
+                          ${
+                            (s.super.sg?.count ?? 0) === 1
+                              ? '1 employer entry'
+                              : `${s.super.sg?.count ?? 0} employer entries`
+                          }
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   <div
-                    class="section-body"
+                    class="section-body super-body"
                     id="wf-body-super"
                     ?hidden=${this.collapsed.super === true}
                   >
+                    ${this.showSuperForm ? html`<super-form></super-form>` : ''}
                     ${
                       this.superEntries.length === 0
                         ? html`<p class="muted">
                             No super entries this FY yet — log a balance, a
                             private contribution, or an SG contribution.
                           </p>`
-                        : html`<div class="table-wrap" style="margin-top:12px">
+                        : html`<div class="table-wrap">
                             <table class="hist-table">
                               <thead>
                                 <tr>
@@ -895,41 +966,10 @@ export class OverviewView extends Base {
                                     </tr>`,
                                 )}
                               </tbody>
-                              <tfoot>
-                                <tr>
-                                  <td class="total-label" colspan="2">
-                                    Balance as at
-                                    ${s.super.balance?.date ?? '—'}
-                                  </td>
-                                  <td class="num money">
-                                    ${formatAUD(s.super.balance?.amount ?? 0)}
-                                  </td>
-                                  <td></td>
-                                </tr>
-                                <tr>
-                                  <td class="total-label" colspan="2">
-                                    Private contributions (FY)
-                                  </td>
-                                  <td class="num money">
-                                    ${formatAUD(s.super.contributions.total)}
-                                  </td>
-                                  <td></td>
-                                </tr>
-                                <tr>
-                                  <td class="total-label" colspan="2">
-                                    SG contributions (FY)
-                                  </td>
-                                  <td class="num money">
-                                    ${formatAUD(sgTotal)}
-                                  </td>
-                                  <td></td>
-                                </tr>
-                              </tfoot>
                             </table>
                             ${this.renderSuperPager()}
                           </div>`
                     }
-                    ${this.showSuperForm ? html`<super-form></super-form>` : ''}
                   </div>
                 </div>
               `

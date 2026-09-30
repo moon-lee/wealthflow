@@ -385,12 +385,8 @@ export const wealthflowStyles = css`
   table.data-table tbody tr.inactive {
     opacity: 0.6;
   }
-  /* Total row: the log's only place a subtotal belongs, so it reads as one.
-     The superannuation log is a hist-table, so it is listed here rather than
-     given a near-copy of this rule — a summary that does not read as a summary
-     is just three more rows, and the two tables must not drift apart. */
-  table.data-table tfoot td,
-  .hist-table tfoot td {
+  /* Total row: the log's only place a subtotal belongs, so it reads as one. */
+  table.data-table tfoot td {
     padding: 8px;
     border-top: 1px solid var(--ff-border, #3e3e3e);
     font-size: var(--ff-font-sm, 12px);
@@ -399,12 +395,8 @@ export const wealthflowStyles = css`
   }
   /* The word that names the row picks up the accent, the way a badge does, so
      the label and the figures read as two different things. */
-  table.data-table tfoot td.total-label,
-  .hist-table tfoot td.total-label {
+  table.data-table tfoot td.total-label {
     color: var(--ff-accent, #007acc);
-  }
-  .hist-table tfoot td.num {
-    font-variant-numeric: tabular-nums;
   }
   /* Sortable column header (dateSortHeader in ui/sort-header.ts). A real button
      so the order is reachable by keyboard; it borrows the th's own typography so
@@ -597,6 +589,36 @@ export const wealthflowStyles = css`
   .section-body {
     padding: 16px;
   }
+  /* A fixed strip inside a foldable section: the part that has to stay readable
+     when the body collapses. It reads as part of the section rather than as a
+     card in its own right, so it carries the section's padding and no chrome of
+     its own. The rule below it is drawn only while the body is there to separate. */
+  .section-summary {
+    padding: 12px 16px;
+  }
+  .section-summary + .section-body:not([hidden]) {
+    border-top: 1px solid var(--ff-border, #3e3e3e);
+  }
+  /* The superannuation section is three bands — position, form, log — on one
+     screen, so it runs tighter than the two-padding rhythm the single-band
+     sections use. 12px either side of the rule reads as one space, not two. */
+  .section-body.super-body {
+    padding: 12px 16px 16px;
+  }
+  /* One form per section, opened above the log it feeds. A fixed gap below it,
+     so the form never sits flush against the table it is filling. Adjacent
+     margins collapse, so the form and any notice above it share the 12px
+     rather than stacking two of them. */
+  .section-body > dividend-form,
+  .section-body > interest-form,
+  .section-body > super-form {
+    display: block;
+    margin-bottom: 12px;
+  }
+  .section-body > .notice,
+  .section-body > .muted {
+    margin-bottom: 12px;
+  }
   /* Collapsing sets the hidden attribute; state it here too so a later display
      on .section-body cannot silently turn every collapsed section back on. */
   .section-body[hidden] {
@@ -723,10 +745,26 @@ export const wealthflowStyles = css`
   .stat-grid.cols-2 {
     grid-template-columns: repeat(2, 1fr);
   }
+  /* Three for the superannuation summary: position, private, employer. */
+  .stat-grid.cols-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  /* Four for the Combined taxable breakdown: the gross and the three parts. */
+  .stat-grid.cols-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
   @media (max-width: 640px) {
     .stat-grid,
-    .stat-grid.cols-2 {
+    .stat-grid.cols-2,
+    .stat-grid.cols-3,
+    .stat-grid.cols-4 {
       grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 420px) {
+    .stat-grid.cols-3,
+    .stat-grid.cols-4 {
+      grid-template-columns: 1fr;
     }
   }
   .stat {
@@ -761,6 +799,19 @@ export const wealthflowStyles = css`
     overflow: hidden;
     text-overflow: ellipsis;
     font-variant-numeric: tabular-nums;
+  }
+  /* In the superannuation strip the label names the figure and stays left, but
+     the figures themselves are money and read right, so a column of amounts
+     lines up digit for digit. Scoped to the strip: Combined taxable keeps its
+     left-aligned figures. */
+  .section-summary .stat-value,
+  .section-summary .stat-note {
+    text-align: right;
+  }
+  /* The strip's labels run long — "LATEST SUPER BALANCE" — and clipping that to
+     "LATEST SUPER BAL…" says less than wrapping it onto two lines does. */
+  .section-summary .stat-label {
+    white-space: normal;
   }
   .hist-table {
     width: 100%;

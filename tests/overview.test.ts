@@ -14,6 +14,13 @@ function toggle(el: any, root: ShadowRoot, section: string): void {
   btn.click();
 }
 
+/** The Superannuation summary strip, by its contents. */
+function superCard(root: ShadowRoot): HTMLElement {
+  return [...root.querySelectorAll('.section-summary')].find((el: any) =>
+    el.textContent?.includes('SG contributions'),
+  ) as HTMLElement;
+}
+
 /**
  * Every static chunk and primitive value in a rendered Lit template, including
  * nested ones. happy-dom drops a nested `tfoot` from the shadow root, so this
@@ -50,6 +57,87 @@ describe('overview-view', () => {
   it('registers element', async () => {
     await import('../src/ui/overview-view.js');
     expect(customElements.get('overview-view')).toBeDefined();
+  });
+
+  it('breaks Combined taxable into four cards: the gross and its three parts', async () => {
+    const finance: any = createMockFinance();
+    const bank: any = await createBank(finance, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
+    await createInterestEntry(
+      finance,
+      {
+        bank_id: bank.id,
+        date: '2025-07-31',
+        amount: 90,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    const stock: any = await createStock(finance, {
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard',
+      shares: 5,
+    });
+    await createDividend(
+      finance,
+      {
+        stock_id: stock.id,
+        date: '2025-08-01',
+        type: 'non_trust',
+        gross: 100,
+        franking: 30,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const combined = [...root.querySelectorAll('.section.flush')].find(
+      (sec: any) =>
+        sec
+          .querySelector('.section-title')
+          ?.textContent?.trim()
+          .startsWith('Combined'),
+    ) as HTMLElement;
+    // The two halves of the gross get their own cards rather than being
+    // repeated inside its caption, so the answer and its parts read across.
+    expect(
+      [...combined.querySelectorAll('.stat-label')].map((l) =>
+        l.textContent?.trim(),
+      ),
+    ).toEqual(['Taxable gross', 'Dividends', 'Franking credits', 'Interest']);
+    expect(
+      [...combined.querySelectorAll('.stat-value')].map((v) =>
+        v.textContent?.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual(['$190.00', '$100.00', '$30.00', '$90.00']);
+    // Same card treatment as the superannuation strip, which is what makes the
+    // two sections read as one screen.
+    expect(combined.querySelector('.section-summary')).toBeTruthy();
+    expect(
+      combined.querySelector('.stat-grid')?.classList.contains('cols-4'),
+    ).toBe(true);
+    // Each caption says something the figure above it does not: where it came
+    // from, counted the way the Interest card counts banks.
+    expect(
+      [...combined.querySelectorAll('.stat-note')].map((n) =>
+        n.textContent?.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual([
+      'dividends + interest',
+      '1 holding',
+      'Dividends only',
+      '1 bank',
+    ]);
+    el.remove();
   });
 
   it('renders mortgage-style cards for seeded FY data', async () => {
@@ -97,11 +185,11 @@ describe('overview-view', () => {
     expect(
       root.querySelectorAll('.section-header').length,
     ).toBeGreaterThanOrEqual(3);
-    // Only Combined taxable summarises with cards now. Dividends and Interest
-    // state their totals in the table footer, so a stat-grid in either would
-    // restate the same numbers twice — and no section header carries a summary
-    // badge, for the same reason.
-    expect(root.querySelectorAll('.stat-grid').length).toBe(1);
+    // Two card grids: Combined taxable, and the Superannuation position inside
+    // its own section. Dividends and Interest state their totals in the table
+    // footer, so a stat-grid in either would restate the same numbers twice —
+    // and no section header carries a summary badge, for the same reason.
+    expect(root.querySelectorAll('.stat-grid').length).toBe(2);
     expect(root.querySelectorAll('.section-header .rate-badge').length).toBe(0);
     const text = root.textContent ?? '';
     expect(text).toContain('Dividends');
@@ -118,8 +206,8 @@ describe('overview-view', () => {
     const intSection = root.querySelectorAll('.section.flush')[2];
     expect(intSection.querySelector('.stat-grid')).toBeNull();
     expect(intSection.querySelector('interest-grid')).toBeTruthy();
-    // Combined taxable leads: it is the FY answer the others feed.
-    // Superannuation trails Interest: activity together, answer first.
+    // Combined taxable leads: it is the FY answer the others feed. The
+    // Superannuation summary lives inside its own section, not as a fifth block.
     const sections = [...root.querySelectorAll('.section.flush')].map((el) =>
       (el.querySelector('.section-title')?.textContent ?? '').trim(),
     );
@@ -327,7 +415,9 @@ describe('overview-view', () => {
     expect(body('super').hasAttribute('hidden')).toBe(false);
 
     // The bar itself is a target too, for the space beside the title.
-    const header = body('super').previousElementSibling as HTMLElement;
+    const header = body('super')
+      .closest('.section')
+      ?.querySelector('.section-header') as HTMLElement;
     expect(header.classList.contains('is-toggle')).toBe(true);
     header.click();
     await el.updateComplete;
@@ -546,26 +636,36 @@ describe('overview-view', () => {
     await el.updateComplete;
     const root = el.renderRoot as ShadowRoot;
     // Balance is a summary figure, not a table row: it belongs with the other
-    // totals, and the top-of-section line is gone.
+    // totals, in a card of its own above the log.
     expect(el.summary.super.balance).toEqual({
       amount: 100000,
       date: '2025-08-15',
     });
     expect(el.summary.super.contributions.total).toBe(1000);
     expect(el.summary.super.sg.total).toBe(0);
-    // happy-dom drops a nested tfoot from the shadow root (the same limitation
-    // the dividend-byStock assertion documents), so read the template: the three
-    // labels are static, and the balance's date and figure are interpolated.
-    const tpl = templateText((el as any).render());
-    for (const label of [
-      'Balance as at ',
-      'Private contributions (FY)',
-      'SG contributions (FY)',
-    ]) {
-      expect(tpl.markup).toContain(label);
-    }
-    expect(tpl.values.some((v) => v.includes('2025-08-15'))).toBe(true);
-    expect(root.querySelector('#wf-body-super')).toBeTruthy();
+    const card = superCard(root);
+    expect(card).toBeTruthy();
+    expect(
+      [...card.querySelectorAll('.stat-label')].map((l) =>
+        l.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Latest super balance',
+      'Private contributions',
+      'SG contributions',
+    ]);
+    expect(
+      [...card.querySelectorAll('.stat-value')].map((v) =>
+        v.textContent?.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual(['$100,000.00', '$1,000.00', '$0.00']);
+    expect(card.textContent).toContain('as at 2025-08-15');
+    // It lives in the section, but outside the foldable body — otherwise
+    // folding the log would take the position with it.
+    expect(card.closest('#wf-body-super')).toBeNull();
+    expect(
+      card.closest('.section')?.querySelector('#wf-body-super'),
+    ).toBeTruthy();
     el.remove();
   });
 
@@ -777,6 +877,50 @@ describe('overview-view', () => {
     expect(order().text).toBe('Date ▲');
     expect(order().title).toBe('Newest first');
     host.remove();
+  });
+
+  it('opens the super form above its log, like the other two sections', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/super-form.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const order = (section: string) =>
+      [...(root.querySelector(`#wf-body-${section}`)?.children ?? [])].map(
+        (c: any) => c.tagName.toLowerCase(),
+      );
+    const btn = (label: string) =>
+      [...root.querySelectorAll('button')].find(
+        (b: any) => b.textContent?.trim() === label,
+      ) as HTMLButtonElement;
+
+    // Closed: just the list.
+    expect(order('super')).toEqual(['div']);
+    btn('Log super').click();
+    await el.updateComplete;
+    // Open: the form comes first, so you type without scrolling past a table.
+    expect(order('super')).toEqual(['super-form', 'div']);
+    // Same shape as the sections that already worked this way.
+    btn('Log dividend').click();
+    await el.updateComplete;
+    expect(order('dividends')).toEqual(['dividend-form', 'dividend-log']);
+    el.remove();
   });
 
   it('copies last month to next month and closes the interest form', async () => {
@@ -1236,7 +1380,7 @@ describe('overview-view', () => {
     el.remove();
   });
 
-  it('breaks SG out of the super footer instead of folding it into private contributions', async () => {
+  it('states SG beside private contributions in the summary card', async () => {
     const { createSuperEntry } = await import('../src/dao/super-entries.js');
     await import('../src/ui/overview-view.js');
     await import('../src/ui/dividend-log.js');
@@ -1261,14 +1405,73 @@ describe('overview-view', () => {
     await el.updateComplete;
     await new Promise((r) => setTimeout(r, 0));
     await el.updateComplete;
-    const text = (el.renderRoot as ShadowRoot).textContent ?? '';
+    const root = el.renderRoot as ShadowRoot;
     // Both buckets are named, so neither is mistaken for the other.
-    expect(text).toContain('Private contributions (FY)');
-    expect(text).toContain('SG contributions (FY)');
-    // happy-dom drops the super tbody/tfoot from the shadow root, so assert the
-    // data contract the footer renders from.
+    const card = superCard(root);
+    expect(
+      [...card.querySelectorAll('.stat-label')].map((l) =>
+        l.textContent?.trim(),
+      ),
+    ).toEqual([
+      'Latest super balance',
+      'Private contributions',
+      'SG contributions',
+    ]);
+    expect(
+      [...card.querySelectorAll('.stat-value')].map((v) =>
+        v.textContent?.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual(['$0.00', '$1,000.00', '$350.50']);
+    // The data contract behind the card, since happy-dom drops the super table.
     expect(el.summary.super.contributions).toEqual({ total: 1000, count: 1 });
     expect(el.summary.super.sg).toEqual({ total: 350.5, count: 1 });
+    el.remove();
+  });
+
+  it('keeps the summary card readable while the super log is folded', async () => {
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const finance: any = createMockFinance();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(2025, 6 + (i % 12), i < 12 ? 10 : 20);
+      await createSuperEntry(
+        finance,
+        {
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          kind: 'contribution',
+          amount: 10 * (i + 1),
+        },
+        '07-01',
+      );
+    }
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    toggle(el, root, 'super');
+    await el.updateComplete;
+    // The log is away...
+    expect(root.querySelector('#wf-body-super')?.hasAttribute('hidden')).toBe(
+      true,
+    );
+    // ...and the position is not. A folded log must not hide where you stand.
+    const card = superCard(root);
+    expect(card).toBeTruthy();
+    expect(card.hasAttribute('hidden')).toBe(false);
+    // 14 contributions of 10..140, so the private bucket is their sum.
+    expect(
+      [...card.querySelectorAll('.stat-value')].map((v) =>
+        v.textContent?.replace(/\s+/g, ' ').trim(),
+      ),
+    ).toEqual(['$0.00', '$1,050.00', '$0.00']);
     el.remove();
   });
 
@@ -1319,9 +1522,16 @@ describe('overview-view', () => {
       await new Promise((r) => setTimeout(r, 0));
       await el.updateComplete;
       expect(el.error).toBe('');
-      expect((el.renderRoot as ShadowRoot).textContent).toContain(
-        'SG contributions (FY)',
-      );
+      // The card still renders with no `sg` bucket on the wire, and states the
+      // employer figure as zero rather than blank or NaN.
+      const card = superCard(el.renderRoot as ShadowRoot);
+      expect(card).toBeTruthy();
+      expect(
+        [...card.querySelectorAll('.stat-value')].map((v) =>
+          v.textContent?.replace(/\s+/g, ' ').trim(),
+        ),
+      ).toEqual(['$0.00', '$0.00', '$0.00']);
+      expect(card.textContent).toContain('no balance logged');
       el.remove();
     } finally {
       g.__mockServices?.delete('wealthflow');
