@@ -18,6 +18,8 @@ import {
   type InterestEntry,
 } from '../dao/interest-entries.js';
 
+import { byDate, dateSortHeader } from './sort-header.js';
+
 const Base =
   typeof HTMLElement !== 'undefined'
     ? LitElement
@@ -43,6 +45,19 @@ export function monthsWithEntries(
   );
 }
 
+/**
+ * The months in the order the screen reads them: newest first by default, so
+ * the year reads backwards from the months you are living in. Pure, because
+ * `monthsWithEntries` above answers which months exist and this answers which
+ * way they run — two different questions, kept apart so the first stays
+ * testable without a DOM.
+ */
+export function orderMonths(months: string[], descending: boolean): string[] {
+  return months
+    .slice()
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 1) * (descending ? 1 : -1));
+}
+
 export class InterestGrid extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
@@ -52,8 +67,27 @@ export class InterestGrid extends Base {
   fy = '';
   banks: Bank[] = [];
   entries: InterestEntry[] = [];
+  /**
+   * Order of the month axis. Newest first by default, so the FY reads backwards
+   * from the months you are living in. The rows are months, not entries, so this
+   * is the grid's date order.
+   */
+  sortDesc = true;
   error = '';
   fieldError = '';
+
+  /**
+   * FY entries on screen, for the host's collapsed-section badge. Read after
+   * the child has loaded, never during a render: the entries start empty.
+   */
+  get rowCount(): number {
+    return this.entries.length;
+  }
+
+  private sortByDate(): void {
+    this.sortDesc = !this.sortDesc;
+    (this as any).requestUpdate?.();
+  }
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -183,7 +217,10 @@ export class InterestGrid extends Base {
     if (!this.fy)
       return html`<p class="empty-state">Select a financial year.</p>`;
     const model = interestGridModel(this.fy, this.banks, this.entries);
-    const months = monthsWithEntries(this.fy, this.banks, this.entries);
+    const months = orderMonths(
+      monthsWithEntries(this.fy, this.banks, this.entries),
+      this.sortDesc,
+    );
     return html`
       <div class="log-filters">
         <span class="rate-badge">
@@ -221,7 +258,14 @@ export class InterestGrid extends Base {
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th scope="col">Month</th>
+                      <th
+                        scope="col"
+                        aria-sort=${this.sortDesc ? 'descending' : 'ascending'}
+                      >
+                        ${dateSortHeader('Month', this.sortDesc, () =>
+                          this.sortByDate(),
+                        )}
+                      </th>
                       ${this.banks.map(
                         (b) =>
                           html`<th scope="col" class="num">${b.bank_code}</th>`,

@@ -11,6 +11,7 @@ import {
   type DividendEntry,
 } from '../dao/dividends.js';
 import { listStocks, type Stock } from '../dao/stocks.js';
+import { byDate, dateSortHeader } from './sort-header.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -32,9 +33,30 @@ export class DividendLog extends Base {
   fy = '';
   stocks: Stock[] = [];
   entries: DividendEntry[] = [];
+  /** Date order for the table. Newest first, the order a log is read in. */
+  sortDesc = true;
   stockFilter: number | 'all' = 'all';
   typeFilter: string | 'all' = 'all';
   error = '';
+
+  /**
+   * FY receipts on screen, for the host's collapsed-section badge. Read after
+   * the child has loaded, never during a render: the entries start empty.
+   */
+  get rowCount(): number {
+    return this.entries.length;
+  }
+
+  /** The entries in the order the Date header claims. A copy: the source array
+   *  stays in load order, so the FY totals above the table never depend on it. */
+  private get sortedEntries(): DividendEntry[] {
+    return this.entries.slice().sort(byDate(this.sortDesc));
+  }
+
+  private sortByDate(): void {
+    this.sortDesc = !this.sortDesc;
+    (this as any).requestUpdate?.();
+  }
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -193,7 +215,14 @@ export class DividendLog extends Base {
         <table class="data-table">
           <thead>
             <tr>
-              <th scope="col">Date</th>
+              <th
+                scope="col"
+                aria-sort=${this.sortDesc ? 'descending' : 'ascending'}
+              >
+                ${dateSortHeader('Date', this.sortDesc, () =>
+                  this.sortByDate(),
+                )}
+              </th>
               <th scope="col">Holding</th>
               <th scope="col">Type</th>
               <th scope="col" class="num">Gross</th>
@@ -202,7 +231,7 @@ export class DividendLog extends Base {
             </tr>
           </thead>
           <tbody>
-            ${this.entries.map(
+            ${this.sortedEntries.map(
               (e) => html`
                 <tr>
                   <td class="mono">${e.date}</td>

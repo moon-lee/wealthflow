@@ -8,6 +8,7 @@ import type { DividendEntry } from '../dao/dividends.js';
 import type { InterestEntry } from '../dao/interest-entries.js';
 import type { SuperEntry } from '../dao/super-entries.js';
 import { superKindLabel } from '../dao/super-entries.js';
+import { byDate, dateSortHeader } from './sort-header.js';
 import type { DividendForm } from './dividend-form.js';
 import type { InterestForm } from './interest-form.js';
 import type { InterestGrid } from './interest-grid.js';
@@ -23,6 +24,24 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 const logger = new ExtensionLogger('wealthflow');
 
+/** The three log sections that fold away. Combined taxable never does. */
+type Collapsible = 'dividends' | 'interest' | 'super';
+
+/** Superannuation pages at a fixed 12 rows so the log stays scannable. */
+const SUPER_PAGE_SIZE = 12;
+
+/**
+ * What a folded section's header calls its records, as [one, many]. The badge
+ * has to use the same noun the open section uses, or folding a section renames
+ * its contents. Spelled out rather than derived: "entries" does not singularise
+ * by dropping a character.
+ */
+const COUNT_NOUN: Record<Collapsible, [string, string]> = {
+  dividends: ['receipt', 'receipts'],
+  interest: ['entry', 'entries'],
+  super: ['entry', 'entries'],
+};
+
 export class OverviewView extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
@@ -36,6 +55,26 @@ export class OverviewView extends Base {
   showInterestForm = false;
   showSuperForm = false;
   superEntries: SuperEntry[] = [];
+  /**
+   * FY record count per section, for the folded-section badge. Captured after
+   * the children have loaded rather than read during a render, because the
+   * children only fill in during the same reload that triggers the render.
+   */
+  rowCounts: Record<Collapsible, number> = {
+    dividends: 0,
+    interest: 0,
+    super: 0,
+  };
+  /** Zero-based page of the superannuation log; clamped on every reload. */
+  superPage = 0;
+  /** Date order for the super log. Newest first, the order a log is read in. */
+  superSortDesc = true;
+  /** Which log sections are folded away, per section so one stays open. */
+  collapsed: Record<Collapsible, boolean> = {
+    dividends: false,
+    interest: false,
+    super: false,
+  };
   /** Outcome of the last "copy from last month" run, stated in the section. */
   copyNotice = '';
   copying = false;
@@ -100,6 +139,8 @@ export class OverviewView extends Base {
         this.superEntries = await listSuperEntries(this.finance, {
           financeYear: this.fy,
         });
+        // A shorter FY, or a deleted row, can leave the cursor past the end.
+        this.superPage = Math.min(this.superPage, this.superPages - 1);
       }
       this.summary = summary;
     } catch (e: any) {
@@ -108,6 +149,26 @@ export class OverviewView extends Base {
     }
     (this as any).requestUpdate?.();
     await this.pushToChildren();
+    this.captureRowCounts();
+    (this as any).requestUpdate?.();
+  }
+
+  /**
+   * Take each section's record count for the folded-section badge. Runs after
+   * the children have settled, and re-renders, because the first pass has
+   * already been committed by the time their data arrives.
+   */
+  private captureRowCounts(): void {
+    const root = (this as any).renderRoot as ShadowRoot | undefined;
+    const count = (sel: string): number => {
+      const el = root?.querySelector(sel) as { rowCount?: number } | null;
+      return typeof el?.rowCount === 'number' ? el.rowCount : 0;
+    };
+    this.rowCounts = {
+      dividends: count('dividend-log'),
+      interest: count('interest-grid'),
+      super: this.superEntries.length,
+    };
   }
 
   /** Forward finance + fy to embedded grids, logs, and toggleable forms. */
@@ -140,6 +201,122 @@ export class OverviewView extends Base {
         /* child surfaces its own errors */
       }
     }
+  }
+
+  /**
+   * Show/hide one log section. The header bar is the click target and the title
+   * inside it is a real button, so the control is reachable by keyboard and
+   * carries its own expanded state — the same shape as expenseflow's section
+   * headers, so the two overview screens read as one app.
+   */
+  private toggleSection(which: Collapsible): void {
+    this.collapsed = { ...this.collapsed, [which]: !this.collapsed[which] };
+    (this as any).requestUpdate?.();
+  }
+
+  /**
+   * Pager for the superannuation log. Nothing at all when the FY fits on one
+   * page — a disabled Next on a 12-row FY is a control that can only lie.
+   */
+  private renderSuperPager(): unknown {
+    const pages = this.superPages;
+    if (pages <= 1) return '';
+    const n = this.superEntries.length;
+    return html`
+      <div class="table-pager">
+        <span class="muted">
+          Page ${this.superPage + 1} of ${pages} · ${n}
+          ${n === 1 ? 'entry' : 'entries'}
+        </span>
+        <div class="pager-actions">
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            ?disabled=${this.superPage === 0}
+            @click=${() => this.gotoSuperPage(this.superPage - 1)}
+          >
+            Previous
+          </button>
+          <button
+            class="btn btn-secondary btn-small"
+            type="button"
+            ?disabled=${this.superPage >= pages - 1}
+            @click=${() => this.gotoSuperPage(this.superPage + 1)}
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * The record count a folded section keeps in its header. Only rendered while
+   * folded: while the section is open its own body already states the count, and
+   * saying it twice on one screen reads as a mistake.
+   */
+  private countBadge(which: Collapsible): unknown {
+    if (this.collapsed[which] !== true) return '';
+    const n = this.rowCounts[which] ?? 0;
+    const [one, many] = COUNT_NOUN[which];
+    return html`<span class="section-badge rows-badge"
+      >${n} ${n === 1 ? one : many}</span
+    >`;
+  }
+
+  /** Total pages of the superannuation log; always at least one. */
+  private get superPages(): number {
+    return Math.max(1, Math.ceil(this.superEntries.length / SUPER_PAGE_SIZE));
+  }
+
+  /**
+   * The rows for the current page, in the order the Date header claims. Newest
+   * first by default: this log is appended to, so page 1 has to be what you most
+   * recently added — ascending order would bury a new entry on the last page.
+   */
+  private get superPageRows(): SuperEntry[] {
+    const start = this.superPage * SUPER_PAGE_SIZE;
+    return this.superEntries
+      .slice()
+      .sort(byDate(this.superSortDesc))
+      .slice(start, start + SUPER_PAGE_SIZE);
+  }
+
+  /** Flip the date order and return to the first page: page 3 of the old order
+   *  is an arbitrary window on the new one, and landing mid-list is disorienting. */
+  private sortSuperByDate(): void {
+    this.superSortDesc = !this.superSortDesc;
+    this.superPage = 0;
+    (this as any).requestUpdate?.();
+  }
+
+  private gotoSuperPage(page: number): void {
+    const next = Math.min(Math.max(0, page), this.superPages - 1);
+    if (next === this.superPage) return;
+    this.superPage = next;
+    (this as any).requestUpdate?.();
+  }
+
+  /** The chevron + title that opens and closes a section. */
+  private sectionToggle(which: Collapsible, text: string): unknown {
+    const open = this.collapsed[which] !== true;
+    return html`
+      <button
+        type="button"
+        class="section-toggle"
+        aria-expanded=${open ? 'true' : 'false'}
+        aria-controls=${`wf-body-${which}`}
+        title=${open ? 'Hide' : 'Show'}
+        @click=${(e: Event) => {
+          // The header bar also toggles; do not fire it twice.
+          e.stopPropagation();
+          this.toggleSection(which);
+        }}
+      >
+        <span class="chevron" aria-hidden="true"></span>
+        <span class="section-title">${text}</span>
+      </button>
+    `;
   }
 
   private toggleForm(which: 'dividends' | 'interest' | 'super'): void {
@@ -547,9 +724,19 @@ export class OverviewView extends Base {
 
                 <!-- Dividends -->
                 <div class="section flush">
-                  <div class="section-header">
-                    <h3 class="section-title">Dividends — FY ${this.fy}</h3>
-                    <div class="header-actions">
+                  <div
+                    class="section-header is-toggle"
+                    @click=${() => this.toggleSection('dividends')}
+                  >
+                    ${this.sectionToggle(
+                      'dividends',
+                      `Dividends — FY ${this.fy}`,
+                    )}
+                    <div
+                      class="header-actions"
+                      @click=${(e: Event) => e.stopPropagation()}
+                    >
+                      ${this.countBadge('dividends')}
                       <button
                         class="btn btn-secondary btn-small"
                         @click=${() => this.toggleForm('dividends')}
@@ -558,7 +745,11 @@ export class OverviewView extends Base {
                       </button>
                     </div>
                   </div>
-                  <div class="section-body">
+                  <div
+                    class="section-body"
+                    id="wf-body-dividends"
+                    ?hidden=${this.collapsed.dividends === true}
+                  >
                     ${
                       this.showDividendForm
                         ? html`<dividend-form></dividend-form>`
@@ -570,9 +761,19 @@ export class OverviewView extends Base {
 
                 <!-- Interest -->
                 <div class="section flush">
-                  <div class="section-header">
-                    <h3 class="section-title">Interest — FY ${this.fy}</h3>
-                    <div class="header-actions">
+                  <div
+                    class="section-header is-toggle"
+                    @click=${() => this.toggleSection('interest')}
+                  >
+                    ${this.sectionToggle(
+                      'interest',
+                      `Interest — FY ${this.fy}`,
+                    )}
+                    <div
+                      class="header-actions"
+                      @click=${(e: Event) => e.stopPropagation()}
+                    >
+                      ${this.countBadge('interest')}
                       <button
                         class="btn btn-secondary btn-small"
                         @click=${() => this.copyLastMonth()}
@@ -588,7 +789,11 @@ export class OverviewView extends Base {
                       </button>
                     </div>
                   </div>
-                  <div class="section-body">
+                  <div
+                    class="section-body"
+                    id="wf-body-interest"
+                    ?hidden=${this.collapsed.interest === true}
+                  >
                     ${
                       this.copyNotice
                         ? html`<p class="notice" role="status">
@@ -607,11 +812,19 @@ export class OverviewView extends Base {
 
                 <!-- Superannuation -->
                 <div class="section flush">
-                  <div class="section-header">
-                    <h3 class="section-title">
-                      Superannuation — FY ${this.fy}
-                    </h3>
-                    <div class="header-actions">
+                  <div
+                    class="section-header is-toggle"
+                    @click=${() => this.toggleSection('super')}
+                  >
+                    ${this.sectionToggle(
+                      'super',
+                      `Superannuation — FY ${this.fy}`,
+                    )}
+                    <div
+                      class="header-actions"
+                      @click=${(e: Event) => e.stopPropagation()}
+                    >
+                      ${this.countBadge('super')}
                       <button
                         class="btn btn-secondary btn-small"
                         @click=${() => this.toggleForm('super')}
@@ -620,15 +833,11 @@ export class OverviewView extends Base {
                       </button>
                     </div>
                   </div>
-                  <div class="section-body">
-                    ${
-                      s.super.balance
-                        ? html`<p class="muted">
-                            Latest balance ${formatAUD(s.super.balance.amount)}
-                            as at ${s.super.balance.date}
-                          </p>`
-                        : ''
-                    }
+                  <div
+                    class="section-body"
+                    id="wf-body-super"
+                    ?hidden=${this.collapsed.super === true}
+                  >
                     ${
                       this.superEntries.length === 0
                         ? html`<p class="muted">
@@ -639,14 +848,27 @@ export class OverviewView extends Base {
                             <table class="hist-table">
                               <thead>
                                 <tr>
-                                  <th scope="col">Date</th>
+                                  <th
+                                    scope="col"
+                                    aria-sort=${
+                                      this.superSortDesc
+                                        ? 'descending'
+                                        : 'ascending'
+                                    }
+                                  >
+                                    ${dateSortHeader(
+                                      'Date',
+                                      this.superSortDesc,
+                                      () => this.sortSuperByDate(),
+                                    )}
+                                  </th>
                                   <th scope="col">Entry</th>
                                   <th scope="col" class="num">Amount</th>
                                   <th scope="col" class="num">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                ${this.superEntries.map(
+                                ${this.superPageRows.map(
                                   (e) =>
                                     html`<tr>
                                       <td>${e.date}</td>
@@ -675,7 +897,17 @@ export class OverviewView extends Base {
                               </tbody>
                               <tfoot>
                                 <tr>
-                                  <td colspan="2">
+                                  <td class="total-label" colspan="2">
+                                    Balance as at
+                                    ${s.super.balance?.date ?? '—'}
+                                  </td>
+                                  <td class="num money">
+                                    ${formatAUD(s.super.balance?.amount ?? 0)}
+                                  </td>
+                                  <td></td>
+                                </tr>
+                                <tr>
+                                  <td class="total-label" colspan="2">
                                     Private contributions (FY)
                                   </td>
                                   <td class="num money">
@@ -684,7 +916,9 @@ export class OverviewView extends Base {
                                   <td></td>
                                 </tr>
                                 <tr>
-                                  <td colspan="2">SG contributions (FY)</td>
+                                  <td class="total-label" colspan="2">
+                                    SG contributions (FY)
+                                  </td>
                                   <td class="num money">
                                     ${formatAUD(sgTotal)}
                                   </td>
@@ -692,6 +926,7 @@ export class OverviewView extends Base {
                                 </tr>
                               </tfoot>
                             </table>
+                            ${this.renderSuperPager()}
                           </div>`
                     }
                     ${this.showSuperForm ? html`<super-form></super-form>` : ''}

@@ -6,6 +6,46 @@ import { createInterestEntry } from '../src/dao/interest-entries.js';
 import { createStock } from '../src/dao/stocks.js';
 import { createDividend } from '../src/dao/dividends.js';
 
+/** Click a section's collapse control, the way the header bar does. */
+function toggle(el: any, root: ShadowRoot, section: string): void {
+  const btn = root.querySelector(
+    `.section-toggle[aria-controls="wf-body-${section}"]`,
+  ) as HTMLButtonElement;
+  btn.click();
+}
+
+/**
+ * Every static chunk and primitive value in a rendered Lit template, including
+ * nested ones. happy-dom drops a nested `tfoot` from the shadow root, so this
+ * is the only way to assert footer markup without a real browser.
+ */
+function templateText(node: any): { markup: string; values: string[] } {
+  if (Array.isArray(node))
+    return node
+      .map((n) => templateText(n))
+      .reduce(
+        (acc, r) => ({
+          markup: acc.markup + r.markup,
+          values: acc.values.concat(r.values),
+        }),
+        { markup: '', values: [] as string[] },
+      );
+  // A nested template sits in the parent's value list, so recurse rather than
+  // take only the primitives — the footer labels live one or two levels down.
+  if (node && typeof node === 'object' && Array.isArray(node.strings)) {
+    const inner = templateText(node.values ?? []);
+    return {
+      // Collapse the template's own newlines and indentation, so a label can be
+      // matched as one string instead of with the source's line break in it.
+      markup: `${node.strings.join(' ')}${inner.markup}`.replace(/\s+/g, ' '),
+      values: inner.values,
+    };
+  }
+  if (typeof node === 'string' || typeof node === 'number')
+    return { markup: '', values: [String(node)] };
+  return { markup: '', values: [] };
+}
+
 describe('overview-view', () => {
   it('registers element', async () => {
     await import('../src/ui/overview-view.js');
@@ -107,6 +147,7 @@ describe('overview-view', () => {
   });
 
   it('opens the form pre-filled from a receipt row', async () => {
+    await import('../src/ui/overview-view.js');
     await import('../src/ui/dividend-log.js');
     await import('../src/ui/dividend-form.js');
     const finance: any = createMockFinance();
@@ -240,6 +281,502 @@ describe('overview-view', () => {
     expect(root.querySelector('dividend-form')).toBeFalsy();
     expect(root.querySelector('interest-form')).toBeTruthy();
     el.remove();
+  });
+
+  it('folds each log section from its header, and the section actions do not', async () => {
+    const finance: any = createMockFinance();
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const body = (section: string) =>
+      root.querySelector(`#wf-body-${section}`) as HTMLElement;
+    const toggle = (section: string) =>
+      root.querySelector(
+        `.section-toggle[aria-controls="wf-body-${section}"]`,
+      ) as HTMLButtonElement;
+    const btn = (label: string) =>
+      [...root.querySelectorAll('button')].find(
+        (b: any) => b.textContent?.trim() === label,
+      ) as HTMLButtonElement;
+
+    // All three start open, and each control names the body it owns.
+    for (const section of ['dividends', 'interest', 'super']) {
+      expect(toggle(section)).toBeTruthy();
+      expect(toggle(section).getAttribute('aria-expanded')).toBe('true');
+      expect(body(section).hasAttribute('hidden')).toBe(false);
+    }
+    // The Combined card is the FY answer, so it has no toggle at all.
+    const combined = root.querySelectorAll('.section.flush')[0];
+    expect(combined.querySelector('.section-toggle')).toBeNull();
+    expect(combined.querySelector('.is-toggle')).toBeNull();
+
+    // Clicking the title folds its own section, once — the title button and the
+    // header bar are both click targets, and only one of them may fire.
+    toggle('dividends').click();
+    await el.updateComplete;
+    expect(el.collapsed.dividends).toBe(true);
+    expect(body('dividends').hasAttribute('hidden')).toBe(true);
+    expect(toggle('dividends').getAttribute('aria-expanded')).toBe('false');
+    // The other two are untouched: folding one section is not a global collapse.
+    expect(body('interest').hasAttribute('hidden')).toBe(false);
+    expect(body('super').hasAttribute('hidden')).toBe(false);
+
+    // The bar itself is a target too, for the space beside the title.
+    const header = body('super').previousElementSibling as HTMLElement;
+    expect(header.classList.contains('is-toggle')).toBe(true);
+    header.click();
+    await el.updateComplete;
+    expect(body('super').hasAttribute('hidden')).toBe(true);
+
+    // A section action must not reach the bar: "Log dividend" would otherwise
+    // fold the section it just opened into.
+    toggle('interest').click();
+    await el.updateComplete;
+    expect(body('interest').hasAttribute('hidden')).toBe(true);
+    btn('Log dividend').click();
+    await el.updateComplete;
+    expect(root.querySelector('dividend-form')).toBeTruthy();
+    // Still folded, exactly as it was — the action neither folded nor unfolded it.
+    expect(el.collapsed.dividends).toBe(true);
+    expect(body('dividends').hasAttribute('hidden')).toBe(true);
+    // Nothing in the log section was disturbed by the collapse round-trip.
+    expect(root.querySelector('dividend-log')).toBeTruthy();
+    el.remove();
+  });
+
+  it('keeps the FY record count in a folded section header', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createStock } = await import('../src/dao/stocks.js');
+    const { createDividend } = await import('../src/dao/dividends.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    const stock: any = await createStock(finance, {
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard',
+      shares: 5,
+    });
+    for (const [i, date] of [
+      '2025-08-01',
+      '2025-09-01',
+      '2025-10-01',
+    ].entries()) {
+      await createDividend(
+        finance,
+        {
+          stock_id: stock.id,
+          date,
+          type: 'non_trust',
+          gross: 100 + i,
+          franking: 0,
+          finance_year: '2025-2026',
+        },
+        '07-01',
+      );
+    }
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    // Counts come from the children, which load after the first render.
+    expect(el.rowCounts).toEqual({
+      dividends: 3,
+      interest: 0,
+      super: 1,
+    });
+    const badge = (section: string) =>
+      root
+        .querySelector(`.section-toggle[aria-controls="wf-body-${section}"]`)
+        ?.closest('.section')
+        ?.querySelector('.rows-badge') as HTMLElement | null;
+
+    // Open: no badge, because the body already states the count.
+    expect(badge('dividends')).toBeNull();
+    // Folded: the count survives in the header, in the section's own noun.
+    toggle(el, root, 'dividends');
+    await el.updateComplete;
+    expect(badge('dividends')?.textContent?.trim()).toBe('3 receipts');
+    toggle(el, root, 'super');
+    await el.updateComplete;
+    expect(badge('super')?.textContent?.trim()).toBe('1 entry');
+    toggle(el, root, 'interest');
+    await el.updateComplete;
+    // Zero is still a fact worth keeping: the section is empty, not unloaded.
+    expect(badge('interest')?.textContent?.trim()).toBe('0 entries');
+    el.remove();
+  });
+
+  it('pages the superannuation log 12 rows at a time, newest first', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    // 14 entries inside FY 2025-2026 (Jul 2025 - Jun 2026): a page of 12 and a
+    // second of 2. Two months carry a second entry so the year fits 14 rows.
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(2025, 6 + (i % 12), i < 12 ? 10 : 20);
+      await createSuperEntry(
+        finance,
+        {
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          kind: 'contribution',
+          amount: 10 * (i + 1),
+        },
+        '07-01',
+      );
+    }
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const pager = () => root.querySelector('.table-pager');
+    // The count line only; the pager also holds the two buttons.
+    const pageLine = () =>
+      pager()
+        ?.querySelector('.muted')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim();
+    // happy-dom drops the conditional tbody, so assert at the data boundary too.
+    const rowsOf = () =>
+      (el as any).superPageRows.map((e: any) => e.date) as string[];
+
+    expect(pager()).toBeTruthy();
+    expect(pageLine()).toBe('Page 1 of 2 · 14 entries');
+    // Newest first: what you last added is on page 1, not buried on the last.
+    expect(rowsOf()).toHaveLength(12);
+    expect(rowsOf()[0]).toBe('2026-06-10');
+    const buttons = [...root.querySelectorAll('.pager-actions button')];
+    const pick = (bs: Element[], label: string) =>
+      bs.find((b: any) => b.textContent?.trim() === label) as HTMLButtonElement;
+    expect(pick(buttons, 'Previous').disabled).toBe(true);
+    expect(pick(buttons, 'Next').disabled).toBe(false);
+    pick(buttons, 'Next').click();
+    await el.updateComplete;
+    expect(el.superPage).toBe(1);
+    expect(pageLine()).toBe('Page 2 of 2 · 14 entries');
+    expect(rowsOf()).toEqual(['2025-07-20', '2025-07-10']);
+    const buttons2 = [...root.querySelectorAll('.pager-actions button')];
+    expect(pick(buttons2, 'Previous').disabled).toBe(false);
+    expect(pick(buttons2, 'Next').disabled).toBe(true);
+    el.remove();
+  });
+
+  it('shows no pager when the superannuation FY fits on one page', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    // Exactly a full page, all inside the FY.
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(2025, 6 + i, 10);
+      await createSuperEntry(
+        finance,
+        {
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-10`,
+          kind: 'sg',
+          amount: 100,
+        },
+        '07-01',
+      );
+    }
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    expect((el as any).superPages).toBe(1);
+    expect(root.querySelector('.table-pager')).toBeNull();
+    el.remove();
+  });
+
+  it('puts the balance in the super footer alongside the contribution totals', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    await createSuperEntry(
+      finance,
+      { date: '2025-08-15', kind: 'balance', amount: 100000 },
+      '07-01',
+    );
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    // Balance is a summary figure, not a table row: it belongs with the other
+    // totals, and the top-of-section line is gone.
+    expect(el.summary.super.balance).toEqual({
+      amount: 100000,
+      date: '2025-08-15',
+    });
+    expect(el.summary.super.contributions.total).toBe(1000);
+    expect(el.summary.super.sg.total).toBe(0);
+    // happy-dom drops a nested tfoot from the shadow root (the same limitation
+    // the dividend-byStock assertion documents), so read the template: the three
+    // labels are static, and the balance's date and figure are interpolated.
+    const tpl = templateText((el as any).render());
+    for (const label of [
+      'Balance as at ',
+      'Private contributions (FY)',
+      'SG contributions (FY)',
+    ]) {
+      expect(tpl.markup).toContain(label);
+    }
+    expect(tpl.values.some((v) => v.includes('2025-08-15'))).toBe(true);
+    expect(root.querySelector('#wf-body-super')).toBeTruthy();
+    el.remove();
+  });
+
+  it('sorts each section by date, latest first, and flips on click', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createStock } = await import('../src/dao/stocks.js');
+    const { createDividend } = await import('../src/dao/dividends.js');
+    const { createBank } = await import('../src/dao/banks.js');
+    const { createInterestEntry } =
+      await import('../src/dao/interest-entries.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    const stock: any = await createStock(finance, {
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard',
+      shares: 5,
+    });
+    const bank: any = await createBank(finance, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
+    for (const [i, date] of [
+      '2025-08-10',
+      '2025-10-10',
+      '2025-09-10',
+    ].entries()) {
+      await createDividend(
+        finance,
+        {
+          stock_id: stock.id,
+          date,
+          type: 'non_trust',
+          gross: 100 + i,
+          franking: 0,
+          finance_year: '2025-2026',
+        },
+        '07-01',
+      );
+      await createSuperEntry(
+        finance,
+        { date, kind: 'contribution', amount: 10 * (i + 1) },
+        '07-01',
+      );
+    }
+    for (const date of ['2025-08-10', '2025-10-10', '2025-09-10']) {
+      await createInterestEntry(
+        finance,
+        {
+          bank_id: bank.id,
+          date,
+          amount: 5,
+          finance_year: '2025-2026',
+        },
+        '07-01',
+      );
+    }
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    // happy-dom drops thead/tfoot from a shadow root, so the order is asserted
+    // where it is actually decided — on the rows each section hands its table.
+    // The control itself is covered by the dateSortHeader test.
+
+    // Dividends: the log owns its own order, newest first.
+    const log = root.querySelector('dividend-log') as any;
+    expect(log.sortDesc).toBe(true);
+    expect(log.sortedEntries.map((e: any) => e.date)).toEqual([
+      '2025-10-10',
+      '2025-09-10',
+      '2025-08-10',
+    ]);
+    log.sortByDate();
+    await log.updateComplete;
+    expect(log.sortDesc).toBe(false);
+    expect(log.sortedEntries.map((e: any) => e.date)).toEqual([
+      '2025-08-10',
+      '2025-09-10',
+      '2025-10-10',
+    ]);
+    // Round-trips back to the default.
+    log.sortByDate();
+    await log.updateComplete;
+    expect(log.sortDesc).toBe(true);
+    // The source array keeps its load order, so the FY totals above the table
+    // never depend on how the user happens to be reading it.
+    expect(log.entries.map((e: any) => e.date)).toEqual([
+      '2025-08-10',
+      '2025-09-10',
+      '2025-10-10',
+    ]);
+
+    // Interest: the date axis is the month rows, so the control is on Month.
+    const { monthsWithEntries, orderMonths } =
+      await import('../src/ui/interest-grid.js');
+    const grid = root.querySelector('interest-grid') as any;
+    expect(grid.sortDesc).toBe(true);
+    // happy-dom drops tbody rows too, so the ordering is asserted on the pure
+    // rule the grid renders from.
+    const months = monthsWithEntries('2025-2026', grid.banks, grid.entries);
+    expect(months).toEqual(['2025-08', '2025-09', '2025-10']);
+    expect(orderMonths(months, true)).toEqual([
+      '2025-10',
+      '2025-09',
+      '2025-08',
+    ]);
+    expect(orderMonths(months, false)).toEqual(months);
+    grid.sortByDate();
+    await grid.updateComplete;
+    expect(grid.sortDesc).toBe(false);
+    // The pure rule keeps its calendar order whatever the screen does with it.
+    expect(monthsWithEntries('2025-2026', grid.banks, grid.entries)).toEqual(
+      months,
+    );
+
+    // Super: owned by the host.
+    expect(el.superSortDesc).toBe(true);
+    expect(el.superPageRows.map((e: any) => e.date)).toEqual([
+      '2025-10-10',
+      '2025-09-10',
+      '2025-08-10',
+    ]);
+    el.sortSuperByDate();
+    await el.updateComplete;
+    expect(el.superSortDesc).toBe(false);
+    expect(el.superPageRows.map((e: any) => e.date)).toEqual([
+      '2025-08-10',
+      '2025-09-10',
+      '2025-10-10',
+    ]);
+    el.remove();
+  });
+
+  it('returns to page 1 when the super date order is flipped', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    for (let i = 0; i < 14; i++) {
+      const d = new Date(2025, 6 + (i % 12), i < 12 ? 10 : 20);
+      await createSuperEntry(
+        finance,
+        {
+          date: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+          kind: 'contribution',
+          amount: 10 * (i + 1),
+        },
+        '07-01',
+      );
+    }
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    el.gotoSuperPage(1);
+    await el.updateComplete;
+    expect(el.superPage).toBe(1);
+    el.sortSuperByDate();
+    await el.updateComplete;
+    // Page 2 of the old order is an arbitrary window on the new one.
+    expect(el.superPage).toBe(0);
+    expect(el.superSortDesc).toBe(false);
+    expect(el.superPageRows).toHaveLength(12);
+    expect(root.querySelector('.table-pager')).toBeTruthy();
+    el.remove();
+  });
+
+  it('dateSortHeader states the current order and fires once per click', async () => {
+    const { render } = await import('lit');
+    const { dateSortHeader } = await import('../src/ui/sort-header.js');
+    const host = document.createElement('div');
+    document.body.appendChild(host);
+    const order = () => {
+      const btn = host.querySelector('button') as HTMLButtonElement;
+      return {
+        text: btn.textContent?.replace(/\s+/g, ' ').trim(),
+        title: btn.getAttribute('title'),
+      };
+    };
+    let calls = 0;
+    render(
+      dateSortHeader('Date', true, () => calls++),
+      host,
+    );
+    // The caret states where the column is, the title where a click would send it.
+    expect(order().text).toBe('Date ▼');
+    expect(order().title).toBe('Oldest first');
+    (host.querySelector('button') as HTMLButtonElement).click();
+    expect(calls).toBe(1);
+    render(
+      dateSortHeader('Date', false, () => calls++),
+      host,
+    );
+    expect(order().text).toBe('Date ▲');
+    expect(order().title).toBe('Newest first');
+    host.remove();
   });
 
   it('copies last month to next month and closes the interest form', async () => {
@@ -584,6 +1121,7 @@ describe('overview-view', () => {
 
   it('closes the dividend form after add, and on save, cancel and delete', async () => {
     await import('../src/ui/dividend-form.js');
+    await import('../src/ui/overview-view.js');
     await import('../src/ui/dividend-log.js');
     const finance: any = createMockFinance();
     const stock: any = await createStock(finance, {
@@ -700,6 +1238,7 @@ describe('overview-view', () => {
 
   it('breaks SG out of the super footer instead of folding it into private contributions', async () => {
     const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    await import('../src/ui/overview-view.js');
     await import('../src/ui/dividend-log.js');
     await import('../src/ui/dividend-form.js');
     await import('../src/ui/interest-grid.js');

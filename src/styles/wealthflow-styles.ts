@@ -385,8 +385,12 @@ export const wealthflowStyles = css`
   table.data-table tbody tr.inactive {
     opacity: 0.6;
   }
-  /* Total row: the log's only place a subtotal belongs, so it reads as one. */
-  table.data-table tfoot td {
+  /* Total row: the log's only place a subtotal belongs, so it reads as one.
+     The superannuation log is a hist-table, so it is listed here rather than
+     given a near-copy of this rule — a summary that does not read as a summary
+     is just three more rows, and the two tables must not drift apart. */
+  table.data-table tfoot td,
+  .hist-table tfoot td {
     padding: 8px;
     border-top: 1px solid var(--ff-border, #3e3e3e);
     font-size: var(--ff-font-sm, 12px);
@@ -395,8 +399,64 @@ export const wealthflowStyles = css`
   }
   /* The word that names the row picks up the accent, the way a badge does, so
      the label and the figures read as two different things. */
-  table.data-table tfoot td.total-label {
+  table.data-table tfoot td.total-label,
+  .hist-table tfoot td.total-label {
     color: var(--ff-accent, #007acc);
+  }
+  .hist-table tfoot td.num {
+    font-variant-numeric: tabular-nums;
+  }
+  /* Sortable column header (dateSortHeader in ui/sort-header.ts). A real button
+     so the order is reachable by keyboard; it borrows the th's own typography so
+     it does not look like a control dropped into a heading. */
+  .th-sort {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    cursor: pointer;
+  }
+  .th-sort:hover {
+    color: var(--ff-text-strong, #fff);
+  }
+  .th-sort:focus-visible {
+    outline: 1px solid var(--ff-accent, #007acc);
+    outline-offset: 2px;
+  }
+  /* Idle: the affordance is there but unassertive. Active: the accent says
+     which way the column is sorted without relying on the glyph. */
+  .th-sort .caret {
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.5;
+  }
+  th[aria-sort] .th-sort {
+    color: var(--ff-text-strong, #fff);
+  }
+  th[aria-sort] .th-sort .caret {
+    opacity: 1;
+    color: var(--ff-accent, #007acc);
+  }
+
+  /* Pager under a paged log. Hidden entirely when the FY fits on one page, so
+     the common case has no dead control in it. */
+  .table-pager {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .pager-actions {
+    display: flex;
+    gap: 6px;
   }
   .row-code {
     font-weight: 700;
@@ -537,6 +597,101 @@ export const wealthflowStyles = css`
   .section-body {
     padding: 16px;
   }
+  /* Collapsing sets the hidden attribute; state it here too so a later display
+     on .section-body cannot silently turn every collapsed section back on. */
+  .section-body[hidden] {
+    display: none;
+  }
+  /* ===== Collapsible overview sections (mirrors expenseflow) =====
+     The whole header bar is the click target, and the title inside it is a real
+     button so the control is reachable by keyboard and announces its own
+     expanded state. Section actions stop their click from reaching the bar, or
+     "Log dividend" would fold the section it just opened. */
+  .section-header.is-toggle {
+    cursor: pointer;
+    user-select: none;
+  }
+  .section-header.is-toggle:hover {
+    background: color-mix(in srgb, var(--ff-text, #d4d4d4) 6%, transparent);
+  }
+  /* The title was an <h3> before it became a control, and a button may only hold
+     phrasing content — so the heading's metrics move onto the button itself.
+     The size is the UA's 1.17em h3 measured against the bar's 15px (≈17.55px),
+     kept in em rather than rounded to a token so the title stays the size it was.
+     Declared after the font shorthand because that shorthand would reset it. */
+  .section-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    background: none;
+    border: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    font-size: 1.17em;
+    font-weight: 700;
+    text-align: left;
+    cursor: inherit;
+  }
+  .section-toggle:focus-visible {
+    outline: 2px solid var(--ff-accent, #007acc);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+  .section-toggle .section-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Chevron, drawn from borders so it inherits the title's colour. Points right
+     when folded, down when open. */
+  .section-toggle .chevron {
+    width: 0;
+    height: 0;
+    flex: none;
+    border-left: 5px solid currentColor;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    color: var(--ff-text-muted, #858585);
+    opacity: 0.6;
+    transform: rotate(0deg);
+    transition:
+      transform 120ms ease,
+      opacity 120ms ease;
+  }
+  .section-toggle[aria-expanded='true'] .chevron {
+    transform: rotate(90deg);
+  }
+  .section-header.is-toggle:hover .chevron {
+    opacity: 1;
+  }
+  /* A folded section hides its body, and the body's own count badge goes with
+     it — so the header keeps one. Quiet by design: it must not compete with the
+     section actions to the right of it. */
+  .section-badge.rows-badge {
+    background: transparent;
+    border-color: var(--ff-border, #3e3e3e);
+    color: var(--ff-text-muted, #858585);
+    font-weight: 600;
+  }
+  .header-actions .section-badge {
+    background: var(--ff-bg-input, #3c3c3c);
+    border: 1px solid var(--ff-border, #3e3e3e);
+    color: var(--ff-text-muted, #858585);
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    padding: 1px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .section-toggle .chevron {
+      transition: none;
+    }
+  }
+
   .header-actions {
     display: flex;
     align-items: center;
