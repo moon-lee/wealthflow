@@ -25,15 +25,23 @@
     <script type="module">
       import '/src/ui/index.ts';
       import { createMockFinance } from '/src/mock/finance-mock.ts';
+      import {
+        currentFy,
+        TAB_LABELS,
+      } from '/src/ui/wealthflow-orchestrator.ts';
       import * as main from '/src/main.ts';
 
-      // ---- add view tags here when you create new views ----
+      // ---- one entry per real view, in the same order as the app's nav ----
+      // These mirror package.json#financeExtension.contributions.navigation:
+      // the same three views, addressed by the same `view` value their command
+      // passes to finance.ui.requestMount. The dropdown is a stand-in for the
+      // sidebar, not a list of components — a nested child like interest-grid
+      // has no nav item and is not offered here. Add a view here and add its
+      // navigation entry in package.json too.
       const VIEWS = [
-        { tag: 'wealthflow-orchestrator', label: 'Wealthflow' },
-        { tag: 'bank-list', label: 'Banks' },
-        { tag: 'interest-grid', label: 'Interest Grid' },
-        { tag: 'stock-list', label: 'Stocks' },
-        { tag: 'overview-view', label: 'Overview' },
+        { view: 'overview', label: TAB_LABELS.overview },
+        { view: 'banks', label: TAB_LABELS.banks },
+        { view: 'stocks', label: TAB_LABELS.stocks },
       ];
 
       const switcher = document.getElementById('view-switcher');
@@ -55,7 +63,14 @@
       //   await __svc('getOverviewSummary', '2026-2027')
       window.__svc = (method, ...args) =>
         finance.services.invoke('wealthflow', method, args);
-      let current = null;
+      // Child views are FY-driven and the orchestrator takes an explicit FY in
+      // its mount payload, so the page has to hand one over — which is what
+      // panel-bootstrap passes in the real app.
+      const FY = currentFy();
+      // One panel for the whole session, exactly as in the app: switching views
+      // retargets it in place rather than tearing the element down and back up.
+      const panel = document.createElement('wealthflow-orchestrator');
+      document.getElementById('app').appendChild(panel);
 
       // ---- ?seed (or ?seed=1) loads src/seed/wealth-seed.ts before mount ----
       // The seed module is gitignored, so a missing file is not an error: the
@@ -72,21 +87,31 @@
         }
       }
 
-      async function mountView(index) {
-        if (current) {
-          current.remove();
-          current = null;
-        }
+      // Registers the commands and the public 'wealthflow' service once. It is
+      // deliberately called WITHOUT a viewId: with one, activate() clears #app
+      // and mounts an orchestrator of its own, which would replace the panel
+      // this page owns (and re-register the service on every switch).
+      await main.activate(finance, {});
+
+      // The same retarget the sidebar performs: in the app the host dispatches
+      // 'mount-update' on #app and the orchestrator's listener calls init() with
+      // the view, so drive init() directly rather than re-dispatching an event
+      // nothing is listening for (activate() only wires that listener when it
+      // is given a viewId, and this page owns the panel instead).
+      async function showView(index) {
         const v = VIEWS[index];
-        const el = document.createElement(v.tag);
-        document.getElementById('app').appendChild(el);
-        current = el;
-        if (typeof main.activate === 'function')
-          await main.activate(finance, { viewId: v.tag.replace('-view', '') });
+        if (!v) return;
+        switcher.value = String(index);
+        await panel.init(finance, { view: v.view, fy: FY });
+        await panel.updateComplete;
       }
 
-      switcher.addEventListener('change', (e) => mountView(+e.target.value));
-      await mountView(0);
+      switcher.value = '0';
+      switcher.addEventListener('change', (e) => {
+        void showView(+e.target.value);
+      });
+      await panel.init(finance, { view: VIEWS[0].view, fy: FY });
+      await panel.updateComplete;
     </script>
   </body>
 </html>

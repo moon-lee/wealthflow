@@ -9,6 +9,17 @@ const Base =
 
 export type WealthTab = 'banks' | 'stocks' | 'overview';
 
+/**
+ * Topbar dialect: name the extension, then the section you are looking at.
+ * Which section is reachable is the host's call — the app's own navigation
+ * retargets this panel via `mount-update` — so the bar only reports it.
+ */
+export const TAB_LABELS: Record<WealthTab, string> = {
+  banks: 'Banks',
+  stocks: 'Stocks',
+  overview: 'Overview',
+};
+
 export function viewForMount(mount: Record<string, unknown> = {}): WealthTab {
   const v = (mount.view ?? mount.viewId) as string | undefined;
   if (v === 'banks' || v === 'bank-list') return 'banks';
@@ -118,7 +129,7 @@ export class WealthOrchestrator extends Base {
    */
   override updated(): void {
     const sel = (this as any).renderRoot?.querySelector(
-      '.topbar select',
+      '#fy-select',
     ) as HTMLSelectElement | null;
     if (sel && sel.value !== this.fy) sel.value = this.fy;
   }
@@ -156,12 +167,16 @@ export class WealthOrchestrator extends Base {
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
-    const tabs: WealthTab[] = ['banks', 'stocks', 'overview'];
     return html`
       <div class="view-scroll">
         <div class="topbar">
-          <span class="crumb-current">Wealth Flow</span>
+          <span class="crumb-current"
+            >Wealth Flow · ${TAB_LABELS[this.tab]}</span
+          >
+          <div class="spacer"></div>
+          <label class="fy-label" for="fy-select">Finance year</label>
           <select
+            id="fy-select"
             aria-label="Financial year"
             .value=${this.fy}
             @change=${(e: Event) => {
@@ -179,16 +194,6 @@ export class WealthOrchestrator extends Base {
               (f) => html`<option value=${f}>FY ${f}</option>`,
             )}
           </select>
-          <div class="spacer"></div>
-          ${tabs.map(
-            (t) =>
-              html`<button
-                class="filter-btn${this.tab === t ? ' active' : ''}"
-                @click=${() => this.navigate(t)}
-              >
-                ${t[0].toUpperCase() + t.slice(1)}
-              </button>`,
-          )}
         </div>
         <div class="view-container">
           <div class="view-container-inner">

@@ -8,6 +8,7 @@ import {
   SUPER_KINDS,
   SUPER_LABELS,
   createSuperEntry,
+  superKindLabel,
   updateSuperEntry,
   deleteSuperEntry,
   type SuperEntry,
@@ -188,7 +189,7 @@ export class SuperForm extends Base {
   }
 
   private kindLabel(): string {
-    return this.kind === 'contribution' ? 'Private contribution' : 'Balance';
+    return superKindLabel(this.kind);
   }
 
   private async onDelete(): Promise<void> {

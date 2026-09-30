@@ -1,6 +1,6 @@
 import type { FinanceApi } from 'finance';
 import { fyEndDate } from '../utils/finance-year.js';
-import type { SuperEntry } from '../dao/super-entries.js';
+import type { SuperEntry, SuperKind } from '../dao/super-entries.js';
 import { listSuperEntries } from '../dao/super-entries.js';
 import type { SuperSummary } from './public-wealth-adapter.js';
 
@@ -17,16 +17,19 @@ export function sumSuper(
     .filter((e) => e.kind === 'balance' && e.date <= end)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
   const top = balances[0];
-  const mine = entries.filter(
-    (e) => e.kind === 'contribution' && e.finance_year === financialYear,
-  );
+  const inFy = (kind: SuperKind) =>
+    entries.filter((e) => e.kind === kind && e.finance_year === financialYear);
+  // Private and employer money stay in separate buckets: only the first one is
+  // a Tax deduction, so a consumer must never have to subtract to find it.
+  const mine = inFy('contribution');
+  const employer = inFy('sg');
+  const total = (rows: typeof entries) =>
+    round2(rows.reduce((x, e) => x + Number(e.amount ?? 0), 0));
   return {
     financialYear,
     balance: top ? { amount: Number(top.amount), date: top.date } : null,
-    contributions: {
-      total: round2(mine.reduce((x, e) => x + Number(e.amount ?? 0), 0)),
-      count: mine.length,
-    },
+    contributions: { total: total(mine), count: mine.length },
+    sg: { total: total(employer), count: employer.length },
   };
 }
 

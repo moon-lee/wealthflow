@@ -656,4 +656,36 @@ export const wealthflowStyles = css`
     display: flex;
     flex-direction: column;
   }
+
+  /* ===== Topbar dialect (mirrors expenseflow) =====
+     Crumb on the left, then right-aligned chrome ending in the finance-year
+     control with a visible label. Which section you are on is stated by the
+     crumb, not by a switch: the host owns navigation, so a second copy of it
+     here would be a control that can disagree with the sidebar. */
+  /* The FY label shares the control's baseline so the pair reads as one unit
+     rather than as two items in the bar's flex gap. */
+  .topbar .fy-label {
+    display: inline-flex;
+    align-items: center;
+    flex-direction: row;
+    margin: 0;
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: var(--ff-text-muted, #858585);
+    white-space: nowrap;
+    cursor: default;
+  }
+  .topbar select:focus-visible {
+    outline: 1px solid var(--ff-accent, #007acc);
+    outline-offset: 1px;
+  }
+  /* Narrow panel: the bar keeps its order, but the label is the first thing to
+     go so the control it names stays with its options. */
+  @media (max-width: 720px) {
+    .topbar .fy-label {
+      display: none;
+    }
+  }
 `;

@@ -698,6 +698,97 @@ describe('overview-view', () => {
     el.remove();
   });
 
+  it('breaks SG out of the super footer instead of folding it into private contributions', async () => {
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const finance: any = createMockFinance();
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-28', kind: 'sg', amount: 350.5 },
+      '07-01',
+    );
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const text = (el.renderRoot as ShadowRoot).textContent ?? '';
+    // Both buckets are named, so neither is mistaken for the other.
+    expect(text).toContain('Private contributions (FY)');
+    expect(text).toContain('SG contributions (FY)');
+    // happy-dom drops the super tbody/tfoot from the shadow root, so assert the
+    // data contract the footer renders from.
+    expect(el.summary.super.contributions).toEqual({ total: 1000, count: 1 });
+    expect(el.summary.super.sg).toEqual({ total: 350.5, count: 1 });
+    el.remove();
+  });
+
+  it('renders a summary that predates the sg bucket without throwing', async () => {
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    const bank: any = await createBank(finance, {
+      bank_code: 'UBank',
+      account_number: '9',
+    });
+    await createInterestEntry(
+      finance,
+      {
+        bank_id: bank.id,
+        date: '2025-07-31',
+        amount: 10,
+        finance_year: '2025-2026',
+      },
+      '07-01',
+    );
+    // One entry so the super table (and its footer) renders rather than the
+    // empty-state copy.
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+    finance.services.register('wealthflow', {
+      getOverviewSummary: async () => ({
+        financialYear: '2025-2026',
+        dividends: { gross: 0, franking: 0 },
+        interest: { total: 0, byBank: [] },
+        super: {
+          financialYear: '2025-2026',
+          balance: null,
+          contributions: { total: 0, count: 0 },
+        },
+        combined: { gross: 0, franking: 0 },
+      }),
+    });
+    const g: any = globalThis as any;
+    try {
+      const el = document.createElement('overview-view') as any;
+      document.body.appendChild(el);
+      el.fy = '2025-2026';
+      await el.setFinance(finance);
+      await el.updateComplete;
+      await new Promise((r) => setTimeout(r, 0));
+      await el.updateComplete;
+      expect(el.error).toBe('');
+      expect((el.renderRoot as ShadowRoot).textContent).toContain(
+        'SG contributions (FY)',
+      );
+      el.remove();
+    } finally {
+      g.__mockServices?.delete('wealthflow');
+    }
+  });
+
   // The card above only proves the DAO fallback, because no test registered the
   // public service. Once the service is live the view must pass its args in the
   // shape the host expects, or it reads a bogus year and silently shows zeros.

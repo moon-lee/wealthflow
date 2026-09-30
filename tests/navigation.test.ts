@@ -24,18 +24,30 @@ function tabButtons(el: WealthOrchestrator): HTMLButtonElement[] {
 }
 
 describe('orchestrator click navigation', () => {
-  it('clicking Stocks switches the visible child', async () => {
+  it('the topbar holds no section switch of its own', async () => {
     const { el } = await mount();
+    // The app's own navigation owns which section is mounted: a second switch
+    // in the bar could disagree with the sidebar it mirrors. The crumb still
+    // reports the current section.
+    expect(tabButtons(el)).toHaveLength(0);
     expect((el as any).renderRoot.querySelector('bank-list')).toBeTruthy();
-    expect(tabButtons(el)).toHaveLength(3);
-    for (const [label, tag] of [
-      ['Stocks', 'stock-list'],
-      ['Overview', 'overview-view'],
-      ['Banks', 'bank-list'],
+    expect(
+      (el as any).renderRoot
+        .querySelector('.crumb-current')
+        ?.textContent?.trim(),
+    ).toBe('Wealth Flow · Banks');
+    el.remove();
+  });
+
+  it('a host retarget switches the visible child', async () => {
+    const { el, finance } = await mount();
+    for (const [view, tag] of [
+      ['stocks', 'stock-list'],
+      ['overview', 'overview-view'],
+      ['banks', 'bank-list'],
     ] as const) {
-      const btn = tabButtons(el).find((b) => b.textContent?.trim() === label)!;
-      expect(btn).toBeTruthy();
-      btn.click();
+      // What panel-bootstrap does on a warm-panel retarget.
+      await el.init(finance, { view });
       await (el as any).updateComplete;
       await new Promise((r) => setTimeout(r, 0));
       await (el as any).updateComplete;

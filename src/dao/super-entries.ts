@@ -1,12 +1,23 @@
 import type { FinanceApi } from 'finance';
 import { computeFinanceYear, isValidIsoDate } from '../utils/finance-year.js';
 
-export const SUPER_KINDS = ['balance', 'contribution'] as const;
+/**
+ * `sg` is the employer's super guarantee — money the fund paid in, so it is
+ * tracked apart from a personal voluntary contribution (`contribution`, the
+ * Tax-deduction input) and never folded into that total.
+ */
+export const SUPER_KINDS = ['balance', 'contribution', 'sg'] as const;
 export type SuperKind = (typeof SUPER_KINDS)[number];
 export const SUPER_LABELS: Record<SuperKind, string> = {
   balance: 'Balance',
   contribution: 'Private contribution',
+  sg: 'SG contribution',
 };
+
+/** Human label for a stored `kind`, falling back to the raw value. */
+export function superKindLabel(kind: string): string {
+  return SUPER_LABELS[kind as SuperKind] ?? kind;
+}
 
 export interface SuperEntry {
   readonly id: number;
@@ -71,7 +82,7 @@ export async function updateSuperEntry(
     !(SUPER_KINDS as readonly string[]).includes(patch.kind)
   )
     throw new SuperValidationError(
-      'kind must be one of balance | contribution',
+      `kind must be one of ${(SUPER_KINDS as readonly string[]).join(' | ')}`,
     );
   if (
     patch.amount !== undefined &&

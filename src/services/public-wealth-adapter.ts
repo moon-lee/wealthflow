@@ -52,7 +52,10 @@ export interface OverviewSummary {
 export interface SuperSummary {
   financialYear: string;
   balance: { amount: number; date: string } | null;
+  /** Personal voluntary contributions — the Tax-deduction input. */
   contributions: { total: number; count: number };
+  /** Employer super guarantee, summed separately from the private bucket. */
+  sg: { total: number; count: number };
 }
 export interface PublicWealthService {
   getInterestSummary(financialYear: string): Promise<InterestSummary | null>;

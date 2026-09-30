@@ -7,6 +7,7 @@ import { monthLabel } from '../utils/finance-year.js';
 import type { DividendEntry } from '../dao/dividends.js';
 import type { InterestEntry } from '../dao/interest-entries.js';
 import type { SuperEntry } from '../dao/super-entries.js';
+import { superKindLabel } from '../dao/super-entries.js';
 import type { DividendForm } from './dividend-form.js';
 import type { InterestForm } from './interest-form.js';
 import type { InterestGrid } from './interest-grid.js';
@@ -456,7 +457,7 @@ export class OverviewView extends Base {
     if (
       typeof confirm !== 'undefined' &&
       !confirm(
-        `Delete ${entry.kind === 'contribution' ? 'private contribution' : 'balance'} ${formatAUD(Number(entry.amount))} on ${entry.date}?`,
+        `Delete ${superKindLabel(entry.kind)} ${formatAUD(Number(entry.amount))} on ${entry.date}?`,
       )
     )
       return;
@@ -491,6 +492,9 @@ export class OverviewView extends Base {
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
     const s = this.summary;
+    // `sg` is optional on the wire so a summary served by an older build (or a
+    // hand-rolled one) still renders instead of throwing mid-template.
+    const sgTotal = s?.super?.sg?.total ?? 0;
     return html`
       <div class="order-stack">
         ${
@@ -628,8 +632,8 @@ export class OverviewView extends Base {
                     ${
                       this.superEntries.length === 0
                         ? html`<p class="muted">
-                            No super entries this FY yet — log a balance or a
-                            private contribution.
+                            No super entries this FY yet — log a balance, a
+                            private contribution, or an SG contribution.
                           </p>`
                         : html`<div class="table-wrap" style="margin-top:12px">
                             <table class="hist-table">
@@ -646,13 +650,7 @@ export class OverviewView extends Base {
                                   (e) =>
                                     html`<tr>
                                       <td>${e.date}</td>
-                                      <td>
-                                        ${
-                                          e.kind === 'contribution'
-                                            ? 'Private contribution'
-                                            : 'Balance'
-                                        }
-                                      </td>
+                                      <td>${superKindLabel(e.kind)}</td>
                                       <td class="num money">
                                         ${formatAUD(Number(e.amount))}
                                       </td>
@@ -682,6 +680,13 @@ export class OverviewView extends Base {
                                   </td>
                                   <td class="num money">
                                     ${formatAUD(s.super.contributions.total)}
+                                  </td>
+                                  <td></td>
+                                </tr>
+                                <tr>
+                                  <td colspan="2">SG contributions (FY)</td>
+                                  <td class="num money">
+                                    ${formatAUD(sgTotal)}
                                   </td>
                                   <td></td>
                                 </tr>
