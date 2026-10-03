@@ -1,13 +1,13 @@
 {
   "name": "wealthflow",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
     "activationEvents": [
@@ -43,9 +43,19 @@
         {
           "id": "wealthflow.show-overview",
           "title": "Wealth Flow: Show Overview"
+        },
+        {
+          "id": "wealthflow.refresh",
+          "title": "Refresh Wealth Flow"
         }
       ],
       "navigation": [
+        {
+          "id": "wealthflow-refresh",
+          "label": "Refresh",
+          "command": "wealthflow.refresh",
+          "group": "Quick Links"
+        },
         {
           "id": "wealthflow-overview",
           "label": "Overview",
@@ -81,7 +91,8 @@
         "wealthflow.add-interest",
         "wealthflow.show-stocks",
         "wealthflow.add-dividend",
-        "wealthflow.show-overview"
+        "wealthflow.show-overview",
+        "wealthflow.refresh"
       ],
       "allowedUiEvents": [
         "bank-create",

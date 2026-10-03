@@ -15,6 +15,18 @@ export async function activate(
 ): Promise<void> {
   _finance = finance;
   logger.info('activate wealthflow', { viewId: ctx.viewId });
+
+  // Nav-bar Refresh (Quick Links group), same pattern as taxflow. pushData
+  // rather than requestMount: the latter would create the panel if it were
+  // closed, popping a view the user had deliberately shut. Dropped when nothing
+  // is mounted, which is what a Refresh item should do.
+  finance.commands.registerCommand('wealthflow.refresh', 'Refresh Wealth Flow', async () => {
+    try {
+      await finance.ui?.pushData?.('wealthflow', { refreshedAt: Date.now() });
+    } catch (err) {
+      logger.error('wealthflow refresh failed', err);
+    }
+  });
   const openView = (view: string, focus?: string) => async () => {
     await finance.ui?.requestMount(
       'wealthflow',

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 5 commands, 5 tables', () => {
+  it('declares single view, 6 commands, 5 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -12,6 +12,7 @@ describe('manifest', () => {
       [
         'wealthflow.add-dividend',
         'wealthflow.add-interest',
+        'wealthflow.refresh',
         'wealthflow.show-banks',
         'wealthflow.show-overview',
         'wealthflow.show-stocks',
@@ -30,25 +31,31 @@ describe('manifest', () => {
       expect(fe.contributions.allowedCommands).toContain(id);
   });
 
-  it('declares navigation in Overview, Banks, Stocks order with no add entries', () => {
+  it('declares the Quick Links Refresh item, then Overview, Banks, Stocks, with no add entries', () => {
     const fe: any = (pkg as any).financeExtension;
     const nav = fe.contributions.navigation;
+    // Refresh leads, in the shared "Quick Links" group, so every extension
+    // presents it identically (matching taxflow and dashboard).
     expect(nav.map((n: any) => n.label)).toEqual([
+      'Refresh',
       'Overview',
       'Banks',
       'Stocks',
     ]);
     expect(nav.map((n: any) => n.command)).toEqual([
+      'wealthflow.refresh',
       'wealthflow.show-overview',
       'wealthflow.show-banks',
       'wealthflow.show-stocks',
     ]);
+    expect(nav[0].group).toBe('Quick Links');
     const ids = fe.contributions.commands.map((c: any) => c.id);
     for (const item of nav) {
       expect(ids).toContain(item.command);
       expect(fe.contributions.allowedCommands).toContain(item.command);
     }
     expect(nav.map((n: any) => n.id)).toEqual([
+      'wealthflow-refresh',
       'wealthflow-overview',
       'wealthflow-banks',
       'wealthflow-stocks',
