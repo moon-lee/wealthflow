@@ -1,7 +1,7 @@
 import type { FinanceApi } from 'finance';
 import type { DisposalRow } from '../dao/disposals.js';
 import { listDisposals } from '../dao/disposals.js';
-import { getOpeningBalance } from '../dao/capital-losses.js';
+import { carriedForwardFor } from '../dao/capital-losses.js';
 import { listStocks } from '../dao/stocks.js';
 import { summariseYear, type CapitalGainsSummary } from './cgt-service.js';
 import type { Trade } from '../dao/trades.js';
@@ -19,7 +19,7 @@ export async function getCapitalGainsSummary(
 ): Promise<CapitalGainsSummary> {
   const [disposals, opening, stocks, sells] = await Promise.all([
     listDisposals(finance, { financeYear: financialYear }),
-    getOpeningBalance(finance, financialYear),
+    carriedForwardFor(finance, financialYear),
     listStocks(finance, { status: 'all' }),
     listTrades(finance),
   ]);

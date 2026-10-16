@@ -1,5 +1,33 @@
 import type { FinanceApi } from 'finance';
 
+/**
+ * Carried INTO `financeYear`, by recurrence from the earliest FY that has an
+ * opening balance:
+ *
+ *     carriedForward(fy)      = openingBalance(fy) + carriedForward(fy - 1)
+ *     carriedForward(firstFy) = openingBalance(firstFy)
+ *
+ * Reading only this FY's row would silently discard a balance the owner
+ * entered for an earlier year — which is the normal case, since they enter one
+ * opening figure and then expect the app to roll it.
+ *
+ * Labels sort correctly as strings because every one is `YYYY-YYYY`.
+ */
+export async function carriedForwardFor(
+  finance: FinanceApi,
+  financeYear: string,
+): Promise<number> {
+  const rows = await listOpeningBalances(finance);
+  const sum = rows
+    .filter((r) => r.finance_year <= financeYear)
+    .reduce((s, r) => s + Number(r.opening_balance), 0);
+  return round4(Math.max(0, sum));
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
+}
+
 export interface CapitalLossBalance {
   readonly id: number;
   readonly finance_year: string;

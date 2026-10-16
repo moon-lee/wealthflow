@@ -78,6 +78,47 @@ describe('getCapitalGainsSummary', () => {
   });
 });
 
+describe('carried-forward losses accumulate by recurrence (spec 5)', () => {
+  it('sums every opening balance from the earliest FY forward', async () => {
+    const { f } = await sold();
+    await setOpeningBalance(f, '2024-2025', 200);
+    await setOpeningBalance(f, '2025-2026', 150);
+    // Nothing entered for 2026-2027, but the earlier balances carry into it.
+    const s = await getCapitalGainsSummary(f, '2026-2027');
+    expect(s.carriedForwardLoss).toBeCloseTo(350, 4);
+    expect(s.hasOpeningBalance).toBe(true);
+  });
+
+  it('does not carry a LATER balance backwards', async () => {
+    const { f } = await sold();
+    await setOpeningBalance(f, '2028-2029', 900);
+    const s = await getCapitalGainsSummary(f, '2026-2027');
+    expect(s.carriedForwardLoss).toBe(0);
+    expect(s.hasOpeningBalance).toBe(false);
+  });
+
+  it('draw down: the full 350 absorbs the gain and the residue carries out', async () => {
+    const { f } = await sold();
+    await setOpeningBalance(f, '2024-2025', 200);
+    await setOpeningBalance(f, '2025-2026', 150);
+    const s = await getCapitalGainsSummary(f, '2026-2027');
+    expect(s.netGain).toBe(0);
+    expect(s.carriedForwardOut).toBeCloseTo(350 - 213, 4);
+  });
+
+  it('reports the highest FY as the ceiling, not the sum of all years', async () => {
+    const { f } = await sold();
+    for (const [fy, amt] of [
+      ['2022-2023', 100],
+      ['2023-2024', 200],
+      ['2024-2025', 300],
+    ])
+      await setOpeningBalance(f, fy, amt);
+    const last = await getCapitalGainsSummary(f, '2024-2025');
+    expect(last.carriedForwardLoss).toBeCloseTo(600, 4);
+  });
+});
+
 describe('public wealth service exposes capital gains', () => {
   it('serves the summary to a cross-extension caller', async () => {
     const { f } = await sold();
