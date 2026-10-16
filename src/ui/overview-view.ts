@@ -186,6 +186,7 @@ export class OverviewView extends Base {
       'super-form',
       'interest-grid',
       'dividend-log',
+      'cgt-section',
     ]) {
       const el = root.querySelector(sel) as any;
       if (!el || typeof el.setFinance !== 'function') continue;
@@ -835,6 +836,9 @@ export class OverviewView extends Base {
                     <interest-grid></interest-grid>
                   </div>
                 </div>
+
+                <!-- Capital gains -->
+                <cgt-section></cgt-section>
 
                 <!-- Superannuation -->
                 <div class="section flush">

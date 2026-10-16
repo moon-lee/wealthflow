@@ -7,6 +7,7 @@ import { listDividends } from '../dao/dividends.js';
 import { sumInterestByBank } from './bank-service.js';
 import { sumDividends } from './stock-service.js';
 import { getSuperTotals } from './super-service.js';
+import type { CapitalGainsSummary } from './capital-gains-service.js';
 
 const logger = new ExtensionLogger('wealthflow');
 
@@ -62,6 +63,9 @@ export interface PublicWealthService {
   getDividendSummary(financialYear: string): Promise<DividendSummary | null>;
   getOverviewSummary(financialYear: string): Promise<OverviewSummary | null>;
   getSuperSummary(financialYear: string): Promise<SuperSummary | null>;
+  getCapitalGainsSummary(
+    financialYear: string,
+  ): Promise<CapitalGainsSummary | null>;
 }
 
 export function createPublicWealthAdapter(
@@ -139,5 +143,17 @@ export function createPublicWealthAdapter(
     getDividendSummary,
     getOverviewSummary,
     getSuperSummary,
+    getCapitalGainsSummary: async (
+      financialYear: string,
+    ): Promise<CapitalGainsSummary | null> => {
+      try {
+        const { getCapitalGainsSummary } =
+          await import('./capital-gains-service.js');
+        return await getCapitalGainsSummary(finance, financialYear);
+      } catch (err) {
+        logger.error('getCapitalGainsSummary failed:', err);
+        return null;
+      }
+    },
   };
 }

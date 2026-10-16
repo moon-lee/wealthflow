@@ -13,6 +13,7 @@ import { DividendLog } from './dividend-log';
 import { DividendForm } from './dividend-form';
 import { SuperForm } from './super-form';
 import { OverviewView } from './overview-view';
+import { CgtSection } from './cgt-section';
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('wealthflow-orchestrator'))
@@ -89,5 +90,10 @@ if (typeof customElements !== 'undefined') {
     customElements.define(
       'overview-view',
       OverviewView as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('cgt-section'))
+    customElements.define(
+      'cgt-section',
+      CgtSection as unknown as CustomElementConstructor,
     );
 }

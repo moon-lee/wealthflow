@@ -198,6 +198,8 @@ export interface CapitalGainsSummary {
    *  than showing a 0 that implies none was ever lost. */
   hasOpeningBalance: boolean;
   byStock: StockSummary[];
+  /** Sells recorded in the year, which is not the same as rows in byStock. */
+  sellCount?: number;
 }
 
 export function summariseYear(

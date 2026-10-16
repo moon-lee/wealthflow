@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import { createMockFinance } from '../src/mock/finance-mock.js';
 import { createStock } from '../src/dao/stocks.js';
 import { createTrade } from '../src/dao/trades.js';
+import { rebuildParcels } from '../src/services/parcel-service.js';
 import '../src/ui/trade-log.js';
 import '../src/ui/trade-form.js';
 import '../src/ui/trades-view.js';
@@ -78,18 +79,119 @@ describe('trades ui', () => {
     log.remove();
   });
 
-  it('offers no Buy/Sell toggle in Phase 1', async () => {
+  it('offers a Buy/Sell toggle and previews the allocation on Sell', async () => {
     const f: any = createMockFinance();
-    await createStock(f, {
+    const s: any = await createStock(f, {
       stock_code: 'VAS',
       stock_full_name: 'V',
       shares: 0,
     });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2024-03-15',
+      side: 'buy',
+      quantity: 20,
+      price: 95.4,
+      brokerage: 3,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2025-11-20',
+      side: 'buy',
+      quantity: 15,
+      price: 102.1,
+      brokerage: 3,
+    });
+    await rebuildParcels(f, s.id);
+
     const form = document.createElement('trade-form') as any;
     document.body.appendChild(form);
     await form.setFinance(f);
+    form.editTrade(null);
+    expect(form.side).toBe('buy');
+    // No preview on the Buy state: a buy has no tax consequence.
+    expect(form.allocation).toEqual([]);
+
+    form.setSide('sell');
     await form.updateComplete;
-    expect(form.renderRoot.textContent).not.toMatch(/sell/i);
+    expect(form.side).toBe('sell');
+    form.stockId = s.id;
+    form.date = '2026-10-16';
+    form.quantity = '25';
+    form.price = '112';
+    await form.refreshPreview();
+    await form.updateComplete;
+    expect(form.allocation.map((r: any) => r.quantity)).toEqual([20, 5]);
+    expect(form.allocation[0].eligible).toBe(true);
+    expect(form.allocation[1].eligible).toBe(false);
+    expect(form.previewNet).toBeCloseTo(213, 2);
+    form.remove();
+  });
+
+  it('explains a sell of more than is held in the form, not in a rejection', async () => {
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2024-03-15',
+      side: 'buy',
+      quantity: 20,
+      price: 95.4,
+      brokerage: 3,
+    });
+    await rebuildParcels(f, s.id);
+
+    const form = document.createElement('trade-form') as any;
+    document.body.appendChild(form);
+    await form.setFinance(f);
+    form.setSide('sell');
+    form.stockId = s.id;
+    form.quantity = '99';
+    form.price = '112';
+    await form.refreshPreview();
+    await form.updateComplete;
+    expect(form.allocation).toEqual([]);
+    expect(form.previewError).toMatch(/20 units on hand/i);
+    form.remove();
+  });
+
+  it('refuses to save a sell that will not balance', async () => {
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2024-03-15',
+      side: 'buy',
+      quantity: 20,
+      price: 95.4,
+      brokerage: 3,
+    });
+    await rebuildParcels(f, s.id);
+
+    const form = document.createElement('trade-form') as any;
+    document.body.appendChild(form);
+    await form.setFinance(f);
+    form.setSide('sell');
+    form.stockId = s.id;
+    form.date = '2026-10-16';
+    form.quantity = '99';
+    form.price = '112';
+    form.requestUpdate?.();
+    await form.updateComplete;
+    await form.onSubmit(new Event('submit'));
+    await flush();
+    expect(
+      await f.db.table('wealthflow_trades').find({ side: 'sell' }),
+    ).toHaveLength(0);
+    expect(form.error).toMatch(/on hand/i);
     form.remove();
   });
 

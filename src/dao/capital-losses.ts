@@ -23,11 +23,9 @@ export async function getOpeningBalance(
   finance: FinanceApi,
   financeYear: string,
 ): Promise<number> {
-  const row = (await finance.db
-    .table(TABLE)
-    .findOne({
-      finance_year: financeYear,
-    })) as unknown as CapitalLossBalance | null;
+  const row = (await finance.db.table(TABLE).findOne({
+    finance_year: financeYear,
+  })) as unknown as CapitalLossBalance | null;
   return row ? Number(row.opening_balance) : 0;
 }
 
@@ -36,11 +34,9 @@ export async function setOpeningBalance(
   financeYear: string,
   openingBalance: number,
 ): Promise<void> {
-  const existing = (await finance.db
-    .table(TABLE)
-    .findOne({
-      finance_year: financeYear,
-    })) as unknown as CapitalLossBalance | null;
+  const existing = (await finance.db.table(TABLE).findOne({
+    finance_year: financeYear,
+  })) as unknown as CapitalLossBalance | null;
   if (existing) {
     await finance.db
       .table(TABLE)
