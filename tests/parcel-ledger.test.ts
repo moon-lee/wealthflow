@@ -53,7 +53,11 @@ describe('parcel ledger', () => {
 
   it('marks a holding with no trades as notTracked, never as zero units', async () => {
     const f: any = createMockFinance();
-    await createStock(f, { stock_code: 'VHY', stock_full_name: 'V', shares: 22 });
+    await createStock(f, {
+      stock_code: 'VHY',
+      stock_full_name: 'V',
+      shares: 22,
+    });
     const el = await mount(f);
     const g = el.groups.find((x: any) => x.stockCode === 'VHY');
     expect(g.notTracked).toBe(true);
@@ -189,14 +193,18 @@ describe('parcel ledger', () => {
 });
 
 describe('stock list reads derived shares', () => {
-  it('shows a tracked holding\'s units and marks an untracked one', async () => {
+  it("shows a tracked holding's units and marks an untracked one", async () => {
     const f: any = createMockFinance();
     const vas: any = await createStock(f, {
       stock_code: 'VAS',
       stock_full_name: 'V',
       shares: 0,
     });
-    await createStock(f, { stock_code: 'VHY', stock_full_name: 'V', shares: 22 });
+    await createStock(f, {
+      stock_code: 'VHY',
+      stock_full_name: 'V',
+      shares: 22,
+    });
     await createTrade(f, {
       stock_id: vas.id,
       date: '2025-01-17',

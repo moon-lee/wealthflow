@@ -31,9 +31,9 @@ describe('orchestrator: trades tab', () => {
     const o = await mountOrchestrator();
     o.navigate('trades');
     await o.updateComplete;
-    expect(
-      o.renderRoot.querySelector('#child')?.tagName.toLowerCase(),
-    ).toBe('trades-view');
+    expect(o.renderRoot.querySelector('#child')?.tagName.toLowerCase()).toBe(
+      'trades-view',
+    );
     o.remove();
   });
 
@@ -125,13 +125,13 @@ describe('orchestrator: trades tab', () => {
     expect(tabs).toEqual(['Trades', 'Parcels']);
     // The active one is marked, so the control reads as segmented rather than
     // as two loose buttons.
-    expect(header.querySelector('[role="tab"].active')?.textContent.trim()).toBe(
-      'Trades',
-    );
+    expect(
+      header.querySelector('[role="tab"].active')?.textContent.trim(),
+    ).toBe('Trades');
     // The contextual action sits on the same header row.
-    expect(header.querySelector('.header-actions button')?.textContent.trim()).toBe(
-      'Hide form',
-    );
+    expect(
+      header.querySelector('.header-actions button')?.textContent.trim(),
+    ).toBe('Hide form');
     v.remove();
   });
 

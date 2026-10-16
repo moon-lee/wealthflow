@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 7 commands, 7 tables', () => {
+  it('declares single view, 7 commands, 9 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -22,7 +22,9 @@ describe('manifest', () => {
     expect(fe.tables.map((t: any) => t.name).sort()).toEqual(
       [
         'wealthflow_banks',
+        'wealthflow_capital_losses',
         'wealthflow_dividends',
+        'wealthflow_disposals',
         'wealthflow_interest_entries',
         'wealthflow_parcels',
         'wealthflow_stocks',
@@ -88,6 +90,39 @@ describe('manifest', () => {
       expect(fe.contributions.allowedUiEvents).toContain(evt);
   });
 
+  it('declares wealthflow_disposals keyed on origin_trade_id with no parcel_id', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find((x: any) => x.name === 'wealthflow_disposals');
+    expect(t).toBeDefined();
+    const cols = t.columns.map((c: any) => c.name);
+    // A rebuild re-mints parcel ids, so a disposal that pointed at one would
+    // silently detach from the parcel it describes.
+    expect(cols).not.toContain('parcel_id');
+    expect(cols).toContain('origin_trade_id');
+    for (const money of [
+      'proceeds',
+      'cost_base',
+      'nominal_gain',
+      'discount_applied',
+      'net_gain',
+    ])
+      expect(t.columns.find((c: any) => c.name === money).type, money).toBe(
+        'real',
+      );
+    // Every v1 table carries a finance_year; audit 4 of seed-sql enforces it.
+    expect(cols).toContain('finance_year');
+  });
+
+  it('declares wealthflow_capital_losses as an opening balance', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find(
+      (x: any) => x.name === 'wealthflow_capital_losses',
+    );
+    expect(t.columns.map((c: any) => c.name).sort()).toEqual(
+      ['finance_year', 'opening_balance'].sort(),
+    );
+  });
+
   it('declares wealthflow_trades with the full Phase 1-3 column set', () => {
     const fe: any = (pkg as any).financeExtension;
     const t = fe.tables.find((x: any) => x.name === 'wealthflow_trades');
@@ -110,9 +145,9 @@ describe('manifest', () => {
     );
     expect(t.columns.find((c: any) => c.name === 'quantity').type).toBe('real');
     expect(t.columns.find((c: any) => c.name === 'price').type).toBe('real');
-    expect(
-      t.columns.find((c: any) => c.name === 'dividend_id').nullable,
-    ).toBe(true);
+    expect(t.columns.find((c: any) => c.name === 'dividend_id').nullable).toBe(
+      true,
+    );
   });
 
   it('declares wealthflow_parcels keyed on origin_trade_id with no eligibility column', () => {

@@ -411,6 +411,30 @@
             "min": 0
           }
         ]
+      },
+      {
+        "name": "wealthflow_disposals",
+        "columns": [
+          { "name": "trade_id", "type": "integer", "nullable": false },
+          { "name": "origin_trade_id", "type": "integer", "nullable": false },
+          { "name": "stock_id", "type": "integer", "nullable": false },
+          { "name": "finance_year", "type": "text", "nullable": false },
+          { "name": "disposal_date", "type": "date", "nullable": false },
+          { "name": "quantity", "type": "real", "nullable": false, "min": 0 },
+          { "name": "proceeds", "type": "real", "nullable": false },
+          { "name": "cost_base", "type": "real", "nullable": false },
+          { "name": "nominal_gain", "type": "real", "nullable": false },
+          { "name": "discount_applied", "type": "real", "nullable": false, "default": 0 },
+          { "name": "net_gain", "type": "real", "nullable": false },
+          { "name": "eligible", "type": "boolean", "nullable": false, "default": false }
+        ]
+      },
+      {
+        "name": "wealthflow_capital_losses",
+        "columns": [
+          { "name": "finance_year", "type": "text", "nullable": false },
+          { "name": "opening_balance", "type": "real", "nullable": false, "default": 0 }
+        ]
       }
     ],
     "main": "src/main.ts"

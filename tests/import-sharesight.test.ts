@@ -53,9 +53,10 @@ describe('import-sharesight', () => {
       // Row counts come from the workbook (including any row the importer
       // refuses); units and cost base come from what will actually be written.
       expect(heldCounts[code].rows, code).toBe(EXPECTED[code].rows);
-      expect(mine.reduce((s: number, r: any) => s + r.quantity, 0), code).toBe(
-        EXPECTED[code].units,
-      );
+      expect(
+        mine.reduce((s: number, r: any) => s + r.quantity, 0),
+        code,
+      ).toBe(EXPECTED[code].units);
       const cb = mine.reduce(
         (s: number, r: any) => s + r.quantity * r.price + r.brokerage,
         0,
@@ -68,7 +69,9 @@ describe('import-sharesight', () => {
     // VHY 16 Jul 2026: a $12.44 distribution that bought 0.1504 units, recorded
     // by ShareSight as 0 units and $0.00. Importing it literally would create a
     // zero-quantity parcel, so the importer stops and says which row.
-    const { accepted, rejected } = parseTrades(readSheet1(readFileSync(WORKBOOK)));
+    const { accepted, rejected } = parseTrades(
+      readSheet1(readFileSync(WORKBOOK)),
+    );
     expect(rejected).toHaveLength(1);
     expect(rejected[0].code).toBe('VHY');
     expect(rejected[0].reason).toMatch(/quantity 0 is not a positive number/);
@@ -76,7 +79,9 @@ describe('import-sharesight', () => {
   });
 
   it('passes its own audit against the real workbook', () => {
-    const failed = audit(parseTrades(readSheet1(readFileSync(WORKBOOK)))).filter((c) => !c.ok);
+    const failed = audit(
+      parseTrades(readSheet1(readFileSync(WORKBOOK))),
+    ).filter((c) => !c.ok);
     expect(failed).toEqual([]);
   });
 
@@ -96,9 +101,30 @@ describe('import-sharesight', () => {
 
   it('drops non-held codes without complaint', () => {
     const rows = [
-      { Code: 'VAS', Date: '2026-01-01', Type: 'Buy', Qty: '1', Price: '1', Brokerage: '0' },
-      { Code: 'TLS', Date: '2026-01-03', Type: 'Buy', Qty: '1', Price: '1', Brokerage: '0' },
-      { Code: 'IVV', Date: '2026-01-04', Type: 'Buy', Qty: '1', Price: '1', Brokerage: '0' },
+      {
+        Code: 'VAS',
+        Date: '2026-01-01',
+        Type: 'Buy',
+        Qty: '1',
+        Price: '1',
+        Brokerage: '0',
+      },
+      {
+        Code: 'TLS',
+        Date: '2026-01-03',
+        Type: 'Buy',
+        Qty: '1',
+        Price: '1',
+        Brokerage: '0',
+      },
+      {
+        Code: 'IVV',
+        Date: '2026-01-04',
+        Type: 'Buy',
+        Qty: '1',
+        Price: '1',
+        Brokerage: '0',
+      },
     ];
     const { accepted, rejected } = parseTrades(rows);
     expect(accepted.map((r: any) => r.code)).toEqual(['VAS']);
@@ -107,8 +133,22 @@ describe('import-sharesight', () => {
 
   it('refuses a type it does not recognise rather than dropping it', () => {
     const rows = [
-      { Code: 'VAS', Date: '2026-01-01', Type: 'Buy', Qty: '1', Price: '1', Brokerage: '0' },
-      { Code: 'VAS', Date: '2026-01-02', Type: 'Split', Qty: '2', Price: '0', Brokerage: '0' },
+      {
+        Code: 'VAS',
+        Date: '2026-01-01',
+        Type: 'Buy',
+        Qty: '1',
+        Price: '1',
+        Brokerage: '0',
+      },
+      {
+        Code: 'VAS',
+        Date: '2026-01-02',
+        Type: 'Split',
+        Qty: '2',
+        Price: '0',
+        Brokerage: '0',
+      },
     ];
     const { accepted, rejected } = parseTrades(rows);
     expect(accepted.map((r: any) => r.code)).toEqual(['VAS']);
@@ -119,7 +159,14 @@ describe('import-sharesight', () => {
 
   it('rejects a Sell on a held code by name, since Phase 1 cannot allocate it', () => {
     const rows = [
-      { Code: 'VHY', Date: '2026-01-02', Type: 'Sell', Qty: '5', Price: '70', Brokerage: '3' },
+      {
+        Code: 'VHY',
+        Date: '2026-01-02',
+        Type: 'Sell',
+        Qty: '5',
+        Price: '70',
+        Brokerage: '3',
+      },
     ];
     const { accepted, rejected } = parseTrades(rows);
     expect(accepted).toEqual([]);
@@ -128,7 +175,14 @@ describe('import-sharesight', () => {
 
   it('flags a zero-quantity DRP instead of importing a zero-cost parcel', () => {
     const rows = [
-      { Code: 'VHY', Date: '2026-07-16', Type: 'Reinvestment', Qty: '0', Price: '82.706', Brokerage: '0' },
+      {
+        Code: 'VHY',
+        Date: '2026-07-16',
+        Type: 'Reinvestment',
+        Qty: '0',
+        Price: '82.706',
+        Brokerage: '0',
+      },
     ];
     const { accepted, rejected } = parseTrades(rows);
     expect(accepted).toEqual([]);
@@ -137,11 +191,28 @@ describe('import-sharesight', () => {
 
   it('maps Buy and Reinvestment onto the trade side and source', () => {
     const rows = [
-      { Code: 'VAS', Date: '2026-09-10', Type: 'Buy', Qty: '7', Price: '110', Brokerage: '3' },
-      { Code: 'VAS', Date: '2026-07-16', Type: 'Reinvestment', Qty: '1', Price: '108.7983', Brokerage: '0' },
+      {
+        Code: 'VAS',
+        Date: '2026-09-10',
+        Type: 'Buy',
+        Qty: '7',
+        Price: '110',
+        Brokerage: '3',
+      },
+      {
+        Code: 'VAS',
+        Date: '2026-07-16',
+        Type: 'Reinvestment',
+        Qty: '1',
+        Price: '108.7983',
+        Brokerage: '0',
+      },
     ];
     const { accepted } = parseTrades(rows);
-    expect(accepted.map((r: any) => r.source).sort()).toEqual(['drp', 'import']);
+    expect(accepted.map((r: any) => r.source).sort()).toEqual([
+      'drp',
+      'import',
+    ]);
     expect(accepted.every((r: any) => r.side === 'buy')).toBe(true);
   });
 });

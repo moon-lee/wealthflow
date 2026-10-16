@@ -53,8 +53,20 @@ describe('trades ui', () => {
       stock_full_name: 'V',
       shares: 0,
     });
-    await createTrade(f, { stock_id: s.id, date: '2023-09-22', side: 'buy', quantity: 10, price: 87.48 });
-    await createTrade(f, { stock_id: s.id, date: '2026-09-10', side: 'buy', quantity: 7, price: 110 });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2023-09-22',
+      side: 'buy',
+      quantity: 10,
+      price: 87.48,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-09-10',
+      side: 'buy',
+      quantity: 7,
+      price: 110,
+    });
     const log = document.createElement('trade-log') as any;
     document.body.appendChild(log);
     await log.setFinance(f);
@@ -68,7 +80,11 @@ describe('trades ui', () => {
 
   it('offers no Buy/Sell toggle in Phase 1', async () => {
     const f: any = createMockFinance();
-    await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
     const form = document.createElement('trade-form') as any;
     document.body.appendChild(form);
     await form.setFinance(f);
@@ -105,7 +121,11 @@ describe('trades ui', () => {
 
   it('surfaces a validation failure rather than swallowing it', async () => {
     const f: any = createMockFinance();
-    await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
     const form = document.createElement('trade-form') as any;
     document.body.appendChild(form);
     await form.setFinance(f);

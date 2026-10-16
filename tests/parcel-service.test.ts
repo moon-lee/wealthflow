@@ -69,7 +69,14 @@ describe('isDiscountEligible', () => {
     expect(isDiscountEligible('2025-10-15', ASOF)).toBe(true);
   });
   it('matches the reconciled VAS position', () => {
-    for (const d of ['2026-01-19', '2026-04-20', '2026-07-16', '2026-09-09', '2026-09-10', '2026-10-16'])
+    for (const d of [
+      '2026-01-19',
+      '2026-04-20',
+      '2026-07-16',
+      '2026-09-09',
+      '2026-09-10',
+      '2026-10-16',
+    ])
       expect(isDiscountEligible(d, ASOF), d).toBe(false);
     expect(isDiscountEligible('2025-10-16', ASOF)).toBe(true);
   });
@@ -78,8 +85,12 @@ describe('isDiscountEligible', () => {
 describe('parcelCostBase', () => {
   it('is quantity x price + brokerage, spread across the parcel', () => {
     expect(parcelCostBase({ quantity: 7, price: 110, brokerage: 3 })).toBe(773);
-    expect(parcelCostBase({ quantity: 1, price: 108.8611, brokerage: 0 })).toBe(108.8611);
-    expect(parcelCostBase({ quantity: 5, price: 94.28, brokerage: 3 })).toBe(474.4);
+    expect(parcelCostBase({ quantity: 1, price: 108.8611, brokerage: 0 })).toBe(
+      108.8611,
+    );
+    expect(parcelCostBase({ quantity: 5, price: 94.28, brokerage: 3 })).toBe(
+      474.4,
+    );
   });
 });
 
@@ -93,9 +104,27 @@ describe('parcel service', () => {
 
   it('derives one parcel per buy and writes derived shares', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 164 });
-    await createTrade(f, { stock_id: vas.id, date: '2021-09-28', side: 'buy', quantity: 11, price: 94.93, brokerage: 9.5 });
-    await createTrade(f, { stock_id: vas.id, date: '2026-09-10', side: 'buy', quantity: 7, price: 110, brokerage: 3 });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 164,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2021-09-28',
+      side: 'buy',
+      quantity: 11,
+      price: 94.93,
+      brokerage: 9.5,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2026-09-10',
+      side: 'buy',
+      quantity: 7,
+      price: 110,
+      brokerage: 3,
+    });
     const parcels = await rebuildParcels(f, vas.id);
     expect(parcels).toHaveLength(2);
     expect(await derivedShares(f)).toEqual(new Map([[vas.id, 18]]));
@@ -105,9 +134,27 @@ describe('parcel service', () => {
 
   it('keeps two buys on the same date as two distinct parcels', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
-    await createTrade(f, { stock_id: vas.id, date: '2022-09-23', side: 'buy', quantity: 5, price: 83.3, brokerage: 3 });
-    await createTrade(f, { stock_id: vas.id, date: '2022-09-23', side: 'buy', quantity: 4, price: 84.8, brokerage: 3 });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2022-09-23',
+      side: 'buy',
+      quantity: 5,
+      price: 83.3,
+      brokerage: 3,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2022-09-23',
+      side: 'buy',
+      quantity: 4,
+      price: 84.8,
+      brokerage: 3,
+    });
     const parcels = await rebuildParcels(f, vas.id);
     expect(parcels).toHaveLength(2);
     expect(new Set(parcels.map((p) => p.id)).size).toBe(2);
@@ -116,16 +163,43 @@ describe('parcel service', () => {
 
   it('ignores sell trades in Phase 1', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
-    await createTrade(f, { stock_id: vas.id, date: '2025-01-17', side: 'buy', quantity: 10, price: 100 });
-    await createTrade(f, { stock_id: vas.id, date: '2026-01-01', side: 'sell', quantity: 4, price: 120 });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2025-01-17',
+      side: 'buy',
+      quantity: 10,
+      price: 100,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2026-01-01',
+      side: 'sell',
+      quantity: 4,
+      price: 120,
+    });
     expect(await rebuildParcels(f, vas.id)).toHaveLength(1);
   });
 
   it('is idempotent: a second rebuild yields the same parcels under the same natural key', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
-    await createTrade(f, { stock_id: vas.id, date: '2025-01-17', side: 'buy', quantity: 2, price: 100.7245, source: 'drp' });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2025-01-17',
+      side: 'buy',
+      quantity: 2,
+      price: 100.7245,
+      source: 'drp',
+    });
     await rebuildParcels(f, vas.id);
     const first = await listParcels(f, { stockId: vas.id });
     await rebuildParcels(f, vas.id);
@@ -135,25 +209,61 @@ describe('parcel service', () => {
     // stable is the natural key (stock_id, origin_trade_id) — that is what
     // Plan 2's disposals will reference, and never parcel_id.
     const keyOf = (ps: typeof first) =>
-      ps.map((p) => [p.stock_id, p.origin_trade_id, p.acquired_date, p.quantity, p.price, p.brokerage]);
+      ps.map((p) => [
+        p.stock_id,
+        p.origin_trade_id,
+        p.acquired_date,
+        p.quantity,
+        p.price,
+        p.brokerage,
+      ]);
     expect(keyOf(second)).toEqual(keyOf(first));
   });
 
   it('discards hand-edited parcels on rebuild', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 0 });
-    await createTrade(f, { stock_id: vas.id, date: '2025-01-17', side: 'buy', quantity: 2, price: 100.7245 });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: vas.id,
+      date: '2025-01-17',
+      side: 'buy',
+      quantity: 2,
+      price: 100.7245,
+    });
     await rebuildParcels(f, vas.id);
-    await replaceParcels(f, vas.id, [{ stock_id: vas.id, origin_trade_id: 999, acquired_date: '2020-01-01', quantity: 9, price: 1, brokerage: 0 }]);
+    await replaceParcels(f, vas.id, [
+      {
+        stock_id: vas.id,
+        origin_trade_id: 999,
+        acquired_date: '2020-01-01',
+        quantity: 9,
+        price: 1,
+        brokerage: 0,
+      },
+    ]);
     await rebuildParcels(f, vas.id);
-    expect((await listParcels(f, { stockId: vas.id }))[0].acquired_date).toBe('2025-01-17');
+    expect((await listParcels(f, { stockId: vas.id }))[0].acquired_date).toBe(
+      '2025-01-17',
+    );
   });
 
   it('marks a holding with no trades as notTracked, never as zero units', async () => {
     const f: any = createMockFinance();
-    await createStock(f, { stock_code: 'VHY', stock_full_name: 'V', shares: 22 });
+    await createStock(f, {
+      stock_code: 'VHY',
+      stock_full_name: 'V',
+      shares: 22,
+    });
     await rebuildAllParcels(f);
-    const [g] = groupParcels(await listStocks(f, { status: 'all' }), await listParcels(f), ASOF);
+    const [g] = groupParcels(
+      await listStocks(f, { status: 'all' }),
+      await listParcels(f),
+      ASOF,
+    );
     expect(g.notTracked).toBe(true);
     expect(g.units).toBe(0);
     expect(g.avgCost).toBe(0);
@@ -161,11 +271,27 @@ describe('parcel service', () => {
 
   it('groups the real VAS position: 165 units, 32 parcels, 154 eligible', async () => {
     const f: any = createMockFinance();
-    const vas: any = await createStock(f, { stock_code: 'VAS', stock_full_name: 'V', shares: 165 });
+    const vas: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 165,
+    });
     for (const [q, d, p, b] of VAS_FIXTURE)
-      await createTrade(f, { stock_id: vas.id, date: d, side: 'buy', quantity: q, price: p, brokerage: b, source: b === 0 ? 'drp' : 'manual' });
+      await createTrade(f, {
+        stock_id: vas.id,
+        date: d,
+        side: 'buy',
+        quantity: q,
+        price: p,
+        brokerage: b,
+        source: b === 0 ? 'drp' : 'manual',
+      });
     await rebuildParcels(f, vas.id);
-    const [g] = groupParcels(await listStocks(f, { status: 'all' }), await listParcels(f), ASOF);
+    const [g] = groupParcels(
+      await listStocks(f, { status: 'all' }),
+      await listParcels(f),
+      ASOF,
+    );
     expect(g.units).toBe(165);
     expect(g.parcelCount).toBe(32);
     expect(g.eligibleUnits).toBe(154);
