@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 7 commands, 9 tables', () => {
+  it('declares single view, 7 commands, 10 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -23,6 +23,7 @@ describe('manifest', () => {
       [
         'wealthflow_banks',
         'wealthflow_capital_losses',
+        'wealthflow_cost_base_adjustments',
         'wealthflow_dividends',
         'wealthflow_disposals',
         'wealthflow_interest_entries',
@@ -88,6 +89,32 @@ describe('manifest', () => {
     );
     for (const evt of ['super-create', 'super-edit', 'super-delete'])
       expect(fe.contributions.allowedUiEvents).toContain(evt);
+  });
+
+  it('declares AMIT adjustments as fund-level, not parcel-level', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find(
+      (x: any) => x.name === 'wealthflow_cost_base_adjustments',
+    );
+    const cols = t.columns.map((c: any) => c.name);
+    // Spec 6.1: adjustments arrive as a per-distribution fund-level dollar
+    // amount. A parcel/event key would assert knowledge the statement does not
+    // carry, and is the thing spec 6.1 explicitly corrects.
+    expect(cols).not.toContain('parcel_id');
+    expect(cols).not.toContain('origin_trade_id');
+    expect(cols).toContain('stock_id');
+    expect(cols).toContain('date');
+    // Signed: negative reduces cost base, so it must NOT be min-constrained.
+    expect(t.columns.find((c: any) => c.name === 'amount').min).toBeUndefined();
+  });
+
+  it('carries the DRP figures on the dividend row itself', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const cols = fe.tables
+      .find((x: any) => x.name === 'wealthflow_dividends')
+      .columns.map((c: any) => c.name);
+    expect(cols).toContain('amount_reinvested');
+    expect(cols).toContain('units_acquired');
   });
 
   it('declares wealthflow_disposals keyed on origin_trade_id with no parcel_id', () => {

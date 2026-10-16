@@ -67,6 +67,14 @@ function assertValid(input: TradeInput): void {
   const brokerage = input.brokerage ?? 0;
   if (!Number.isFinite(brokerage) || brokerage < 0)
     throw new TradeValidationError('brokerage must be ≥ 0');
+  // Spec 6.6: brokerage is acquisition cost only. Selling costs are capital
+  // costs that reduce the gain separately from cost base, and capturing them is
+  // a non-goal. The honest form of a non-goal is to refuse the input rather
+  // than accept it, store it, and quietly ignore it.
+  if (input.side === 'sell' && brokerage !== 0)
+    throw new TradeValidationError(
+      'A sell cannot carry brokerage — selling costs reduce the gain, not cost base. Leave it at 0.',
+    );
   const source = input.source ?? 'manual';
   if (!SOURCES.includes(source))
     throw new TradeValidationError(

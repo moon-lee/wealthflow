@@ -43,6 +43,62 @@ async function holding() {
   return { f, s, first, second };
 }
 
+describe('sell brokerage is refused, not ignored (spec 6.6)', () => {
+  it('rejects a sell carrying brokerage', async () => {
+    const { f, s } = await holding();
+    await expect(
+      createTrade(f, {
+        stock_id: s.id,
+        date: '2026-10-16',
+        side: 'sell',
+        quantity: 5,
+        price: 112,
+        brokerage: 3,
+      }),
+    ).rejects.toThrow(/cannot carry brokerage/i);
+    expect(await listDisposals(f)).toHaveLength(0);
+  });
+
+  it('allows a sell with brokerage left at zero', async () => {
+    const { f, s } = await holding();
+    const t: any = await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 5,
+      price: 112,
+    });
+    expect(t.brokerage).toBe(0);
+  });
+
+  it('refuses an edit that would introduce brokerage onto a sell', async () => {
+    const { f, s } = await holding();
+    const sell: any = await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 5,
+      price: 112,
+    });
+    await expect(updateTrade(f, sell.id, { brokerage: 3 })).rejects.toThrow(
+      /cannot carry brokerage/i,
+    );
+  });
+
+  it('still accepts brokerage on a buy', async () => {
+    const { f, s } = await holding();
+    const t: any = await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-01-05',
+      side: 'buy',
+      quantity: 5,
+      price: 100,
+      brokerage: 3,
+    });
+    expect(t.brokerage).toBe(3);
+  });
+});
+
 describe('previewSell', () => {
   it('shows the tax consequence before anything is saved', async () => {
     const { f, s } = await holding();

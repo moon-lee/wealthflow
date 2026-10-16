@@ -275,6 +275,45 @@
             "name": "notes",
             "type": "text",
             "nullable": true
+          },
+          {
+            "name": "amount_reinvested",
+            "type": "real",
+            "nullable": false,
+            "min": 0,
+            "default": 0
+          },
+          {
+            "name": "units_acquired",
+            "type": "real",
+            "nullable": false,
+            "min": 0,
+            "default": 0
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_cost_base_adjustments",
+        "columns": [
+          {
+            "name": "stock_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "amount",
+            "type": "real",
+            "nullable": false
+          },
+          {
+            "name": "reason",
+            "type": "text",
+            "nullable": true
           }
         ]
       },
