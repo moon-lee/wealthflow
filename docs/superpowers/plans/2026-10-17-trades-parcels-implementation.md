@@ -151,7 +151,7 @@ Command `{ "id": "wealthflow.show-trades", "title": "Wealth Flow: Show Trades" }
 
 - [ ] **Step 5: Bump the version**
 
-Set both `version` and `financeExtension.version` to `"0.3.0"`.
+Set both `version` and `financeExtension.version` to **`0.2.4`** — a patch bump, per the Global Constraints and `AGENTS.md` §9. Not `0.3.0`: a new table is not a minor release here, and the installer's downgrade check compares these fields.
 
 - [ ] **Step 6: Run the full suite**
 
@@ -728,7 +728,9 @@ Expected: FAIL — `trade-log` is not a registered element.
 
 Copy `src/ui/overview-view.ts`'s section idiom: `section flush`, `section-header is-toggle`, `header-actions`, `btn btn-secondary btn-small`. Render the **segment control above the body**, `Trades` active or `Parcels` active, switching `this.segment` and re-rendering. Render `<trade-log>` under `Trades`.
 
-Listen for `trade-create`, `trade-edit` and `trade-delete` on `this` and call `reload()` — the same pattern `overview-view.ts` uses for the dividend events. These names are allowlisted by Task 1.
+Listen for `trade-create`, `trade-edit` and `trade-delete` on `this` and, in that order, **`await rebuildAllParcels(this.finance)` then `reload()`** — these names are allowlisted by Task 1.
+
+The rebuild lives here and nowhere else. Nothing else may call it: `parcel-ledger` reads `wealthflow_parcels`, it never recomputes. One caller, one place to look, and a buy typed in the form is reflected in `shares` and the ledger on the same tick.
 
 - [ ] **Step 4: Implement `trade-log.ts`**
 
@@ -749,7 +751,7 @@ Add imports and `customElements.define` calls for `trades-view`, `trade-form`, `
 - [ ] **Step 7: Run to verify it passes**
 
 Run: `npm test -- tests/trades-view.test.ts`
-Expected: PASS, 4 tests.
+Expected: PASS, 5 tests.
 
 - [ ] **Step 8: Commit**
 
@@ -984,6 +986,26 @@ it('labels the crumb Trades', async () => {
 ```
 
 Add to `tests/navigation.test.ts`: `wealthflow.show-trades` is registered by `activate` and calls `requestMount('wealthflow', { view: 'trades' })`.
+
+Also add a segment-switch test to `tests/orchestrator.test.ts` — no earlier task covers it:
+
+```ts
+it('switches between the Trades log and the parcel ledger', async () => {
+  const v = document.createElement('trades-view') as any;
+  document.body.appendChild(v);
+  v.finance = createMockFinance();
+  await v.setFinance(v.finance);
+  await v.updateComplete;
+  expect(v.renderRoot.querySelector('trade-log')).toBeTruthy();
+  expect(v.renderRoot.querySelector('parcel-ledger')).toBeFalsy();
+  v.segment = 'parcels';
+  v.requestUpdate?.();
+  await v.updateComplete;
+  expect(v.renderRoot.querySelector('parcel-ledger')).toBeTruthy();
+  expect(v.renderRoot.querySelector('trade-log')).toBeFalsy();
+  v.remove();
+});
+```
 
 - [ ] **Step 2: Run to verify it fails**
 
