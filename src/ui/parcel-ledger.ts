@@ -139,9 +139,11 @@ export class ParcelLedger extends Base {
             </div>
           </div>
           <div class="section-body">
-            ${this.error
-              ? html`<p class="field-error">Error: ${this.error}</p>`
-              : ''}
+            ${
+              this.error
+                ? html`<p class="field-error">Error: ${this.error}</p>`
+                : ''
+            }
             <p class="muted">
               Derived from your trade history — parcels are never edited by
               hand. Change a trade and this rebuilds.
@@ -168,51 +170,59 @@ export class ParcelLedger extends Base {
           <b>${g.stockCode}</b>
           <span class="muted">${g.stockName}</span>
           <span style="flex:1"></span>
-          ${g.notTracked
-            ? html`<span class="section-badge">not yet tracked</span>`
-            : html`
-                <span>${qty(g.units)} units</span>
-                <span>${g.parcelCount} parcels</span>
-                <span>avg ${formatAUD(g.avgCost)}</span>
-                <span
-                  >${qty(g.eligibleUnits)}/${qty(g.units)} discount-eligible</span
-                >
-              `}
+          ${
+            g.notTracked
+              ? html`<span class="section-badge">not yet tracked</span>`
+              : html`
+                  <span>${qty(g.units)} units</span>
+                  <span>${g.parcelCount} parcels</span>
+                  <span>avg ${formatAUD(g.avgCost)}</span>
+                  <span
+                    >${qty(g.eligibleUnits)}/${qty(g.units)}
+                    discount-eligible</span
+                  >
+                `
+          }
         </button>
-        ${open && rows.length
-          ? html`
-              <table class="hist-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Acquired</th>
-                    <th scope="col" class="num">Units</th>
-                    <th scope="col" class="num">Cost base</th>
-                    <th scope="col" class="num">Per unit</th>
-                    <th scope="col" class="num">Held</th>
-                    <th scope="col">50% discount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${rows.map(
-                    (p) => html`<tr>
-                      <td>${p.acquired_date}</td>
-                      <td class="num">${qty(p.quantity)}</td>
-                      <td class="num">${formatAUD(p.costBase)}</td>
-                      <td class="num">${formatAUD(p.perUnit)}</td>
-                      <td class="num">${p.heldLabel}</td>
-                      <td
-                        class=${isDiscountEligible(p.acquired_date, this.asOf)
-                          ? 'ok'
-                          : 'pending'}
-                      >
-                        ${p.discountLabel}
-                      </td>
-                    </tr>`,
-                  )}
-                </tbody>
-              </table>
-            `
-          : ''}
+        ${
+          open && rows.length
+            ? html`
+                <table class="hist-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Acquired</th>
+                      <th scope="col" class="num">Units</th>
+                      <th scope="col" class="num">Cost base</th>
+                      <th scope="col" class="num">Per unit</th>
+                      <th scope="col" class="num">Held</th>
+                      <th scope="col">50% discount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows.map(
+                      (p) =>
+                        html`<tr>
+                          <td>${p.acquired_date}</td>
+                          <td class="num">${qty(p.quantity)}</td>
+                          <td class="num">${formatAUD(p.costBase)}</td>
+                          <td class="num">${formatAUD(p.perUnit)}</td>
+                          <td class="num">${p.heldLabel}</td>
+                          <td
+                            class=${
+                              isDiscountEligible(p.acquired_date, this.asOf)
+                                ? 'ok'
+                                : 'pending'
+                            }
+                          >
+                            ${p.discountLabel}
+                          </td>
+                        </tr>`,
+                    )}
+                  </tbody>
+                </table>
+              `
+            : ''
+        }
       </div>
     `;
   }

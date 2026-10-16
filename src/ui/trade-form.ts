@@ -124,9 +124,11 @@ export class TradeForm extends Base {
           </div>
         </div>
         <div class="section-body">
-          ${this.error
-            ? html`<p class="field-error">Error: ${this.error}</p>`
-            : ''}
+          ${
+            this.error
+              ? html`<p class="field-error">Error: ${this.error}</p>`
+              : ''
+          }
           <div class="stat-grid cols-4">
             <div>
               <div class="stat-label">Date</div>
@@ -147,12 +149,13 @@ export class TradeForm extends Base {
                   )}
               >
                 ${this.stocks.map(
-                  (s) => html`<option
-                    value=${s.id}
-                    ?selected=${s.id === this.stockId}
-                  >
-                    ${s.stock_code} — ${s.stock_full_name}
-                  </option>`,
+                  (s) =>
+                    html`<option
+                      value=${s.id}
+                      ?selected=${s.id === this.stockId}
+                    >
+                      ${s.stock_code} — ${s.stock_full_name}
+                    </option>`,
                 )}
               </select>
             </div>

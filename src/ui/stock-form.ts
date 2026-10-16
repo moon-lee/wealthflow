@@ -162,8 +162,8 @@ export class StockForm extends Base {
                   title="Derived from your trade history — add a buy on the Trades tab."
                 />
                 <p class="muted">
-                  Derived from trades. A new holding starts at 0 until you log its
-                  first buy.
+                  Derived from trades. A new holding starts at 0 until you log
+                  its first buy.
                 </p>
               </label>
               <label class="field field-wide"

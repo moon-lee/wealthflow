@@ -58,7 +58,8 @@ export class TradesView extends Base {
       const el = root.querySelector(tag) as any;
       if (!el) continue;
       el.finance = this.finance;
-      if (typeof el.setFinance === 'function') await el.setFinance(this.finance);
+      if (typeof el.setFinance === 'function')
+        await el.setFinance(this.finance);
       else if (typeof el.reload === 'function') await el.reload();
     }
   }
@@ -71,9 +72,15 @@ export class TradesView extends Base {
 
   override connectedCallback(): void {
     (super.connectedCallback as (() => void) | undefined)?.call(this);
-    this.addEventListener('trade-create', this._onTradeChanged as EventListener);
+    this.addEventListener(
+      'trade-create',
+      this._onTradeChanged as EventListener,
+    );
     this.addEventListener('trade-edit', this._onTradeChanged as EventListener);
-    this.addEventListener('trade-delete', this._onTradeChanged as EventListener);
+    this.addEventListener(
+      'trade-delete',
+      this._onTradeChanged as EventListener,
+    );
     this.addEventListener(
       'trade-edit-request',
       this._onEditRequest as EventListener,
@@ -85,7 +92,10 @@ export class TradesView extends Base {
       'trade-create',
       this._onTradeChanged as EventListener,
     );
-    this.removeEventListener('trade-edit', this._onTradeChanged as EventListener);
+    this.removeEventListener(
+      'trade-edit',
+      this._onTradeChanged as EventListener,
+    );
     this.removeEventListener(
       'trade-delete',
       this._onTradeChanged as EventListener,
@@ -117,9 +127,11 @@ export class TradesView extends Base {
     if (typeof HTMLElement === 'undefined') return html``;
     return html`
       <div class="order-stack">
-        ${this.error
-          ? html`<p class="field-error">Error: ${this.error}</p>`
-          : ''}
+        ${
+          this.error
+            ? html`<p class="field-error">Error: ${this.error}</p>`
+            : ''
+        }
         <div class="segment" role="tablist">
           <button
             role="tab"
@@ -139,30 +151,32 @@ export class TradesView extends Base {
           </button>
         </div>
 
-        ${this.segment === 'trades'
-          ? html`
-              <div class="section flush">
-                <div class="section-header is-toggle">
-                  <h3 class="section-title">Trades</h3>
-                  <div class="header-actions">
-                    <button
-                      class="btn btn-secondary btn-small"
-                      @click=${() => {
-                        this.showForm = !this.showForm;
-                        (this as any).requestUpdate?.();
-                      }}
-                    >
-                      ${this.showForm ? 'Hide form' : 'Log buy'}
-                    </button>
+        ${
+          this.segment === 'trades'
+            ? html`
+                <div class="section flush">
+                  <div class="section-header is-toggle">
+                    <h3 class="section-title">Trades</h3>
+                    <div class="header-actions">
+                      <button
+                        class="btn btn-secondary btn-small"
+                        @click=${() => {
+                          this.showForm = !this.showForm;
+                          (this as any).requestUpdate?.();
+                        }}
+                      >
+                        ${this.showForm ? 'Hide form' : 'Log buy'}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="section-body">
+                    ${this.showForm ? html`<trade-form></trade-form>` : ''}
+                    <trade-log></trade-log>
                   </div>
                 </div>
-                <div class="section-body">
-                  ${this.showForm ? html`<trade-form></trade-form>` : ''}
-                  <trade-log></trade-log>
-                </div>
-              </div>
-            `
-          : html`<parcel-ledger></parcel-ledger>`}
+              `
+            : html`<parcel-ledger></parcel-ledger>`
+        }
       </div>
     `;
   }

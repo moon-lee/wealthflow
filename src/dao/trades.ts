@@ -69,7 +69,9 @@ function assertValid(input: TradeInput): void {
     throw new TradeValidationError('brokerage must be ≥ 0');
   const source = input.source ?? 'manual';
   if (!SOURCES.includes(source))
-    throw new TradeValidationError(`source must be one of ${SOURCES.join(', ')}`);
+    throw new TradeValidationError(
+      `source must be one of ${SOURCES.join(', ')}`,
+    );
 }
 
 export async function createTrade(
@@ -94,9 +96,7 @@ export async function listTrades(
   finance: FinanceApi,
   opts: TradeFilter = {},
 ): Promise<Trade[]> {
-  const rows = (await finance.db
-    .table(TABLE)
-    .find({})) as unknown as Trade[];
+  const rows = (await finance.db.table(TABLE).find({})) as unknown as Trade[];
   const inRange = rows.filter((r) => {
     if (opts.stockId != null && r.stock_id !== opts.stockId) return false;
     if (opts.from != null && r.date < opts.from) return false;
@@ -106,7 +106,9 @@ export async function listTrades(
   // Newest first: a log is read newest-first, and a trade saved a moment ago
   // must land at the top rather than at the bottom. id breaks same-day ties
   // so the order is stable across a reload.
-  return inRange.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id));
+  return inRange.sort((a, b) =>
+    a.date < b.date ? 1 : a.date > b.date ? -1 : b.id - a.id,
+  );
 }
 
 export async function updateTrade(

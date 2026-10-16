@@ -63,9 +63,11 @@ export class TradeLog extends Base {
   }
 
   get sortedTrades(): Trade[] {
-    return this.trades.slice().sort((a, b) =>
-      this.sortDesc ? (a.date < b.date ? 1 : -1) : a.date < b.date ? -1 : 1,
-    );
+    return this.trades
+      .slice()
+      .sort((a, b) =>
+        this.sortDesc ? (a.date < b.date ? 1 : -1) : a.date < b.date ? -1 : 1,
+      );
   }
 
   get rowCount(): number {
@@ -91,9 +93,11 @@ export class TradeLog extends Base {
     const rows = this.sortedTrades;
     return html`
       <div class="table-wrap">
-        ${this.error
-          ? html`<p class="field-error">Error: ${this.error}</p>`
-          : ''}
+        ${
+          this.error
+            ? html`<p class="field-error">Error: ${this.error}</p>`
+            : ''
+        }
         <table class="hist-table">
           <thead>
             <tr>
@@ -112,31 +116,34 @@ export class TradeLog extends Base {
             </tr>
           </thead>
           <tbody>
-            ${rows.length === 0
-              ? html`<tr>
-                  <td colspan="8" class="muted">No trades yet.</td>
-                </tr>`
-              : rows.map(
-                  (t) => html`<tr>
-                    <td>${t.date}</td>
-                    <td>${this.code(t.stock_id)}</td>
-                    <td>${t.side}</td>
-                    <td class="num">${qty(t.quantity)}</td>
-                    <td class="num">${price4(t.price)}</td>
-                    <td class="num">${formatAUD(t.brokerage)}</td>
-                    <td class="num">
-                      ${formatAUD(t.quantity * t.price + t.brokerage)}
-                    </td>
-                    <td class="num actions">
-                      <button
-                        class="btn btn-secondary btn-small"
-                        @click=${() => this.editRequest(t)}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>`,
-                )}
+            ${
+              rows.length === 0
+                ? html`<tr>
+                    <td colspan="8" class="muted">No trades yet.</td>
+                  </tr>`
+                : rows.map(
+                    (t) =>
+                      html`<tr>
+                        <td>${t.date}</td>
+                        <td>${this.code(t.stock_id)}</td>
+                        <td>${t.side}</td>
+                        <td class="num">${qty(t.quantity)}</td>
+                        <td class="num">${price4(t.price)}</td>
+                        <td class="num">${formatAUD(t.brokerage)}</td>
+                        <td class="num">
+                          ${formatAUD(t.quantity * t.price + t.brokerage)}
+                        </td>
+                        <td class="num actions">
+                          <button
+                            class="btn btn-secondary btn-small"
+                            @click=${() => this.editRequest(t)}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>`,
+                  )
+            }
           </tbody>
         </table>
       </div>
@@ -144,10 +151,7 @@ export class TradeLog extends Base {
   }
 }
 
-if (
-  typeof customElements !== 'undefined' &&
-  !customElements.get('trade-log')
-) {
+if (typeof customElements !== 'undefined' && !customElements.get('trade-log')) {
   customElements.define(
     'trade-log',
     TradeLog as unknown as CustomElementConstructor,

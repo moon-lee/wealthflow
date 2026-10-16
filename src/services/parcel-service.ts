@@ -30,7 +30,10 @@ export function parcelCostBase(t: {
  * as whole months, because "held for at least 12 months" is a date test, not
  * a day count, and a parcel qualifies on its anniversary.
  */
-export function isDiscountEligible(acquiredDate: string, asOf: string): boolean {
+export function isDiscountEligible(
+  acquiredDate: string,
+  asOf: string,
+): boolean {
   return asOf >= addMonths(acquiredDate, 12);
 }
 
@@ -104,10 +107,7 @@ export function groupParcels(
     .map((s) => {
       const mine = parcels.filter((p) => p.stock_id === s.id);
       const units = mine.reduce((sum, p) => sum + p.quantity, 0);
-      const costBase = mine.reduce(
-        (sum, p) => sum + parcelCostBase(p),
-        0,
-      );
+      const costBase = mine.reduce((sum, p) => sum + parcelCostBase(p), 0);
       return {
         stockId: s.id,
         stockCode: s.stock_code,

@@ -20,13 +20,17 @@ export async function activate(
   // rather than requestMount: the latter would create the panel if it were
   // closed, popping a view the user had deliberately shut. Dropped when nothing
   // is mounted, which is what a Refresh item should do.
-  finance.commands.registerCommand('wealthflow.refresh', 'Refresh Wealth Flow', async () => {
-    try {
-      await finance.ui?.pushData?.('wealthflow', { refreshedAt: Date.now() });
-    } catch (err) {
-      logger.error('wealthflow refresh failed', err);
-    }
-  });
+  finance.commands.registerCommand(
+    'wealthflow.refresh',
+    'Refresh Wealth Flow',
+    async () => {
+      try {
+        await finance.ui?.pushData?.('wealthflow', { refreshedAt: Date.now() });
+      } catch (err) {
+        logger.error('wealthflow refresh failed', err);
+      }
+    },
+  );
   const openView = (view: string, focus?: string) => async () => {
     await finance.ui?.requestMount(
       'wealthflow',
@@ -47,6 +51,11 @@ export async function activate(
     'wealthflow.show-stocks',
     'Wealth Flow: Show Stocks',
     openView('stocks'),
+  );
+  finance.commands.registerCommand(
+    'wealthflow.show-trades',
+    'Wealth Flow: Show Trades',
+    openView('trades'),
   );
   finance.commands.registerCommand(
     'wealthflow.add-dividend',

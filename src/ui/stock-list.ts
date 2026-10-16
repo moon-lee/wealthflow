@@ -2,6 +2,7 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { ExtensionLogger } from 'finance-logger';
+import { listParcels } from '../dao/parcels.js';
 import {
   listStocks,
   updateStock,
@@ -49,7 +50,6 @@ export class StockList extends Base {
     this.error = '';
     try {
       this.stocks = await listStocks(this.finance, { status: 'all' });
-      const { listParcels } = await import('../dao/parcels.js');
       const parcels = await listParcels(this.finance);
       this.tracked = new Set(parcels.map((p) => p.stock_id));
     } catch (e: any) {
@@ -354,7 +354,9 @@ export class StockList extends Base {
           ${
             this.tracked.has(s.id)
               ? s.shares
-              : html`<span class="muted" title="No trades logged for this holding yet."
+              : html`<span
+                  class="muted"
+                  title="No trades logged for this holding yet."
                   >not yet tracked</span
                 >`
           }

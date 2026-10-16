@@ -88,7 +88,9 @@ export function readSheet1(buffer) {
   const sharedRaw = entries.get('xl/sharedStrings.xml');
   const sheetRaw = entries.get('xl/worksheets/sheet1.xml');
   if (!sheetRaw) throw new Error('xlsx has no xl/worksheets/sheet1.xml');
-  const shared = sharedRaw ? parseSharedStrings(sharedRaw.toString('utf8')) : [];
+  const shared = sharedRaw
+    ? parseSharedStrings(sharedRaw.toString('utf8'))
+    : [];
 
   const raw = [];
   const sheet = sheetRaw.toString('utf8');
@@ -97,13 +99,15 @@ export function readSheet1(buffer) {
     // exact row. Array position is not it: empty rows are not emitted.
     const sheetRow = Number(/<row\b[^>]*\br="(\d+)"/.exec(rowXml)?.[1] ?? 0);
     const row = { __row: sheetRow };
-    for (const cell of rowXml.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) ?? []) {
+    for (const cell of rowXml.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) ??
+      []) {
       const ref = /r="([A-Z]+\d+)"/.exec(cell)?.[1];
       if (!ref) continue;
       const type = /t="([^"]+)"/.exec(cell)?.[1];
       const v = /<v>([\s\S]*?)<\/v>/.exec(cell)?.[1];
       if (v === undefined) continue;
-      row[colOf(ref)] = type === 's' ? (shared[Number(v)] ?? '') : unescapeXml(v);
+      row[colOf(ref)] =
+        type === 's' ? (shared[Number(v)] ?? '') : unescapeXml(v);
     }
     if (Object.keys(row).length) raw.push(row);
   }

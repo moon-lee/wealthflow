@@ -7,7 +7,7 @@ const Base =
     ? LitElement
     : (class {} as unknown as typeof LitElement);
 
-export type WealthTab = 'banks' | 'stocks' | 'overview';
+export type WealthTab = 'banks' | 'stocks' | 'overview' | 'trades';
 
 /**
  * Topbar dialect: name the extension, then the section you are looking at.
@@ -18,12 +18,14 @@ export const TAB_LABELS: Record<WealthTab, string> = {
   banks: 'Banks',
   stocks: 'Stocks',
   overview: 'Overview',
+  trades: 'Trades',
 };
 
 export function viewForMount(mount: Record<string, unknown> = {}): WealthTab {
   const v = (mount.view ?? mount.viewId) as string | undefined;
   if (v === 'banks' || v === 'bank-list') return 'banks';
   if (v === 'stocks' || v === 'stock-list') return 'stocks';
+  if (v === 'trades' || v === 'trade-list') return 'trades';
   // Legacy Dividends tab now lives inside Overview.
   return 'overview';
 }
@@ -200,6 +202,7 @@ export class WealthOrchestrator extends Base {
             ${this.error ? html`<p class="field-error">Error: ${this.error}</p>` : ''}
             ${this.tab === 'banks' ? html`<bank-list id="child"></bank-list>` : ''}
             ${this.tab === 'stocks' ? html`<stock-list id="child"></stock-list>` : ''}
+            ${this.tab === 'trades' ? html`<trades-view id="child"></trades-view>` : ''}
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
           </div>
         </div>

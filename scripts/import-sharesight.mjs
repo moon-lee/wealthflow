@@ -15,8 +15,7 @@ export const EXPECTED = {
   FGX: { rows: 9, units: 1109, costBase: 1284.08 },
 };
 
-const sheetRowOf = (row, i) =>
-  Number.isFinite(row.__row) ? row.__row : i + 1;
+const sheetRowOf = (row, i) => (Number.isFinite(row.__row) ? row.__row : i + 1);
 const ACCEPTED_TYPES = { Buy: 'buy', Reinvestment: 'buy' };
 
 export function parseTrades(rows) {
@@ -44,7 +43,8 @@ export function parseTrades(rows) {
     }
     const quantity = Number(row.Qty);
     const price = Number(row.Price);
-    const brokerage = row.Brokerage === '' || row.Brokerage == null ? 0 : Number(row.Brokerage);
+    const brokerage =
+      row.Brokerage === '' || row.Brokerage == null ? 0 : Number(row.Brokerage);
     const date = (row.Date ?? '').trim();
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
@@ -56,11 +56,19 @@ export function parseTrades(rows) {
       return;
     }
     if (!Number.isFinite(price) || price < 0) {
-      rejected.push({ row: sheetRowOf(row, i), code, reason: `price ${row.Price} is not a number` });
+      rejected.push({
+        row: sheetRowOf(row, i),
+        code,
+        reason: `price ${row.Price} is not a number`,
+      });
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      rejected.push({ row: sheetRowOf(row, i), code, reason: `date ${row.Date} is not YYYY-MM-DD` });
+      rejected.push({
+        row: sheetRowOf(row, i),
+        code,
+        reason: `date ${row.Date} is not YYYY-MM-DD`,
+      });
       return;
     }
     accepted.push({
@@ -87,7 +95,9 @@ function summarise(accepted) {
     out[code] = {
       rows: mine.length,
       units: mine.reduce((s, r) => s + r.quantity, 0),
-      costBase: round2(mine.reduce((s, r) => s + r.quantity * r.price + r.brokerage, 0)),
+      costBase: round2(
+        mine.reduce((s, r) => s + r.quantity * r.price + r.brokerage, 0),
+      ),
     };
   }
   return out;
@@ -104,7 +114,7 @@ export function audit(parsed) {
   const accepted = Array.isArray(parsed) ? parsed : parsed.accepted;
   const heldCounts = Array.isArray(parsed)
     ? summarise(parsed)
-    : parsed.heldCounts ?? summarise(parsed.accepted);
+    : (parsed.heldCounts ?? summarise(parsed.accepted));
   const got = summarise(accepted);
   const checks = [];
   for (const code of HELD_CODES) {
@@ -131,20 +141,28 @@ if (process.argv[1] && process.argv[1].endsWith('import-sharesight.mjs')) {
   console.log(`held codes: ${HELD_CODES.join(', ')}\n`);
   for (const code of HELD_CODES) {
     const s = summarise(accepted)[code];
-    console.log(`  ${code}  ${String(s.rows).padStart(3)} rows  ${String(s.units).padStart(6)} units  $${s.costBase.toFixed(2)}`);
+    console.log(
+      `  ${code}  ${String(s.rows).padStart(3)} rows  ${String(s.units).padStart(6)} units  $${s.costBase.toFixed(2)}`,
+    );
   }
   if (rejected.length) {
-      console.log('\nrejected — the importer does not skip these silently:');
-      for (const r of rejected) console.log(`  row ${r.row}  ${r.code}  ${r.reason}`);
-    }
+    console.log('\nrejected — the importer does not skip these silently:');
+    for (const r of rejected)
+      console.log(`  row ${r.row}  ${r.code}  ${r.reason}`);
+  }
 
   const checks = audit({ accepted, heldCounts });
   console.log('');
-  for (const c of checks) console.log(`  ${c.ok ? 'PASS' : 'FAIL'}  ${c.code}: ${c.detail}`);
+  for (const c of checks)
+    console.log(`  ${c.ok ? 'PASS' : 'FAIL'}  ${c.code}: ${c.detail}`);
 
   if (checks.some((c) => !c.ok)) {
-    console.error('\nRefusing to write: the workbook no longer matches the reconciled figures.');
+    console.error(
+      '\nRefusing to write: the workbook no longer matches the reconciled figures.',
+    );
     process.exit(1);
   }
-  console.log('\nRead-only run. Writing to finance.db is Task 4\'s follow-on; run scripts/db-target.mjs to pick a database.\n');
+  console.log(
+    "\nRead-only run. Writing to finance.db is Task 4's follow-on; run scripts/db-target.mjs to pick a database.\n",
+  );
 }

@@ -18,15 +18,20 @@ export async function listParcels(
   finance: FinanceApi,
   opts: { stockId?: number } = {},
 ): Promise<Parcel[]> {
-  const rows = (await finance.db
-    .table(TABLE)
-    .find({})) as unknown as Parcel[];
-  const mine = opts.stockId == null
-    ? rows
-    : rows.filter((r) => r.stock_id === opts.stockId);
+  const rows = (await finance.db.table(TABLE).find({})) as unknown as Parcel[];
+  const mine =
+    opts.stockId == null
+      ? rows
+      : rows.filter((r) => r.stock_id === opts.stockId);
   // Oldest first: that is the order FIFO consumes parcels in, so the ledger's
   // row order is the order a sale would take them.
-  return mine.sort((a, b) => (a.acquired_date < b.acquired_date ? -1 : a.acquired_date > b.acquired_date ? 1 : a.origin_trade_id - b.origin_trade_id));
+  return mine.sort((a, b) =>
+    a.acquired_date < b.acquired_date
+      ? -1
+      : a.acquired_date > b.acquired_date
+        ? 1
+        : a.origin_trade_id - b.origin_trade_id,
+  );
 }
 
 export async function countParcels(
@@ -48,6 +53,8 @@ export async function replaceParcels(
 ): Promise<void> {
   await finance.db.table(TABLE).delete({ stock_id: stockId });
   for (const row of rows) {
-    await finance.db.table(TABLE).insert(row as unknown as Record<string, unknown>);
+    await finance.db
+      .table(TABLE)
+      .insert(row as unknown as Record<string, unknown>);
   }
 }
