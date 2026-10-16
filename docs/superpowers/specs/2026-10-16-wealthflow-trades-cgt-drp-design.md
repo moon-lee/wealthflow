@@ -168,21 +168,23 @@ netGain       = eligibleNet × factor  +  ineligibleNet
 
 **Rule 2 — `discount_applied` is signed from the taxpayer's point of view.** A positive number reduces what they owe; a negative number is what the adjustment took off a gain. Because a *discounted loss shrinks*, the adjustment on a losing disposal is **positive**.
 
-Worked example, FY 2027 — this is the acceptance fixture:
+Worked example, FY 2027 — this is the acceptance fixture, pinned in `tests/cgt-service.test.ts`:
 
 | Stock | Cost base | Proceeds | Nominal | Adjustment | Net |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| VAS | $2,424.50 | $2,800.00 | $375.50 | −$164.50 | $211.00 |
+| VAS | $2,422.50 | $2,800.00 | $377.50 | −$164.50 | $213.00 |
 | VHY | $841.00 | $820.00 | −$21.00 | **+$10.50** | −$10.50 |
-| **Total** | **$3,265.50** | **$3,620.00** | **$354.50** | **−$154.00** | **$200.50** |
+| **Total** | **$3,263.50** | **$3,620.00** | **$356.50** | **−$154.00** | **$202.50** |
 
 Walk it, because it is easy to get wrong:
 
-- VAS is two parcels. $329.00 of the nominal gain came from a 28-month parcel → eligible → halved to $164.50. $46.50 came from an 11-month parcel → ineligible → untouched. So VAS nets **$164.50 + $46.50 = $211.00**, and the adjustment is −$164.50, **not** half of $375.50.
+- VAS is two parcels. $329.00 of the nominal gain came from a 28-month parcel → eligible → halved to $164.50. $48.50 came from an 11-month parcel → ineligible → untouched. So VAS nets **$164.50 + $48.50 = $213.00**, and the adjustment is −$164.50, **not** half of $377.50.
 - VHY's $21.00 loss came from a 38-month parcel. The discount halves a loss too, so it shrinks to $10.50 — the adjustment is **+$10.50**, adding back magnitude.
-- Net eligible = $329.00 − $21.00 = $308.00, halved = **$154.00**. Plus ineligible $46.50 = **$200.50**. ✓
+- Net eligible = $329.00 − $21.00 = $308.00, halved = **$154.00**. Plus ineligible $48.50 = **$202.50**. ✓
 
-Discounting the whole $354.50 aggregate instead would give $177.25 and would be **wrong**, because it would discount a parcel that has not been held a year.
+Discounting the whole $356.50 aggregate instead would give $178.25 and would be **wrong**, because it would discount a parcel that has not been held a year.
+
+**Cost base on a partial sale is proportional, not "the whole brokerage again."** Selling 5 units of a 15-unit parcel bought at $102.10 with $3 brokerage takes $1,534.50 × 5/15 = **$511.50**, not $513.50. Charging the full $3 each time inflates the gain by $3 every time the parcel is partly sold, and does not conserve. The earlier version of this section stated $513.50 and is corrected here; `conserves cost base across the whole holding` is now a test, so a regression fails loudly.
 
 The UI states this in a footnote rather than leaving it to be reverse-engineered from four numbers.
 
