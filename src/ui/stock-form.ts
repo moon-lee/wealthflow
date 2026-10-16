@@ -65,7 +65,9 @@ export class StockForm extends Base {
       const row = await createStock(this.finance, {
         stock_code: this.stockCode.trim(),
         stock_full_name: this.stockName.trim(),
-        shares: Number(this.shares.trim()),
+        // A brand-new holding has no parcels yet, so the derived total is 0.
+        // The parcel rebuild overwrites this as soon as the first buy lands.
+        shares: 0,
         notes: this.notes.trim() === '' ? null : this.notes.trim(),
       });
       this.dispatchEvent(
@@ -151,22 +153,18 @@ export class StockForm extends Base {
                 }
               </label>
               <label class="field"
-                ><span>Shares<em class="req">*</em></span>
+                ><span>Shares</span>
                 <input
                   aria-label="Shares"
                   inputmode="decimal"
+                  readonly
                   .value=${this.shares}
-                  @input=${(e: Event) => {
-                    this.shares = (e.target as HTMLInputElement).value;
-                    (this as any).requestUpdate?.();
-                  }}
-                  placeholder="120"
+                  title="Derived from your trade history — add a buy on the Trades tab."
                 />
-                ${
-                  this.sharesError
-                    ? html`<p class="field-error">${this.sharesError}</p>`
-                    : ''
-                }
+                <p class="muted">
+                  Derived from trades. A new holding starts at 0 until you log its
+                  first buy.
+                </p>
               </label>
               <label class="field field-wide"
                 ><span>Notes</span>

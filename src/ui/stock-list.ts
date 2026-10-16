@@ -29,6 +29,11 @@ export class StockList extends Base {
   editStockCode = '';
   editStockName = '';
   editShares = '';
+  /**
+   * Stock ids that have at least one parcel. A holding with none has an
+   * unknown unit count, and rendering its derived 0 would read as data loss.
+   */
+  tracked = new Set<number>();
   editNotes = '';
   editTouched = false;
   savingEdit = false;
@@ -44,6 +49,9 @@ export class StockList extends Base {
     this.error = '';
     try {
       this.stocks = await listStocks(this.finance, { status: 'all' });
+      const { listParcels } = await import('../dao/parcels.js');
+      const parcels = await listParcels(this.finance);
+      this.tracked = new Set(parcels.map((p) => p.stock_id));
     } catch (e: any) {
       logger.error('stock list reload failed:', e);
       this.error = String(e?.message || e);
@@ -215,7 +223,8 @@ export class StockList extends Base {
       await updateStock(this.finance, s.id, {
         stock_code: this.editStockCode.trim(),
         stock_full_name: this.editStockName.trim(),
-        shares: Number(this.editShares.trim()),
+        // shares is derived from parcels and deliberately not written here: a
+        // hand-typed figure would be overwritten by the next rebuild anyway.
         notes: this.editNotes.trim() === '' ? null : this.editNotes.trim(),
       });
       this.editingId = null;
@@ -341,7 +350,15 @@ export class StockList extends Base {
           </button>
           <span class="row-sub">${s.stock_full_name}</span>
         </td>
-        <td class="num">${s.shares}</td>
+        <td class="num">
+          ${
+            this.tracked.has(s.id)
+              ? s.shares
+              : html`<span class="muted" title="No trades logged for this holding yet."
+                  >not yet tracked</span
+                >`
+          }
+        </td>
         <td>
           <div class="row-actions">
             <button
