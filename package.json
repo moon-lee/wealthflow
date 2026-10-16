@@ -310,109 +310,109 @@
         ]
       },
       {
-          "name": "wealthflow_trades",
-          "columns": [
-            {
-              "name": "stock_id",
-              "type": "integer",
-              "nullable": false
-            },
-            {
-              "name": "date",
-              "type": "date",
-              "nullable": false
-            },
-            {
-              "name": "side",
-              "type": "text",
-              "nullable": false,
-              "enumOptions": [
-                "buy",
-                "sell"
-              ]
-            },
-            {
-              "name": "quantity",
-              "type": "real",
-              "nullable": false,
-              "min": 0
-            },
-            {
-              "name": "price",
-              "type": "real",
-              "nullable": false,
-              "min": 0
-            },
-            {
-              "name": "brokerage",
-              "type": "real",
-              "nullable": false,
-              "default": 0,
-              "min": 0
-            },
-            {
-              "name": "source",
-              "type": "text",
-              "nullable": false,
-              "default": "manual",
-              "enumOptions": [
-                "manual",
-                "drp",
-                "import"
-              ]
-            },
-            {
-              "name": "dividend_id",
-              "type": "integer",
-              "nullable": true
-            },
-            {
-              "name": "notes",
-              "type": "text",
-              "nullable": true
-            }
-          ]
-        },
-        {
-          "name": "wealthflow_parcels",
-          "columns": [
-            {
-              "name": "stock_id",
-              "type": "integer",
-              "nullable": false
-            },
-            {
-              "name": "origin_trade_id",
-              "type": "integer",
-              "nullable": false
-            },
-            {
-              "name": "acquired_date",
-              "type": "date",
-              "nullable": false
-            },
-            {
-              "name": "quantity",
-              "type": "real",
-              "nullable": false,
-              "min": 0
-            },
-            {
-              "name": "price",
-              "type": "real",
-              "nullable": false,
-              "min": 0
-            },
-            {
-              "name": "brokerage",
-              "type": "real",
-              "nullable": false,
-              "default": 0,
-              "min": 0
-            }
-          ]
-        }
-      ],
+        "name": "wealthflow_trades",
+        "columns": [
+          {
+            "name": "stock_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "side",
+            "type": "text",
+            "nullable": false,
+            "enumOptions": [
+              "buy",
+              "sell"
+            ]
+          },
+          {
+            "name": "quantity",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "price",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "brokerage",
+            "type": "real",
+            "nullable": false,
+            "default": 0,
+            "min": 0
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "nullable": false,
+            "default": "manual",
+            "enumOptions": [
+              "manual",
+              "drp",
+              "import"
+            ]
+          },
+          {
+            "name": "dividend_id",
+            "type": "integer",
+            "nullable": true
+          },
+          {
+            "name": "notes",
+            "type": "text",
+            "nullable": true
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_parcels",
+        "columns": [
+          {
+            "name": "stock_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "origin_trade_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "acquired_date",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "quantity",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "price",
+            "type": "real",
+            "nullable": false,
+            "min": 0
+          },
+          {
+            "name": "brokerage",
+            "type": "real",
+            "nullable": false,
+            "default": 0,
+            "min": 0
+          }
+        ]
+      }
+    ],
     "main": "src/main.ts"
   },
   "scripts": {
