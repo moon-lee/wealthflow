@@ -1,13 +1,13 @@
 {
   "name": "wealthflow",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.2.3",
+    "version": "0.2.4",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
     "activationEvents": [
@@ -45,6 +45,10 @@
           "title": "Wealth Flow: Show Overview"
         },
         {
+          "id": "wealthflow.show-trades",
+          "title": "Wealth Flow: Show Trades"
+        },
+        {
           "id": "wealthflow.refresh",
           "title": "Refresh Wealth Flow"
         }
@@ -73,6 +77,12 @@
           "label": "Stocks",
           "command": "wealthflow.show-stocks",
           "group": "Wealth"
+        },
+        {
+          "id": "wealthflow-trades",
+          "label": "Trades",
+          "command": "wealthflow.show-trades",
+          "group": "Wealth"
         }
       ],
       "configuration": [
@@ -92,6 +102,7 @@
         "wealthflow.show-stocks",
         "wealthflow.add-dividend",
         "wealthflow.show-overview",
+        "wealthflow.show-trades",
         "wealthflow.refresh"
       ],
       "allowedUiEvents": [
@@ -117,7 +128,11 @@
         "super-edit",
         "super-delete",
         "fy-changed",
-        "wealthflow-navigate"
+        "wealthflow-navigate",
+        "trade-create",
+        "trade-edit",
+        "trade-delete",
+        "trade-edit-request"
       ]
     },
     "tables": [
@@ -293,8 +308,111 @@
             "nullable": true
           }
         ]
-      }
-    ],
+      },
+      {
+          "name": "wealthflow_trades",
+          "columns": [
+            {
+              "name": "stock_id",
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "date",
+              "type": "date",
+              "nullable": false
+            },
+            {
+              "name": "side",
+              "type": "text",
+              "nullable": false,
+              "enumOptions": [
+                "buy",
+                "sell"
+              ]
+            },
+            {
+              "name": "quantity",
+              "type": "real",
+              "nullable": false,
+              "min": 0
+            },
+            {
+              "name": "price",
+              "type": "real",
+              "nullable": false,
+              "min": 0
+            },
+            {
+              "name": "brokerage",
+              "type": "real",
+              "nullable": false,
+              "default": 0,
+              "min": 0
+            },
+            {
+              "name": "source",
+              "type": "text",
+              "nullable": false,
+              "default": "manual",
+              "enumOptions": [
+                "manual",
+                "drp",
+                "import"
+              ]
+            },
+            {
+              "name": "dividend_id",
+              "type": "integer",
+              "nullable": true
+            },
+            {
+              "name": "notes",
+              "type": "text",
+              "nullable": true
+            }
+          ]
+        },
+        {
+          "name": "wealthflow_parcels",
+          "columns": [
+            {
+              "name": "stock_id",
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "origin_trade_id",
+              "type": "integer",
+              "nullable": false
+            },
+            {
+              "name": "acquired_date",
+              "type": "date",
+              "nullable": false
+            },
+            {
+              "name": "quantity",
+              "type": "real",
+              "nullable": false,
+              "min": 0
+            },
+            {
+              "name": "price",
+              "type": "real",
+              "nullable": false,
+              "min": 0
+            },
+            {
+              "name": "brokerage",
+              "type": "real",
+              "nullable": false,
+              "default": 0,
+              "min": 0
+            }
+          ]
+        }
+      ],
     "main": "src/main.ts"
   },
   "scripts": {

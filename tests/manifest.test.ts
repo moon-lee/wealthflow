@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 6 commands, 5 tables', () => {
+  it('declares single view, 7 commands, 7 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -16,6 +16,7 @@ describe('manifest', () => {
         'wealthflow.show-banks',
         'wealthflow.show-overview',
         'wealthflow.show-stocks',
+        'wealthflow.show-trades',
       ].sort(),
     );
     expect(fe.tables.map((t: any) => t.name).sort()).toEqual(
@@ -23,15 +24,17 @@ describe('manifest', () => {
         'wealthflow_banks',
         'wealthflow_dividends',
         'wealthflow_interest_entries',
+        'wealthflow_parcels',
         'wealthflow_stocks',
         'wealthflow_super_entries',
+        'wealthflow_trades',
       ].sort(),
     );
     for (const id of ids)
       expect(fe.contributions.allowedCommands).toContain(id);
   });
 
-  it('declares the Quick Links Refresh item, then Overview, Banks, Stocks, with no add entries', () => {
+  it('declares the Quick Links Refresh item, then Overview, Banks, Stocks, Trades, with no add entries', () => {
     const fe: any = (pkg as any).financeExtension;
     const nav = fe.contributions.navigation;
     // Refresh leads, in the shared "Quick Links" group, so every extension
@@ -41,12 +44,14 @@ describe('manifest', () => {
       'Overview',
       'Banks',
       'Stocks',
+      'Trades',
     ]);
     expect(nav.map((n: any) => n.command)).toEqual([
       'wealthflow.refresh',
       'wealthflow.show-overview',
       'wealthflow.show-banks',
       'wealthflow.show-stocks',
+      'wealthflow.show-trades',
     ]);
     expect(nav[0].group).toBe('Quick Links');
     const ids = fe.contributions.commands.map((c: any) => c.id);
@@ -59,6 +64,7 @@ describe('manifest', () => {
       'wealthflow-overview',
       'wealthflow-banks',
       'wealthflow-stocks',
+      'wealthflow-trades',
     ]);
   });
 
@@ -79,6 +85,66 @@ describe('manifest', () => {
       ['amount', 'date', 'finance_year', 'kind', 'notes'].sort(),
     );
     for (const evt of ['super-create', 'super-edit', 'super-delete'])
+      expect(fe.contributions.allowedUiEvents).toContain(evt);
+  });
+
+  it('declares wealthflow_trades with the full Phase 1-3 column set', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find((x: any) => x.name === 'wealthflow_trades');
+    expect(t).toBeDefined();
+    // dividend_id is declared now but used only in Phase 3: the app runs
+    // CREATE TABLE IF NOT EXISTS and never migrates, so a later task could not
+    // add it without dropping the table by hand.
+    expect(t.columns.map((c: any) => c.name).sort()).toEqual(
+      [
+        'brokerage',
+        'date',
+        'dividend_id',
+        'notes',
+        'price',
+        'quantity',
+        'side',
+        'source',
+        'stock_id',
+      ].sort(),
+    );
+    expect(t.columns.find((c: any) => c.name === 'quantity').type).toBe('real');
+    expect(t.columns.find((c: any) => c.name === 'price').type).toBe('real');
+    expect(
+      t.columns.find((c: any) => c.name === 'dividend_id').nullable,
+    ).toBe(true);
+  });
+
+  it('declares wealthflow_parcels keyed on origin_trade_id with no eligibility column', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find((x: any) => x.name === 'wealthflow_parcels');
+    expect(t).toBeDefined();
+    expect(t.columns.map((c: any) => c.name).sort()).toEqual(
+      [
+        'acquired_date',
+        'brokerage',
+        'origin_trade_id',
+        'price',
+        'quantity',
+        'stock_id',
+      ].sort(),
+    );
+    expect(t.columns.find((c: any) => c.name === 'quantity').type).toBe('real');
+    // Eligibility is computed on read: a stored boolean goes stale the moment
+    // a parcel crosses its own 12-month line without any write.
+    expect(t.columns.map((c: any) => c.name)).not.toContain(
+      'discount_eligible',
+    );
+  });
+
+  it('allowlists the four trade UI events', () => {
+    const fe: any = (pkg as any).financeExtension;
+    for (const evt of [
+      'trade-create',
+      'trade-edit',
+      'trade-delete',
+      'trade-edit-request',
+    ])
       expect(fe.contributions.allowedUiEvents).toContain(evt);
   });
 });
