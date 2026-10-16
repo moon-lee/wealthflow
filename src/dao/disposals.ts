@@ -11,6 +11,9 @@ export interface DisposalRow {
   readonly quantity: number;
   readonly proceeds: number;
   readonly cost_base: number;
+  /** This row's slice of the fund's AMIT cost base adjustment. Distinct from
+   *  `discount_applied`, which is the 50% CGT discount. */
+  readonly amit_share: number;
   readonly nominal_gain: number;
   readonly discount_applied: number;
   readonly net_gain: number;

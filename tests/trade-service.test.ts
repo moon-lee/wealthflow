@@ -43,6 +43,61 @@ async function holding() {
   return { f, s, first, second };
 }
 
+describe('a parcel partly consumed by one sale is not over-allocated to the next', () => {
+  it('does not let a second sale take units the first already sold', async () => {
+    const { f, s } = await holding(); // 20 units @ $95.40, 15 units @ $102.10
+    // First sale takes 25 of 35, leaving 10 in the second parcel.
+    const a: any = await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-01-05',
+      side: 'sell',
+      quantity: 25,
+      price: 112,
+    });
+    const b: any = await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 10,
+      price: 118,
+    });
+    await rebuildDisposals(f, s.id);
+    const rows = await listDisposals(f);
+    expect(rows.reduce((x, r) => x + r.quantity, 0)).toBe(35);
+    // The second sale can only be the 10 units left over from parcel 2.
+    const second = rows.filter((r) => r.trade_id === b.id);
+    expect(second).toHaveLength(1);
+    expect(second[0]!.quantity).toBe(10);
+    expect(second[0]!.origin_trade_id).not.toBe(a.id);
+    // Cost base still conserves across the two sales.
+    expect(rows.reduce((x, r) => x + r.cost_base, 0)).toBeCloseTo(
+      1911 + 1534.5,
+      2,
+    );
+  });
+
+  it('refuses a third sale that exceeds what is left', async () => {
+    const { f, s } = await holding();
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-01-05',
+      side: 'sell',
+      quantity: 30,
+      price: 112,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 10,
+      price: 118,
+    });
+    await expect(rebuildDisposals(f, s.id)).rejects.toThrow(
+      AllocationDoesNotBalanceError,
+    );
+  });
+});
+
 describe('sell brokerage is refused, not ignored (spec 6.6)', () => {
   it('rejects a sell carrying brokerage', async () => {
     const { f, s } = await holding();

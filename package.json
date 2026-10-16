@@ -496,6 +496,12 @@
             "nullable": false
           },
           {
+            "name": "amit_share",
+            "type": "real",
+            "nullable": false,
+            "default": 0
+          },
+          {
             "name": "nominal_gain",
             "type": "real",
             "nullable": false

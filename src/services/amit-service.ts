@@ -2,7 +2,7 @@ import type { FinanceApi } from 'finance';
 import type { Parcel } from '../dao/parcels.js';
 import { listParcels } from '../dao/parcels.js';
 import { totalAdjustment } from '../dao/cost-base-adjustments.js';
-import { allocateFifo } from './cgt-service.js';
+import { allocateFifo, computeDisposal } from './cgt-service.js';
 
 /** 4dp, not 2dp — see spec 9.1: per-parcel shares land below display precision
  *  at real magnitudes, and rounding them to cents makes them fail to sum back
@@ -26,10 +26,13 @@ export interface AmitRow {
  * Pro-rata allocation of a FUND-level adjustment across the units sold,
  * weighted on cost base.
  *
- * The whole fund total is apportioned across every allocation in the sale and
- * never applied twice: applying each historical adjustment to an
- * already-adjusted base would make the answer depend on the order rows were
- * entered in, which spec 9.1 check 4 exists to catch.
+ * Delegates to `computeDisposal` so the preview and the stored disposal can
+ * never disagree. Two copies of this arithmetic is exactly the kind of drift
+ * that makes a conservation invariant unverifiable.
+ *
+ * The whole fund total is apportioned and never applied twice: applying each
+ * historical adjustment to an already-adjusted base would make the answer
+ * depend on the order rows were entered in, which spec 9.1 check 4 guards.
  */
 export async function allocationFor(
   finance: FinanceApi,
@@ -43,41 +46,27 @@ export async function allocationFor(
   // The denominator is the WHOLE holding, not the units being sold. Selling 30
   // of 100 units bears 30% of the fund adjustment; dividing by the selected
   // rows instead would charge the entire adjustment to every partial sale.
-  const wholeFundPre = round4(
+  const denominator = round4(
     parcels.reduce((s, p) => s + p.quantity * p.price + p.brokerage, 0),
   );
-  const pre = alloc.map(({ parcel, quantity: q }) => ({
-    parcel,
-    quantity: q,
-    pre: round4(
-      q *
-        ((parcel.quantity * parcel.price + parcel.brokerage) / parcel.quantity),
-    ),
-  }));
-  const grandPre = wholeFundPre;
-  if (grandPre === 0 || total === 0) {
-    return pre.map((r) => ({
-      parcel: r.parcel,
-      quantity: r.quantity,
-      costBasePreAdjustment: r.pre,
-      adjustmentShare: 0,
-      costBase: r.pre,
-    }));
-  }
-  const rows = pre.map((r) => ({
-    parcel: r.parcel,
-    quantity: r.quantity,
-    costBasePreAdjustment: r.pre,
-    adjustmentShare: round4((total * r.pre) / grandPre),
-    costBase: 0,
-  }));
+  const rows = alloc.map(({ parcel, quantity: q }) => {
+    const d = computeDisposal(parcel, q, 0, asOf, { total, denominator });
+    return {
+      parcel,
+      quantity: q,
+      costBasePreAdjustment: round4(d.costBase - d.amitShare),
+      adjustmentShare: d.amitShare,
+      costBase: d.costBase,
+    };
+  });
   // Give any rounding residue to the largest row so the shares sum back to the
   // pro-rata expectation EXACTLY rather than to within a cent. On a full
   // liquidation that expectation is the whole fund total, which is the
   // conservation invariant spec 9.1 check 2 relies on.
-  const expected = round4(
-    (total * round4(pre.reduce((a, r) => a + r.pre, 0))) / grandPre,
+  const selected = round4(
+    rows.reduce((a, r) => a + r.costBasePreAdjustment, 0),
   );
+  const expected = round4((total * selected) / denominator);
   const summed = round4(rows.reduce((a, r) => a + r.adjustmentShare, 0));
   if (summed !== expected) {
     const residue = round4(expected - summed);
@@ -85,9 +74,10 @@ export async function allocationFor(
     for (const r of rows)
       if (r.adjustmentShare > biggest.adjustmentShare) biggest = r;
     biggest.adjustmentShare = round4(biggest.adjustmentShare + residue);
+    biggest.costBase = round4(
+      biggest.costBasePreAdjustment + biggest.adjustmentShare,
+    );
   }
-  for (const r of rows)
-    r.costBase = round4(r.costBasePreAdjustment + r.adjustmentShare);
   return rows;
 }
 

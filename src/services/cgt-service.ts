@@ -83,6 +83,10 @@ export interface Disposal {
   quantity: number;
   proceeds: number;
   costBase: number;
+  /** This row's slice of the FUND's AMIT cost base adjustment. Signed.
+   *  Distinct from `discountApplied`, which is the 50% CGT discount. Two
+   *  different "adjustments"; naming them apart avoids conflating them. */
+  amitShare: number;
   nominalGain: number;
   /** Signed from the taxpayer's view: positive shrinks a loss. */
   discountApplied: number;
@@ -90,18 +94,35 @@ export interface Disposal {
   eligible: boolean;
 }
 
+export interface DisposalAmit {
+  /** The fund's signed total adjustment to apportion. */
+  total: number;
+  /** Cost base of the whole holding at the moment of disposal — the
+   *  denominator. Selling 30 of 100 units bears 30%, not the whole thing. */
+  denominator: number;
+}
+
 export function computeDisposal(
   parcel: Parcel,
   quantity: number,
   price: number,
   disposalDate: string,
+  amit?: DisposalAmit,
 ): Disposal {
   // Cost base is per unit, so a partial sale takes a proportional slice and the
   // parcel's whole basis is conserved across the sale that empties it.
   const wholeCostBase = round4(
     parcel.quantity * parcel.price + parcel.brokerage,
   );
-  const costBase = round4(wholeCostBase * (quantity / parcel.quantity));
+  const preAdjustment = round4(wholeCostBase * (quantity / parcel.quantity));
+  // The AMIT share is apportioned on this row's PRE-adjustment cost base, and
+  // added to it: a negative total (a cost base reduction) lowers the basis and
+  // therefore raises the gain.
+  const amitShare =
+    amit && amit.denominator > 0 && amit.total !== 0
+      ? round4((amit.total * preAdjustment) / amit.denominator)
+      : 0;
+  const costBase = round4(preAdjustment + amitShare);
   const proceeds = round4(quantity * price);
   const nominalGain = round4(proceeds - costBase);
   const rule = adjustmentFor(parcel.acquired_date, disposalDate);
@@ -115,6 +136,7 @@ export function computeDisposal(
     quantity,
     proceeds,
     costBase,
+    amitShare,
     nominalGain,
     discountApplied: round4(netGain - nominalGain),
     netGain,

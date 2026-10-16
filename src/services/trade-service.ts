@@ -9,6 +9,7 @@ import {
   deleteDisposalsForStock,
 } from '../dao/disposals.js';
 import { computeFinanceYear } from '../utils/finance-year.js';
+import { totalAdjustment } from '../dao/cost-base-adjustments.js';
 import { todayIso } from '../utils/dates.js';
 import { allocateFifo, computeDisposal, type Disposal } from './cgt-service.js';
 
@@ -127,20 +128,43 @@ export async function replayStock(
   );
 
   const produced: Array<Disposal & { tradeId: number }> = [];
+  // One lookup for the whole replay: the fund's signed adjustment total.
+  const amitTotal = await totalAdjustment(finance, stockId);
+  // The AMIT denominator is the FUND's cost base as acquired, and it is
+  // CONSTANT across every sale in the replay. A denominator that shrank as
+  // units were sold would make each sale re-bear a full pro-rata share, so a
+  // liquidation split across two sales would total more than the fund
+  // adjustment — breaking the conservation invariant in spec 9.1 check 2.
+  const denominator = round4(
+    parcels.reduce((s, p) => s + p.quantity * p.price + p.brokerage, 0),
+  );
+
   for (const t of withPending) {
     if (t.side !== 'sell') continue;
-    const available = parcels.filter(
-      (p) => remaining.get(p.origin_trade_id)! > 0 && p.acquired_date <= t.date,
-    );
-    const held = available.reduce(
-      (s, p) => s + remaining.get(p.origin_trade_id)!,
-      0,
-    );
+    const open = parcels
+      .filter((p) => p.acquired_date <= t.date)
+      .map((p) => ({ p, left: remaining.get(p.origin_trade_id)! }))
+      .filter((r) => r.left > 0);
+    const held = open.reduce((s, r) => s + r.left, 0);
     if (t.quantity > held)
       throw new AllocationDoesNotBalanceError(
         t.id,
         `Selling ${t.quantity} on ${t.date} needs more units than exist by then — only ${held} on hand at that date.`,
       );
+    // allocateFifo consumes whole parcels, so hand it the REMAINING quantities.
+    // Passing the original quantities would let a second sale take units a
+    // first sale already consumed. The brokerage must be scaled with the
+    // remainder too, or it is charged in full to every partial sale and the
+    // parcel's basis stops conserving.
+    const available = open.map((r) =>
+      r.left === r.p.quantity
+        ? r.p
+        : {
+            ...r.p,
+            quantity: r.left,
+            brokerage: (r.p.brokerage * r.left) / r.p.quantity,
+          },
+    );
     for (const { parcel, quantity } of allocateFifo(available, t.quantity)) {
       remaining.set(
         parcel.origin_trade_id,
@@ -149,12 +173,19 @@ export async function replayStock(
       // The trade id travels with the disposal rather than being matched back
       // by date: two sells on one date would otherwise cross-assign.
       produced.push({
-        ...computeDisposal(parcel, quantity, t.price, t.date),
+        ...computeDisposal(parcel, quantity, t.price, t.date, {
+          total: amitTotal,
+          denominator,
+        }),
         tradeId: t.id,
       });
     }
   }
   return produced;
+}
+
+function round4(n: number): number {
+  return Math.round(n * 10000) / 10000;
 }
 
 function toSeed(trade: Trade, d: Disposal): DisposalSeed {
@@ -167,6 +198,7 @@ function toSeed(trade: Trade, d: Disposal): DisposalSeed {
     quantity: d.quantity,
     proceeds: d.proceeds,
     cost_base: d.costBase,
+    amit_share: d.amitShare,
     nominal_gain: d.nominalGain,
     discount_applied: d.discountApplied,
     net_gain: d.netGain,

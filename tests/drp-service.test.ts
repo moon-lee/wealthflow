@@ -6,6 +6,9 @@ import { listTrades, updateTrade } from '../src/dao/trades.js';
 import { listParcels } from '../src/dao/parcels.js';
 import { listAdjustments } from '../src/dao/cost-base-adjustments.js';
 import { rebuildParcels } from '../src/services/parcel-service.js';
+import { createTrade } from '../src/dao/trades.js';
+import { listDisposals } from '../src/dao/disposals.js';
+import { rebuildDisposals } from '../src/services/trade-service.js';
 import {
   logDividendWithDrp,
   deleteDividendWithDrp,
@@ -327,6 +330,104 @@ describe('AMIT allocation (spec 6.1 and 9.1)', () => {
     expect(rows[1].costBasePreAdjustment).toBeCloseTo(7000, 4);
     expect(rows[0].adjustmentShare).toBeCloseTo(-300, 4);
     expect(rows[1].adjustmentShare).toBeCloseTo(-700, 4);
+  });
+});
+
+describe('AMIT reaches the real disposal pipeline', () => {
+  it('folds the pro-rata share into the stored cost base', async () => {
+    const { f, s } = await fund();
+    // 100 units at $100 = $10,000, one -$1,000 adjustment.
+    await logDividendWithDrp(f, div(s, { date: '2023-01-02' }), {
+      amountReinvested: 10000,
+      unitsAcquired: 100,
+    });
+    await f.db.table('wealthflow_cost_base_adjustments').insert({
+      stock_id: s.id,
+      date: '2023-08-01',
+      amount: -1000,
+      reason: 'AMIT',
+    });
+    await rebuildParcels(f, s.id);
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 30,
+      price: 150,
+    });
+    await rebuildDisposals(f, s.id);
+    const rows = await listDisposals(f);
+    expect(rows).toHaveLength(1);
+    // Without the AMIT wiring this would read 3000 and the tax figure would
+    // overstate the gain by $300.
+    expect(rows[0].cost_base).toBeCloseTo(2700, 4);
+    expect(rows[0].amit_share).toBeCloseTo(-300, 4);
+    expect(rows[0].nominal_gain).toBeCloseTo(4500 - 2700, 4);
+  });
+
+  it('conserves the whole adjustment over a full liquidation (spec 9.1 check 2)', async () => {
+    const { f, s } = await fund();
+    await logDividendWithDrp(f, div(s, { date: '2023-01-02' }), {
+      amountReinvested: 3000,
+      unitsAcquired: 30,
+    });
+    await logDividendWithDrp(f, div(s, { date: '2023-06-02' }), {
+      amountReinvested: 7000,
+      unitsAcquired: 70,
+    });
+    for (const amount of [-3.19, 0, 0.55])
+      await f.db.table('wealthflow_cost_base_adjustments').insert({
+        stock_id: s.id,
+        date: '2024-07-01',
+        amount,
+        reason: 'AMIT',
+      });
+    await rebuildParcels(f, s.id);
+    // Split the liquidation so FIFO has to work across parcels and the
+    // conservation invariant is exercised, not just a single row.
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-01-05',
+      side: 'sell',
+      quantity: 30,
+      price: 150,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 70,
+      price: 150,
+    });
+    await rebuildDisposals(f, s.id);
+    const rows = await listDisposals(f);
+    expect(rows).toHaveLength(2);
+    const total = rows.reduce((a, r) => a + r.amit_share, 0);
+    expect(round4(total)).toBeCloseTo(-2.64, 10);
+    expect(round4(rows.reduce((a, r) => a + r.cost_base, 0))).toBeCloseTo(
+      10000 - 2.64,
+      4,
+    );
+  });
+
+  it('leaves a fund with no adjustments completely untouched', async () => {
+    const { f, s } = await fund();
+    await logDividendWithDrp(f, div(s, { date: '2023-01-02' }), {
+      amountReinvested: 5000,
+      unitsAcquired: 50,
+    });
+    await rebuildParcels(f, s.id);
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-10-16',
+      side: 'sell',
+      quantity: 50,
+      price: 120,
+    });
+    await rebuildDisposals(f, s.id);
+    const rows = await listDisposals(f);
+    expect(rows[0].amit_share).toBe(0);
+    expect(rows[0].cost_base).toBeCloseTo(5000, 4);
   });
 });
 
