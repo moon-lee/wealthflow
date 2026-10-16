@@ -110,4 +110,20 @@ describe('orchestrator: trades tab', () => {
     expect(log.sortedTrades.map((t: any) => t.date)).toEqual(['2026-09-10']);
     o.remove();
   });
+
+  it('opens Trades from init(), which is how the dev harness mounts it', async () => {
+    // index.html calls panel.init(finance, { view }) directly rather than
+    // navigate(), because it owns the panel instead of activate().
+    const f: any = createMockFinance();
+    const o = document.createElement('wealthflow-orchestrator') as any;
+    document.body.appendChild(o);
+    await o.init(f, { view: 'trades', fy: '2026-2027' });
+    await o.updateComplete;
+    expect(o.tab).toBe('trades');
+    expect(o.fy).toBe('2026-2027');
+    expect(o.renderRoot.querySelector('#child')?.tagName.toLowerCase()).toBe(
+      'trades-view',
+    );
+    o.remove();
+  });
 });
