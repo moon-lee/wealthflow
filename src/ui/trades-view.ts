@@ -2,6 +2,7 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import { rebuildAllParcels } from '../services/parcel-service.js';
+import { listParcels } from '../dao/parcels.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -41,7 +42,6 @@ export class TradesView extends Base {
       // remembering to refresh on every path that can change a trade — and at
       // 46 parcels the cost is nothing.
       await rebuildAllParcels(this.finance);
-      const { listParcels } = await import('../dao/parcels.js');
       this.parcelCount = (await listParcels(this.finance)).length;
       await this.pushToChildren();
     } catch (e: any) {
