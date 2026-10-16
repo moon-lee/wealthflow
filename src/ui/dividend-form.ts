@@ -7,11 +7,16 @@ import { listStocks, type Stock } from '../dao/stocks.js';
 import {
   DIVIDEND_TYPES,
   DIVIDEND_LABELS,
-  createDividend,
-  updateDividend,
-  deleteDividend,
   type DividendEntry,
 } from '../dao/dividends.js';
+import {
+  createAdjustment,
+  totalAdjustment,
+} from '../dao/cost-base-adjustments.js';
+import {
+  logDividendWithDrp,
+  deleteDividendWithDrp,
+} from '../services/drp-service.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -22,6 +27,17 @@ const logger = new ExtensionLogger('wealthflow');
 function today(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+/** 6dp: a DRP price per unit carries fractional-unit precision, and rounding
+ *  it to cents would move the cost base of the resulting parcel. */
+function round6(n: number): number {
+  return Math.round(n * 1e6) / 1e6;
+}
+
+/** Adjustment amounts are shown at 4dp, not 2dp (spec 9.1). */
+function formatAdjustment(n: number): string {
+  return n.toFixed(4);
 }
 
 /**
@@ -48,6 +64,25 @@ export class DividendForm extends Base {
   saving = false;
   touched = false;
 
+  /* --- DRP (spec 6.4 / 7.5) -----------------------------------------------
+     Two fields and a checkbox, not a separate form. A DRP is a buy: the money
+     and the units both come from the dividend line, so they belong where that
+     line is already being entered. */
+  drpEnabled = false;
+  amountReinvested = '';
+  unitsAcquired = '';
+
+  /** AMIT cost base adjustment printed on the distribution line of the annual
+   *  tax statement (spec 7.5). Blank is "not recorded"; 0 is a real answer. */
+  amitAdjustment = '';
+  /** The fund's signed running total, shown at 4dp — the headline figure, not
+   *  a per-parcel share. See spec 9.1. */
+  fundAdjustment = 0;
+
+  /** Non-error feedback: a DRP that bought nothing, or a coupled write that
+   *  succeeded. Distinct from `error`, which blocks the form. */
+  notice = '';
+
   async setFinance(f: any): Promise<void> {
     this.finance = f;
     await this.reload();
@@ -58,10 +93,34 @@ export class DividendForm extends Base {
     try {
       this.stocks = await listStocks(this.finance, { status: 'all' });
       if (this.date === '') this.date = today();
+      // The running total belongs to the SELECTED fund, not to whichever
+      // receipt is open for edit — otherwise the number moves when you switch
+      // between receipts of different stocks.
+      const stockId = this.stockId;
+      this.fundAdjustment =
+        stockId == null ? 0 : await totalAdjustment(this.finance, stockId);
     } catch (e: any) {
       this.error = String(e?.message || e);
     }
     (this as any).requestUpdate?.();
+  }
+
+  /** The DRP price per unit. Derived, never typed: it is a consequence of the
+   *  money and the units, and a hand-typed copy would eventually disagree with
+   *  them. Null when there is nothing to derive it from. */
+  get drpPrice(): number | null {
+    const money = Number(this.amountReinvested);
+    const units = Number(this.unitsAcquired);
+    if (!Number.isFinite(money) || !Number.isFinite(units)) return null;
+    if (units <= 0) return null;
+    if (!Number.isFinite(money) || money <= 0) return null;
+    return round6(money / units);
+  }
+
+  /** The exact string rendered for the derived price. Exposed so the
+   *  precision decision is assertable without scraping shadow DOM. */
+  get drpPriceLabel(): string {
+    return this.drpPrice === null ? '—' : this.drpPrice.toFixed(6);
   }
 
   /* Per-field validation: the message renders under the offending control
@@ -88,12 +147,40 @@ export class DividendForm extends Base {
     return Number.isFinite(n) && n >= 0 ? null : 'Franking must be ≥ 0.';
   }
 
+  private get drpError(): string | null {
+    if (!this.drpEnabled) return null;
+    const money =
+      this.amountReinvested.trim() === '' ? 0 : Number(this.amountReinvested);
+    const units =
+      this.unitsAcquired.trim() === '' ? 0 : Number(this.unitsAcquired);
+    if (!Number.isFinite(money) || money < 0)
+      return 'Amount reinvested must be ≥ 0.';
+    if (!Number.isFinite(units) || units < 0)
+      return 'Units acquired must be ≥ 0.';
+    // Units without money has no price to record, so it cannot be stored. Money
+    // without units is the opposite and is allowed — the reinvestment rounded
+    // to nothing — and surfaces as a notice instead.
+    if (units > 0 && money <= 0)
+      return `${units} units for $0 — there is no DRP price to record.`;
+    return null;
+  }
+
+  private get amitError(): string | null {
+    if (this.amitAdjustment.trim() === '') return null;
+    const n = Number(this.amitAdjustment);
+    if (!Number.isFinite(n))
+      return 'AMIT adjustment must be a number, or blank if not recorded.';
+    return null;
+  }
+
   private get canSave(): boolean {
     return (
       this.stockError === null &&
       this.dateError === null &&
       this.grossError === null &&
       this.frankingError === null &&
+      this.drpError === null &&
+      this.amitError === null &&
       !this.saving
     );
   }
@@ -118,10 +205,17 @@ export class DividendForm extends Base {
     this.gross = entry ? String(entry.gross) : '';
     this.franking = entry ? String(entry.franking ?? 0) : '';
     this.notes = entry ? (entry.notes ?? '') : '';
+    const invested = entry ? Number(entry.amount_reinvested ?? 0) : 0;
+    const units = entry ? Number(entry.units_acquired ?? 0) : 0;
+    this.drpEnabled = invested > 0 || units > 0;
+    this.amountReinvested = invested > 0 ? String(invested) : '';
+    this.unitsAcquired = units > 0 ? String(units) : '';
     this.touched = false;
     this.error = '';
+    this.notice = '';
     (this as any).requestUpdate?.();
     void this.focusFirst();
+    void this.reload();
   }
 
   private async focusFirst(): Promise<void> {
@@ -171,31 +265,59 @@ export class DividendForm extends Base {
       finance_year: this.autoFy,
       notes: this.notes.trim() === '' ? null : this.notes.trim(),
     };
+    const drp = this.drpEnabled
+      ? {
+          amountReinvested:
+            this.amountReinvested.trim() === ''
+              ? 0
+              : Number(this.amountReinvested),
+          unitsAcquired:
+            this.unitsAcquired.trim() === '' ? 0 : Number(this.unitsAcquired),
+        }
+      : null;
     this.saving = true;
+    this.notice = '';
     (this as any).requestUpdate?.();
     let saved = false;
     try {
-      if (this.editId == null) {
-        const row = await createDividend(this.finance, payload, '07-01');
+      // One coupled write, not two calls. The dividend and any DRP parcel are
+      // written together or not at all (spec 6.4).
+      const wasEdit = this.editId != null;
+      const out = await logDividendWithDrp(this.finance, payload as any, drp, {
+        dividendId: this.editId ?? undefined,
+      });
+      // The AMIT figure rides along with the same submit: it is printed on the
+      // same statement line, so it has no separate form and no separate event.
+      if (this.amitAdjustment.trim() !== '') {
+        await createAdjustment(this.finance, {
+          stock_id: payload.stock_id,
+          date: this.date,
+          amount: Number(this.amitAdjustment),
+          reason: 'AMIT cost base adjustment',
+        });
+      }
+      this.notice = out.note ?? '';
+      if (wasEdit) {
         this.dispatchEvent(
-          new CustomEvent('dividend-create', {
-            detail: { entry: row },
+          new CustomEvent('dividend-edit', {
+            detail: { id: out.dividend.id },
             bubbles: true,
             composed: true,
           }),
         );
       } else {
-        await updateDividend(this.finance, this.editId, payload);
         this.dispatchEvent(
-          new CustomEvent('dividend-edit', {
-            detail: { id: this.editId },
+          new CustomEvent('dividend-create', {
+            detail: { entry: out.dividend },
             bubbles: true,
             composed: true,
           }),
         );
       }
       saved = true;
+      const keepNotice = this.notice;
       this.editEntry(null);
+      this.notice = keepNotice;
     } catch (err: any) {
       logger.error('dividend save failed:', err);
       this.error = String(err?.message || err);
@@ -220,7 +342,7 @@ export class DividendForm extends Base {
       return;
     const id = this.editId;
     try {
-      await deleteDividend(this.finance, id);
+      await deleteDividendWithDrp(this.finance, id);
       this.dispatchEvent(
         new CustomEvent('dividend-delete', {
           detail: { id },
@@ -281,6 +403,13 @@ export class DividendForm extends Base {
             this.error
               ? html`<p class="field-error" role="alert" aria-live="polite">
                   Error: ${this.error}
+                </p>`
+              : ''
+          }
+          ${
+            this.notice
+              ? html`<p class="muted" role="status" aria-live="polite">
+                  ${this.notice}
                 </p>`
               : ''
           }
@@ -406,6 +535,124 @@ export class DividendForm extends Base {
                   placeholder="Optional"
                 />
               </label>
+            </div>
+
+            <!-- AMIT cost base adjustment. Same distribution line as the rest
+                 of this form, so it is captured here rather than on a view of
+                 its own (spec 7.5). -->
+            <div class="field-grid">
+              <label class="field span-2"
+                ><span>AMIT cost base adjustment</span>
+                <input
+                  aria-label="AMIT cost base adjustment"
+                  inputmode="decimal"
+                  .value=${this.amitAdjustment}
+                  @input=${(e: Event) => {
+                    this.amitAdjustment = (e.target as HTMLInputElement).value;
+                    this.touched = true;
+                    (this as any).requestUpdate?.();
+                  }}
+                  placeholder="blank if not printed"
+                />
+                ${
+                  this.errorFor(this.amitError)
+                    ? html`<p class="field-error">${this.amitError}</p>`
+                    : html`<p class="muted">
+                        From the distribution line of your annual tax statement.
+                        A cost base <em>reduction</em> is negative. Leave blank
+                        if it was not printed — 0 and blank mean different
+                        things.
+                      </p>`
+                }
+              </label>
+              <div class="field">
+                <span>Fund adjustment to date</span>
+                <div class="stat-value">
+                  ${formatAdjustment(this.fundAdjustment)}
+                </div>
+                <p class="muted">
+                  Signed total for this fund, at 4dp so the per-parcel shares
+                  add back to it exactly.
+                </p>
+              </div>
+            </div>
+
+            <!-- DRP: one payment, two consequences. -->
+            <div class="field-grid">
+              <label class="field span-3">
+                <span>
+                  <input
+                    type="checkbox"
+                    aria-label="This distribution was reinvested (DRP)"
+                    .checked=${this.drpEnabled}
+                    @change=${(e: Event) => {
+                      this.drpEnabled = (e.target as HTMLInputElement).checked;
+                      this.notice = '';
+                      this.touched = true;
+                      (this as any).requestUpdate?.();
+                    }}
+                  />
+                  Reinvested (DRP) — records a dividend
+                  <em class="req">and</em> a parcel
+                </span>
+              </label>
+            </div>
+            ${
+              this.drpEnabled
+                ? html`
+                    <div class="field-grid">
+                      <label class="field"
+                        ><span>Amount reinvested</span>
+                        <input
+                          aria-label="Amount reinvested"
+                          inputmode="decimal"
+                          .value=${this.amountReinvested}
+                          @input=${(e: Event) => {
+                            this.amountReinvested = (
+                              e.target as HTMLInputElement
+                            ).value;
+                            this.notice = '';
+                            this.touched = true;
+                            (this as any).requestUpdate?.();
+                          }}
+                          placeholder="0.00"
+                        />
+                      </label>
+                      <label class="field"
+                        ><span>Units acquired</span>
+                        <input
+                          aria-label="Units acquired"
+                          inputmode="decimal"
+                          .value=${this.unitsAcquired}
+                          @input=${(e: Event) => {
+                            this.unitsAcquired = (
+                              e.target as HTMLInputElement
+                            ).value;
+                            this.notice = '';
+                            this.touched = true;
+                            (this as any).requestUpdate?.();
+                          }}
+                          placeholder="0.000000"
+                        />
+                      </label>
+                      <div class="field">
+                        <span>DRP price per unit</span>
+                        <div class="stat-value">${this.drpPriceLabel}</div>
+                        <p class="muted">
+                          Derived, not a market quote. DRP units typically buy
+                          in at a discount, and a parcel cannot be back-filled
+                          from a later price.
+                        </p>
+                      </div>
+                    </div>
+                    ${
+                      this.errorFor(this.drpError)
+                        ? html`<p class="field-error">${this.drpError}</p>`
+                        : ''
+                    }
+                  `
+                : ''
+            }
             </div>
           </form>
         </div>
