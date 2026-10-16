@@ -3,5 +3,7 @@ dist/
 build/
 .DS_Store
 *.log
+# Brainstorming mockup workspace
+.superpowers/
 # Personal seed data (real amounts, accounts) — never commit.
 src/seed/
