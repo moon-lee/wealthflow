@@ -125,7 +125,7 @@ export function audit(parsed) {
 if (process.argv[1] && process.argv[1].endsWith('import-sharesight.mjs')) {
   const path = process.argv[2] ?? 'docs/AllTradesReport.xlsx';
   const rows = readSheet1(readFileSync(path));
-  const { accepted, rejected } = parseTrades(rows);
+  const { accepted, rejected, heldCounts } = parseTrades(rows);
 
   console.log(`\nsource: ${path}`);
   console.log(`held codes: ${HELD_CODES.join(', ')}\n`);
