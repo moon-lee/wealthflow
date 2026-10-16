@@ -26,6 +26,8 @@ export class TradesView extends Base {
   error = '';
   segment: 'trades' | 'parcels' = 'trades';
   showForm = true;
+  /** Parcel count for the header badge; set by reload, which rebuilds anyway. */
+  parcelCount = 0;
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -39,6 +41,8 @@ export class TradesView extends Base {
       // remembering to refresh on every path that can change a trade — and at
       // 46 parcels the cost is nothing.
       await rebuildAllParcels(this.finance);
+      const { listParcels } = await import('../dao/parcels.js');
+      this.parcelCount = (await listParcels(this.finance)).length;
       await this.pushToChildren();
     } catch (e: any) {
       this.error = String(e?.message || e);
@@ -125,58 +129,59 @@ export class TradesView extends Base {
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
+    const onTrades = this.segment === 'trades';
     return html`
       <div class="order-stack">
-        ${
-          this.error
-            ? html`<p class="field-error">Error: ${this.error}</p>`
-            : ''
-        }
-        <div class="segment" role="tablist">
-          <button
-            role="tab"
-            class=${this.segment === 'trades' ? 'on' : ''}
-            aria-selected=${this.segment === 'trades'}
-            @click=${() => this.setSegment('trades')}
-          >
-            Trades
-          </button>
-          <button
-            role="tab"
-            class=${this.segment === 'parcels' ? 'on' : ''}
-            aria-selected=${this.segment === 'parcels'}
-            @click=${() => this.setSegment('parcels')}
-          >
-            Parcels
-          </button>
+        <div class="section flush">
+          <div class="section-header">
+            <div class="segment" role="tablist" aria-label="Trades sections">
+              <button
+                role="tab"
+                class="filter-btn ${onTrades ? 'active' : ''}"
+                aria-selected=${onTrades}
+                @click=${() => this.setSegment('trades')}
+              >
+                Trades
+              </button>
+              <button
+                role="tab"
+                class="filter-btn ${onTrades ? '' : 'active'}"
+                aria-selected=${!onTrades}
+                @click=${() => this.setSegment('parcels')}
+              >
+                Parcels
+              </button>
+            </div>
+            <div class="header-actions">
+              ${
+                onTrades
+                  ? html`<button
+                      class="btn btn-secondary btn-small"
+                      @click=${() => {
+                        this.showForm = !this.showForm;
+                        (this as any).requestUpdate?.();
+                      }}
+                    >
+                      ${this.showForm ? 'Hide form' : 'Log buy'}
+                    </button>`
+                  : html`<span class="muted">${this.parcelCount} parcels</span>`
+              }
+            </div>
+          </div>
+          <div class="section-body">
+            ${
+              this.error
+                ? html`<p class="field-error">Error: ${this.error}</p>`
+                : ''
+            }
+            ${
+              onTrades
+                ? html`${this.showForm ? html`<trade-form></trade-form>` : ''}
+                    <trade-log></trade-log>`
+                : html`<parcel-ledger></parcel-ledger>`
+            }
+          </div>
         </div>
-
-        ${
-          this.segment === 'trades'
-            ? html`
-                <div class="section flush">
-                  <div class="section-header is-toggle">
-                    <h3 class="section-title">Trades</h3>
-                    <div class="header-actions">
-                      <button
-                        class="btn btn-secondary btn-small"
-                        @click=${() => {
-                          this.showForm = !this.showForm;
-                          (this as any).requestUpdate?.();
-                        }}
-                      >
-                        ${this.showForm ? 'Hide form' : 'Log buy'}
-                      </button>
-                    </div>
-                  </div>
-                  <div class="section-body">
-                    ${this.showForm ? html`<trade-form></trade-form>` : ''}
-                    <trade-log></trade-log>
-                  </div>
-                </div>
-              `
-            : html`<parcel-ledger></parcel-ledger>`
-        }
       </div>
     `;
   }

@@ -85,6 +85,27 @@ export const wealthflowStyles = css`
     border-color: var(--ff-accent, #007acc);
     color: var(--ff-text-strong, #fff);
   }
+  /* Segmented control living in a section header, beside the contextual action.
+     Same button as .filter-btn; the active state is scoped to the header rather
+     than the topbar because this one is not in the topbar. */
+  .section-header .filter-btn {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ff-text-muted, #9a9a9a);
+    padding: 3px 10px;
+    border-radius: 3px;
+    font-size: var(--ff-font-base, 14px);
+  }
+  .section-header .filter-btn:hover {
+    color: var(--ff-text, #d4d4d4);
+    background: var(--ff-bg-input, #3c3c3c);
+  }
+  .section-header .filter-btn.active {
+    color: var(--ff-text-strong, #fff);
+    background: var(--ff-bg-input, #3c3c3c);
+    border-color: var(--ff-border, #3e3e3e);
+    font-weight: 600;
+  }
   .topbar select {
     background: var(--ff-bg-input, #3c3c3c);
     color: var(--ff-text, #d4d4d4);

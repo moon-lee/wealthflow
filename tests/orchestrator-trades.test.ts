@@ -111,6 +111,61 @@ describe('orchestrator: trades tab', () => {
     o.remove();
   });
 
+  it('puts the Trades/Parcels toggle in the section header, not above it', async () => {
+    const v = document.createElement('trades-view') as any;
+    document.body.appendChild(v);
+    v.finance = createMockFinance();
+    await v.setFinance(v.finance);
+    await v.updateComplete;
+    const header = v.renderRoot.querySelector('.section-header') as any;
+    expect(header).toBeTruthy();
+    const tabs = [...header.querySelectorAll('[role="tab"]')].map((b: any) =>
+      b.textContent.trim(),
+    );
+    expect(tabs).toEqual(['Trades', 'Parcels']);
+    // The active one is marked, so the control reads as segmented rather than
+    // as two loose buttons.
+    expect(header.querySelector('[role="tab"].active')?.textContent.trim()).toBe(
+      'Trades',
+    );
+    // The contextual action sits on the same header row.
+    expect(header.querySelector('.header-actions button')?.textContent.trim()).toBe(
+      'Hide form',
+    );
+    v.remove();
+  });
+
+  it('shows a parcel count instead of the buy action on the Parcels segment', async () => {
+    const f: any = createMockFinance();
+    const v: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: v.id,
+      date: '2026-09-10',
+      side: 'buy',
+      quantity: 7,
+      price: 110,
+      brokerage: 3,
+    });
+    await rebuildParcels(f, v.id);
+
+    const view = document.createElement('trades-view') as any;
+    document.body.appendChild(view);
+    view.finance = f;
+    await view.setFinance(f);
+    view.setSegment('parcels');
+    await view.updateComplete;
+    const header = view.renderRoot.querySelector('.section-header') as any;
+    expect(header.querySelector('.header-actions')?.textContent).toMatch(
+      /1 parcels/,
+    );
+    expect(header.querySelector('.header-actions button')).toBeNull();
+    view.remove();
+  });
+
   it('opens Trades from init(), which is how the dev harness mounts it', async () => {
     // index.html calls panel.init(finance, { view }) directly rather than
     // navigate(), because it owns the panel instead of activate().
