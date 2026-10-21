@@ -248,8 +248,6 @@ export class CgtSection extends Base {
     this.copyNotice = 'Copied to the clipboard.';
     (this as any).requestUpdate?.();
   }
-
-  copyNotice = '';
 }
 
 if (
