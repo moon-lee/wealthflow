@@ -324,8 +324,12 @@ export class BankList extends Base {
         <td class="mono num">
           ${
             b.bsb
-              ? html`${formatBSB(b.bsb)}
-                  <span class="muted">${maskAccount(b.account_number)}</span>`
+              ? html`<span
+                  >${formatBSB(b.bsb)}
+                  <span class="muted"
+                    >${maskAccount(b.account_number)}</span
+                  ></span
+                >`
               : html`<span class="muted"
                   >no BSB · ${maskAccount(b.account_number)}</span
                 >`

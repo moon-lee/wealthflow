@@ -291,12 +291,12 @@ This is a correction to an earlier draft of this document, which allowlisted an 
 
 The owner holds VAS, VHY and FGX. `wealthflow_stocks.shares` is hand-typed and must become derived, or existing holdings will read as zero units.
 
-**The full acquisition history is already known.** Reconciled against `AllTradesReport.xlsx`, the three held positions total **1,296 units across 46 parcels** and a **$18,048.15** cost base:
+**The full acquisition history is already known.** Reconciled against `AllTradesReport.xlsx`, the three held positions total **1,297 units across 46 parcels** and a **$18,130.86** cost base post-AMIT ($18,146.12 as acquired):
 
 | | Units | Parcels | Cost base | Discount-eligible |
 | --- | ---: | ---: | ---: | --- |
 | VAS | 165 | 32 | $15,233.73 | 154 of 165 |
-| VHY | 22 | 5 | $1,530.34 | 22 of 22 |
+| VHY | 23 | 5 | $1,613.05 | 23 of 23 |
 | FGX | 1,109 | 9 | $1,284.08 | 832 of 1,109 |
 
 Every parcel comes from exactly one trade, and there are **no disposals, splits or consolidations** across the whole portfolio — so the parcel-is-one-trade invariant holds exactly as the data stands. The import path is a **one-off importer** that reads the ShareSight workbook and writes trades, not an "opening position" form requiring the owner to reconstruct dates.

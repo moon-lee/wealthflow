@@ -24,10 +24,53 @@ export async function activate(
     'wealthflow.refresh',
     'Refresh Wealth Flow',
     async () => {
+      // A refresh means "give me the current numbers", and the current price
+      // is the one that moves. The host is plain Node, so the fetch belongs
+      // here rather than in the panel.
       try {
+        const { updatePrices } = await import('./services/price-service.js');
+        const prices = await updatePrices(finance);
+        logger.info('refreshed prices', {
+          updated: prices.updated,
+          failed: prices.failed,
+        });
+      } catch (err) {
+        logger.error('wealthflow refresh prices failed', err);
+      }
+      try {
+        // No `view` in the payload: this is DATA, not a navigation. The panel
+        // re-reads the current screen and stays where it is.
         await finance.ui?.pushData?.('wealthflow', { refreshedAt: Date.now() });
       } catch (err) {
         logger.error('wealthflow refresh failed', err);
+      }
+    },
+  );
+  // Fetch the current market price for every holding.
+  //
+  // HOST SIDE ONLY, and deliberately so. The panel is a browser context: a
+  // cross-origin fetch from there is blocked, and the extension has no way to
+  // relax that. The host is plain Node, so it can reach the ASX and Yahoo
+  // endpoints directly.
+  //
+  // The panel calls this through the command bridge and then re-reads the
+  // price table, so nothing is pushed back to it — a push would retarget the
+  // open panel, which is not what updating a price should do.
+  finance.commands.registerCommand(
+    'wealthflow.update-prices',
+    'Wealth Flow: Update Prices',
+    async () => {
+      try {
+        const { updatePrices } = await import('./services/price-service.js');
+        const result = await updatePrices(finance);
+        logger.info('update-prices', {
+          updated: result.updated,
+          failed: result.failed,
+        });
+        return result;
+      } catch (err) {
+        logger.error('update-prices failed', err);
+        return null;
       }
     },
   );
@@ -95,16 +138,36 @@ export async function activate(
       // Retargets of the open panel (sidebar nav while mounted) arrive as DOM
       // 'mount-update' dispatched ON #app by panel-bootstrap — listen there,
       // not on the orchestrator child (parent-dispatched events never reach children).
-      app.addEventListener('mount-update', (e: Event) => {
-        const detail = (e as CustomEvent).detail as { view?: string } & Record<
-          string,
-          unknown
-        >;
-        if (typeof el.init === 'function')
-          void el.init(finance, { view: detail.view ?? 'overview', ...detail });
-      });
+      listenForHostPush(app, el, finance, base);
     }
   }
+}
+
+/**
+ * Listen for the host's panel pushes.
+ *
+ * A push that carries a `view` is a RETARGET — the sidebar moved the panel.
+ * A push without one is DATA — a refresh — and must re-read the current
+ * screen WITHOUT moving the user. Treating a refresh as a retarget used to
+ * throw the user to Overview.
+ */
+export function listenForHostPush(
+  app: HTMLElement,
+  el: any,
+  finance: FinanceApi,
+  base: Record<string, unknown> = {},
+): void {
+  app.addEventListener('mount-update', (e: Event) => {
+    const detail = (e as CustomEvent).detail as
+      { view?: string } | Record<string, unknown>;
+    if (typeof el.init !== 'function') return;
+    const view = (detail as { view?: string })?.view;
+    if (typeof view === 'string') {
+      void el.init(finance, { view, ...base });
+      return;
+    }
+    if (typeof el.refresh === 'function') void el.refresh();
+  });
 }
 
 export function deactivate(): void {

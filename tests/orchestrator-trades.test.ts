@@ -64,19 +64,17 @@ describe('orchestrator: trades tab', () => {
     o.remove();
   });
 
-  it('switches between the Trades log and the parcel ledger', async () => {
+  it('shows the Trades log and the parcel ledger on the SAME page', async () => {
     const v = document.createElement('trades-view') as any;
     document.body.appendChild(v);
     v.finance = createMockFinance();
     await v.setFinance(v.finance);
     await v.updateComplete;
+    // The segment control is gone. A log and the ledger of that log belong on
+    // one page, not behind a switch that hides one of them.
     expect(v.renderRoot.querySelector('trade-log')).toBeTruthy();
-    expect(v.renderRoot.querySelector('parcel-ledger')).toBeFalsy();
-    v.segment = 'parcels';
-    v.requestUpdate?.();
-    await v.updateComplete;
     expect(v.renderRoot.querySelector('parcel-ledger')).toBeTruthy();
-    expect(v.renderRoot.querySelector('trade-log')).toBeFalsy();
+    expect(v.renderRoot.querySelector('.segment')).toBeNull();
     v.remove();
   });
 
@@ -111,31 +109,30 @@ describe('orchestrator: trades tab', () => {
     o.remove();
   });
 
-  it('puts the Trades/Parcels toggle in the section header, not above it', async () => {
+  it('gives the four sections their own headers, each with a count badge', async () => {
     const v = document.createElement('trades-view') as any;
     document.body.appendChild(v);
     v.finance = createMockFinance();
     await v.setFinance(v.finance);
     await v.updateComplete;
-    const header = v.renderRoot.querySelector('.section-header') as any;
-    expect(header).toBeTruthy();
-    const tabs = [...header.querySelectorAll('[role="tab"]')].map((b: any) =>
-      b.textContent.trim(),
+    const titles = [...v.renderRoot.querySelectorAll('.section-title')].map(
+      (e: any) => e.textContent.trim(),
     );
-    expect(tabs).toEqual(['Trades', 'Parcels']);
-    // The active one is marked, so the control reads as segmented rather than
-    // as two loose buttons.
-    expect(
-      header.querySelector('[role="tab"].active')?.textContent.trim(),
-    ).toBe('Trades');
-    // The contextual action sits on the same header row.
-    expect(
-      header.querySelector('.header-actions button')?.textContent.trim(),
-    ).toBe('Hide form');
+    expect(titles).toEqual([
+      'Trades Summary',
+      'Investment',
+      'Trades',
+      'Parcels',
+    ]);
+    // The contextual action sits on the Trades section's own header row.
+    const tradesHeader = [
+      ...v.renderRoot.querySelectorAll('.section'),
+    ][2]?.querySelector('.header-actions button');
+    expect(tradesHeader?.textContent.trim()).toBe('Hide form');
     v.remove();
   });
 
-  it('shows a parcel count instead of the buy action on the Parcels segment', async () => {
+  it('shows a parcel count on the Parcels section, which has no buy action', async () => {
     const f: any = createMockFinance();
     const v: any = await createStock(f, {
       stock_code: 'VAS',
@@ -156,13 +153,14 @@ describe('orchestrator: trades tab', () => {
     document.body.appendChild(view);
     view.finance = f;
     await view.setFinance(f);
-    view.setSegment('parcels');
     await view.updateComplete;
-    const header = view.renderRoot.querySelector('.section-header') as any;
-    expect(header.querySelector('.header-actions')?.textContent).toMatch(
-      /1 parcels/,
-    );
-    expect(header.querySelector('.header-actions button')).toBeNull();
+    const parcelsSection = [
+      ...view.renderRoot.querySelectorAll('.section'),
+    ][3] as any;
+    expect(
+      parcelsSection.querySelector('.header-actions')?.textContent,
+    ).toMatch(/1 parcel/);
+    expect(parcelsSection.querySelector('.header-actions button')).toBeNull();
     view.remove();
   });
 

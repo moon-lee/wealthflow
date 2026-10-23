@@ -9,7 +9,7 @@ import {
   deleteDisposalsForStock,
 } from '../dao/disposals.js';
 import { computeFinanceYear } from '../utils/finance-year.js';
-import { totalAdjustment } from '../dao/cost-base-adjustments.js';
+import { totalAdjustmentAsOf } from '../dao/cost-base-adjustments.js';
 import { todayIso } from '../utils/dates.js';
 import { allocateFifo, computeDisposal, type Disposal } from './cgt-service.js';
 
@@ -24,7 +24,7 @@ export interface Allocation {
   discountApplied: number;
   netGain: number;
   eligible: boolean;
-  heldMonths: number;
+  heldMonths: string;
 }
 
 export class AllocationDoesNotBalanceError extends Error {
@@ -87,7 +87,7 @@ export async function replayStock(
   finance: FinanceApi,
   stockId: number,
   opts: { exceptTradeId?: number; pending?: Trade | null } = {},
-): Promise<Disposal[]> {
+): Promise<Array<Disposal & { tradeId: number }>> {
   const stored = await listParcels(finance, { stockId });
   const pending = opts.pending ?? null;
 
@@ -128,8 +128,6 @@ export async function replayStock(
   );
 
   const produced: Array<Disposal & { tradeId: number }> = [];
-  // One lookup for the whole replay: the fund's signed adjustment total.
-  const amitTotal = await totalAdjustment(finance, stockId);
   // The AMIT denominator is the FUND's cost base as acquired, and it is
   // CONSTANT across every sale in the replay. A denominator that shrank as
   // units were sold would make each sale re-bear a full pro-rata share, so a
@@ -170,6 +168,10 @@ export async function replayStock(
         parcel.origin_trade_id,
         remaining.get(parcel.origin_trade_id)! - quantity,
       );
+      // A disposal bears only the adjustments that existed by ITS OWN date.
+      // An adjustment published later cannot have reduced a cost base that
+      // was already gone.
+      const amitTotal = await totalAdjustmentAsOf(finance, stockId, t.date);
       // The trade id travels with the disposal rather than being matched back
       // by date: two sells on one date would otherwise cross-assign.
       produced.push({
@@ -211,7 +213,7 @@ export async function rebuildDisposals(
   finance: FinanceApi,
   stockId: number,
   opts: { exceptTradeId?: number; pending?: Trade | null } = {},
-): Promise<Disposal[]> {
+): Promise<Array<Disposal & { tradeId: number }>> {
   const produced = await replayStock(finance, stockId, opts);
   // Wipe the stock's disposals wholesale rather than per surviving trade: a
   // DELETED sell is no longer in listTrades, so a per-trade loop would leave

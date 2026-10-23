@@ -2,6 +2,7 @@ import type { FinanceApi } from 'finance';
 import { addMonths, monthsBetween } from '../utils/dates.js';
 import type { Parcel, ParcelSeed } from '../dao/parcels.js';
 import { listParcels, replaceParcels } from '../dao/parcels.js';
+import type { DisposalRow } from '../dao/disposals.js';
 import type { Trade } from '../dao/trades.js';
 import { listTrades } from '../dao/trades.js';
 import type { Stock } from '../dao/stocks.js';
@@ -53,9 +54,15 @@ function seedFor(stockId: number, t: Trade): ParcelSeed {
 }
 
 /**
- * Rebuild one stock's parcels from its buy trades and write the summed quantity
- * back to `wealthflow_stocks.shares`. Sell trades are ignored in Phase 1 —
- * Plan 2 reduces parcel quantities instead.
+ * Rebuild one stock's parcels from its buy trades.
+ *
+ * A parcel holds the quantity **as acquired** and is never reduced: it is the
+ * original lot, and FIFO allocates a sale against it. What is LEFT of a lot is
+ * `parcel.quantity` less the disposals that consumed it.
+ *
+ * This does NOT write `wealthflow_stocks.shares`. Units HELD depends on the
+ * disposals, which are rebuilt after this - see `rebuildStock` in
+ * `holding-service.ts`, which owns the whole chain.
  */
 export async function rebuildParcels(
   finance: FinanceApi,
@@ -66,8 +73,6 @@ export async function rebuildParcels(
     .filter((t) => t.side === 'buy')
     .map((t) => seedFor(stockId, t));
   await replaceParcels(finance, stockId, seeds);
-  const units = seeds.reduce((s, p) => s + p.quantity, 0);
-  await updateStock(finance, stockId, { shares: units });
   return listParcels(finance, { stockId });
 }
 
@@ -90,6 +95,7 @@ export interface ParcelGroup {
   stockId: number;
   stockCode: string;
   stockName: string;
+  /** Units HELD: bought less sold. */
   units: number;
   parcelCount: number;
   avgCost: number;
@@ -98,15 +104,33 @@ export interface ParcelGroup {
   notTracked: boolean;
 }
 
+/**
+ * Group a stock's parcels into one row per holding.
+ *
+ * The unit count is units **HELD**, not units bought: a sale reduces the
+ * holding, and a ledger that still says 100 after selling 30 is wrong.
+ */
 export function groupParcels(
   stocks: Pick<Stock, 'id' | 'stock_code' | 'stock_full_name'>[],
   parcels: Parcel[],
   asOf: string,
+  disposals: DisposalRow[] = [],
 ): ParcelGroup[] {
+  const soldByOrigin = new Map<number, number>();
+  for (const d of disposals)
+    soldByOrigin.set(
+      d.origin_trade_id,
+      (soldByOrigin.get(d.origin_trade_id) ?? 0) + d.quantity,
+    );
   return stocks
     .map((s) => {
       const mine = parcels.filter((p) => p.stock_id === s.id);
-      const units = mine.reduce((sum, p) => sum + p.quantity, 0);
+      const units = mine.reduce(
+        (sum, p) =>
+          sum +
+          Math.max(0, p.quantity - (soldByOrigin.get(p.origin_trade_id) ?? 0)),
+        0,
+      );
       const costBase = mine.reduce((sum, p) => sum + parcelCostBase(p), 0);
       return {
         stockId: s.id,
@@ -117,9 +141,28 @@ export function groupParcels(
         avgCost: units > 0 ? round4(costBase / units) : 0,
         eligibleUnits: mine
           .filter((p) => isDiscountEligible(p.acquired_date, asOf))
-          .reduce((sum, p) => sum + p.quantity, 0),
+          .reduce(
+            (sum, p) =>
+              sum +
+              Math.max(
+                0,
+                p.quantity - (soldByOrigin.get(p.origin_trade_id) ?? 0),
+              ),
+            0,
+          ),
         notTracked: mine.length === 0,
       };
     })
     .sort((a, b) => a.stockCode.localeCompare(b.stockCode));
+}
+
+/** How much of a parcel is LEFT after the disposals that consumed it. */
+export function remainingOf(
+  parcel: Pick<Parcel, 'quantity' | 'origin_trade_id'>,
+  disposals: DisposalRow[],
+): number {
+  const sold = disposals
+    .filter((d) => d.origin_trade_id === parcel.origin_trade_id)
+    .reduce((s, d) => s + d.quantity, 0);
+  return round4(Math.max(0, parcel.quantity - sold));
 }

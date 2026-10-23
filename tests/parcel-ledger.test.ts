@@ -168,6 +168,33 @@ describe('parcel ledger', () => {
     el.remove();
   });
 
+  it('styles the acquired date like the other logs do', async () => {
+    const f: any = createMockFinance();
+    const v: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: v.id,
+      date: '2021-09-28',
+      side: 'buy',
+      quantity: 11,
+      price: 94.93,
+      brokerage: 9.5,
+    });
+    await rebuildParcels(f, v.id);
+    const el = await mount(f);
+    el.toggleGroup(v.id);
+    await el.updateComplete;
+    // The same class the dividends list and the trade log use for a date
+    // cell, so the two read as one product.
+    const cell = el.renderRoot.querySelector('tbody td') as any;
+    expect(cell.classList.contains('mono')).toBe(true);
+    expect(cell.textContent.trim()).toBe('2021-09-28');
+    el.remove();
+  });
+
   it('collapses and expands a group', async () => {
     const f: any = createMockFinance();
     const v: any = await createStock(f, {

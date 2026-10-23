@@ -102,7 +102,7 @@ describe('parcel service', () => {
     expect(Math.round(cb * 100) / 100).toBe(15238.16);
   });
 
-  it('derives one parcel per buy and writes derived shares', async () => {
+  it('derives one parcel per buy, and leaves the shares to the holding service', async () => {
     const f: any = createMockFinance();
     const vas: any = await createStock(f, {
       stock_code: 'VAS',
@@ -128,8 +128,11 @@ describe('parcel service', () => {
     const parcels = await rebuildParcels(f, vas.id);
     expect(parcels).toHaveLength(2);
     expect(await derivedShares(f)).toEqual(new Map([[vas.id, 18]]));
+    // The parcels are the lots, as acquired. `shares` is units HELD, which
+    // depends on the disposals too, so it is written by the holding service
+    // and not here.
     const s: any = (await listStocks(f, { status: 'all' }))[0];
-    expect(s.shares).toBe(18);
+    expect(s.shares).toBe(164);
   });
 
   it('keeps two buys on the same date as two distinct parcels', async () => {

@@ -209,6 +209,9 @@ export const wealthflowStyles = css`
   .field-grid.cols-3 {
     grid-template-columns: repeat(3, 1fr);
   }
+  .field-grid .span-2 {
+    grid-column: span 2;
+  }
   .field-grid .span-3 {
     grid-column: span 3;
   }
@@ -216,6 +219,9 @@ export const wealthflowStyles = css`
     .field-grid,
     .field-grid.cols-3 {
       grid-template-columns: repeat(2, 1fr);
+    }
+    .field-grid .span-2 {
+      grid-column: 1 / -1;
     }
     .field-grid .span-3 {
       grid-column: 1 / -1;
@@ -227,6 +233,30 @@ export const wealthflowStyles = css`
       grid-template-columns: 1fr;
     }
   }
+  /* A figure that reads as a gain and one that reads as a loss. Money in
+     green, money out in red — the colour carries the sign so a number in a
+     long column does not have to be read to be understood. */
+  .ok {
+    color: var(--ff-success, #3fb950);
+  }
+  .neg {
+    color: var(--ff-danger, #f85149);
+  }
+
+  /* A row of controls that sits inline with a caption: the caption on the
+     left, the actions on the right. */
+  .inline-form {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--ff-space-3, 10px);
+    flex-wrap: wrap;
+    margin-top: var(--ff-space-3, 10px);
+  }
+
+  .inline-form .field {
+    min-width: 160px;
+  }
+
   /* Editable matrix cell: amount input keeps the full track, the per-entry
      Edit button sits beside it so notes/date/bank stay reachable. */
   .cell-edit {
@@ -787,6 +817,44 @@ export const wealthflowStyles = css`
     .stat-grid.cols-4 {
       grid-template-columns: 1fr;
     }
+  }
+  /* The trade form: five fields on one row. Stock is the only field that
+     carries text, so it takes the extra width; the four numbers stay even. */
+  .trade-form-grid {
+    display: grid;
+    grid-template-columns: 0.9fr 1.7fr 0.8fr 0.8fr 0.8fr;
+    gap: 12px;
+  }
+  @media (max-width: 760px) {
+    .trade-form-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+  @media (max-width: 420px) {
+    .trade-form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  /* A hint under a closed field, quieter than the label above it. */
+  .trade-form-hint {
+    margin: 4px 0 0;
+    font-size: var(--ff-font-xs, 11px);
+    line-height: 1.35;
+  }
+  /* The running buy total: right-aligned under the fields, so it reads as
+     their sum rather than as one more field. */
+  .trade-form-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 10px;
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .trade-form-total strong {
+    font-size: var(--ff-font-lg, 15px);
+    color: var(--ff-text-strong, #fff);
+    font-variant-numeric: tabular-nums;
   }
   .stat {
     background: var(--ff-bg-subpanel, #2a2a2a);

@@ -3,6 +3,8 @@ import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import type { Parcel } from '../dao/parcels.js';
 import { listParcels } from '../dao/parcels.js';
+import type { DisposalRow } from '../dao/disposals.js';
+import { listDisposals } from '../dao/disposals.js';
 import { listStocks } from '../dao/stocks.js';
 import type { ParcelGroup } from '../services/parcel-service.js';
 import {
@@ -10,9 +12,10 @@ import {
   parcelCostBase,
   isDiscountEligible,
   monthsHeld,
+  remainingOf,
 } from '../services/parcel-service.js';
 import { addMonths, monthsBetween, todayIso } from '../utils/dates.js';
-import { formatAUD } from '../utils/format.js';
+import { formatAUD, formatPrice } from '../utils/format.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -20,7 +23,13 @@ const Base =
     : (class {} as unknown as typeof LitElement);
 
 export interface ParcelRow extends Parcel {
+  /** The class the discount cell carries. Computed here rather than in the
+   *  template: a CONDITIONAL class binding in an attribute misaligns lit's
+   *  bindings for the whole template. */
+  discountClass: string;
   costBase: number;
+  /** Units of this lot still held, after the disposals that consumed it. */
+  remaining: number;
   perUnit: number;
   heldLabel: string;
   discountLabel: string;
@@ -69,11 +78,15 @@ export class ParcelLedger extends Base {
   error = '';
   asOf = todayIso();
   parcels: Parcel[] = [];
+  disposals: DisposalRow[] = [];
   stocks: { id: number; stock_code: string; stock_full_name: string }[] = [];
   expanded = new Set<number>();
+  selectedStockId: number | null = null;
+  page = 0;
+  readonly pageSize = 10;
 
   get groups(): ParcelGroup[] {
-    return groupParcels(this.stocks, this.parcels, this.asOf);
+    return groupParcels(this.stocks, this.parcels, this.asOf, this.disposals);
   }
 
   get rowCount(): number {
@@ -89,12 +102,14 @@ export class ParcelLedger extends Base {
     if (!this.finance) return;
     this.error = '';
     try {
-      const [stocks, parcels] = await Promise.all([
+      const [stocks, parcels, disposals] = await Promise.all([
         listStocks(this.finance, { status: 'all' }),
         listParcels(this.finance),
+        listDisposals(this.finance),
       ]);
       this.stocks = stocks;
       this.parcels = parcels;
+      this.disposals = disposals;
     } catch (e: any) {
       this.error = String(e?.message || e);
     }
@@ -109,6 +124,18 @@ export class ParcelLedger extends Base {
     (this as any).requestUpdate?.();
   }
 
+  selectStock(stockId: number): void {
+    if (this.selectedStockId === stockId) {
+      this.selectedStockId = null;
+      this.page = 0;
+      (this as any).requestUpdate?.();
+      return;
+    }
+    this.selectedStockId = stockId;
+    this.page = 0;
+    (this as any).requestUpdate?.();
+  }
+
   /** Oldest first — that is FIFO's order, so the top row is what a sale eats. */
   expandedParcels(stockId: number): ParcelRow[] {
     return this.parcels
@@ -117,75 +144,94 @@ export class ParcelLedger extends Base {
       .sort((a, b) => (a.acquired_date < b.acquired_date ? -1 : 1))
       .map((p) => {
         const costBase = parcelCostBase(p);
+        // How much of the lot is LEFT. A lot that was partly sold shows what
+        // remains of it, not what was bought.
+        const remaining = remainingOf(p, this.disposals);
         return {
           ...p,
           costBase,
-          perUnit: p.quantity > 0 ? costBase / p.quantity : 0,
+          remaining,
+          perUnit: remaining > 0 ? costBase / remaining : 0,
           heldLabel: heldLabel(p.acquired_date, this.asOf),
           discountLabel: discountLabel(p.acquired_date, this.asOf),
+          discountClass: isDiscountEligible(p.acquired_date, this.asOf)
+            ? 'ok'
+            : 'pending',
         };
       });
   }
 
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
+    const codes = ['FGX', 'VAS', 'VHY'];
+    const cardGroups = codes
+      .map((code) => {
+        const stock = this.stocks.find((s) => s.stock_code === code);
+        if (!stock) return null;
+        return this.groups.find((g) => g.stockId === stock.id) || null;
+      })
+      .filter(Boolean) as ParcelGroup[];
+
     return html`
-      <div class="order-stack">
-        <div class="section flush">
-          <div class="section-header">
-            <h3 class="section-title">Parcels</h3>
-            <div class="header-actions">
-              <span class="muted">${this.rowCount} parcels</span>
-            </div>
-          </div>
-          <div class="section-body">
-            ${
-              this.error
-                ? html`<p class="field-error">Error: ${this.error}</p>`
-                : ''
-            }
-            <p class="muted">
-              Derived from your trade history — parcels are never edited by
-              hand. Change a trade and this rebuilds.
-            </p>
-            ${this.groups.map((g) => this.renderGroup(g))}
-          </div>
+      <div>
+        ${
+          this.error
+            ? html`<p class="field-error">Error: ${this.error}</p>`
+            : ''
+        }
+        <p class="muted">
+          Derived from your trade history — parcels are never edited by
+          hand. Change a trade and this rebuilds.
+        </p>
+        <div class="parcel-cards" style="display:flex; gap:12px; margin:12px 0;">
+          ${cardGroups.map((g) => this.renderCard(g))}
         </div>
+        ${this.selectedStockId
+          ? (() => {
+              const g = this.groups.find((x) => x.stockId === this.selectedStockId);
+              return g ? this.renderGroupDetail(g) : '';
+            })()
+          : ''}
       </div>
     `;
   }
 
-  private renderGroup(g: ParcelGroup): unknown {
-    const open = this.expanded.has(g.stockId);
-    const rows = open ? this.expandedParcels(g.stockId) : [];
+  private renderCard(g: ParcelGroup): unknown {
+    const selected = this.selectedStockId === g.stockId;
     return html`
-      <div class="parcel-group">
-        <button
-          type="button"
-          class="parcel-group-head"
-          aria-expanded=${open ? 'true' : 'false'}
-          @click=${() => this.toggleGroup(g.stockId)}
-        >
-          <span>${open ? '▾' : '▸'}</span>
-          <b>${g.stockCode}</b>
-          <span class="muted">${g.stockName}</span>
-          <span style="flex:1"></span>
+      <button
+        type="button"
+        class="btn btn-secondary parcel-card"
+        style="flex:1; text-align:left; justify-content:flex-start; padding:12px 16px; border-radius:8px; ${selected ? 'border-color: var(--ff-accent);' : ''}"
+        @click=${() => this.selectStock(g.stockId)}
+      >
+        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
+          <div style="font-weight:600; color: var(--ff-text);">${g.stockCode}</div>
+          <div class="muted" style="font-size:12px;">${g.stockName}</div>
           ${
             g.notTracked
-              ? html`<span class="section-badge">not yet tracked</span>`
-              : html`
+              ? html`<div class="muted" style="margin-top:4px;">not yet tracked</div>`
+              : html`<div style="margin-top:6px; display:flex; gap:12px; flex-wrap:wrap; color: var(--ff-text);">
                   <span>${qty(g.units)} units</span>
                   <span>${g.parcelCount} parcels</span>
-                  <span>avg ${formatAUD(g.avgCost)}</span>
-                  <span
-                    >${qty(g.eligibleUnits)}/${qty(g.units)}
-                    discount-eligible</span
-                  >
-                `
+                  <span>avg ${formatPrice(g.avgCost)}</span>
+                </div>`
           }
-        </button>
+        </div>
+      </button>
+    `;
+  }
+
+  private renderGroupDetail(g: ParcelGroup): unknown {
+    const rows = this.expandedParcels(g.stockId);
+    const pages = Math.max(1, Math.ceil(rows.length / this.pageSize));
+    if (this.page >= pages) this.page = pages - 1;
+    const start = this.page * this.pageSize;
+    const pageRows = rows.slice(start, start + this.pageSize);
+    return html`
+      <div class="parcel-group-detail" style="margin-top:12px;">
         ${
-          open && rows.length
+          rows.length
             ? html`
                 <table class="hist-table">
                   <thead>
@@ -199,29 +245,53 @@ export class ParcelLedger extends Base {
                     </tr>
                   </thead>
                   <tbody>
-                    ${rows.map(
+                    ${pageRows.map(
                       (p) =>
                         html`<tr>
-                          <td>${p.acquired_date}</td>
-                          <td class="num">${qty(p.quantity)}</td>
+                          <td class="mono">${p.acquired_date}</td>
+                          <td class="num">${qty(p.remaining)}</td>
                           <td class="num">${formatAUD(p.costBase)}</td>
-                          <td class="num">${formatAUD(p.perUnit)}</td>
+                          <td class="num">${formatPrice(p.perUnit)}</td>
                           <td class="num">${p.heldLabel}</td>
-                          <td
-                            class=${
-                              isDiscountEligible(p.acquired_date, this.asOf)
-                                ? 'ok'
-                                : 'pending'
-                            }
-                          >
-                            ${p.discountLabel}
-                          </td>
+                          <td class=${p.discountClass}>${p.discountLabel}</td>
                         </tr>`,
                     )}
                   </tbody>
                 </table>
+                ${pages > 1
+                  ? html`<div class="table-pager">
+                      <span class="muted"
+                        >Page ${this.page + 1} of ${pages} · ${rows.length}
+                        parcels</span
+                      >
+                      <div class="pager-actions">
+                        <button
+                          class="btn btn-secondary btn-small"
+                          type="button"
+                          ?disabled=${this.page === 0}
+                          @click=${() => {
+                            this.page = Math.max(0, this.page - 1);
+                            (this as any).requestUpdate?.();
+                          }}
+                        >
+                          Previous
+                        </button>
+                        <button
+                          class="btn btn-secondary btn-small"
+                          type="button"
+                          ?disabled=${this.page >= pages - 1}
+                          @click=${() => {
+                            this.page = Math.min(pages - 1, this.page + 1);
+                            (this as any).requestUpdate?.();
+                          }}
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>`
+                  : ''}
               `
-            : ''
+            : html`<p class="muted">No parcels.</p>`
         }
       </div>
     `;

@@ -229,110 +229,119 @@ export class InterestGrid extends Base {
           ${this.entries.length === 1 ? 'entry' : 'entries'} this FY
         </span>
       </div>
-      ${
-        this.error
-          ? html`<p class="field-error" role="alert" aria-live="polite">
-              Error: ${this.error}
-            </p>`
-          : ''
-      }
-      ${
-        this.fieldError
-          ? html`<p class="field-error" role="alert" aria-live="polite">
-              ${this.fieldError}
-            </p>`
-          : ''
-      }
-      ${
-        this.banks.length === 0
-          ? html`<p class="empty-state">
-              No active banks — add one in Banks, then fill the monthly grid
-              here.
-            </p>`
-          : months.length === 0
-            ? html`<p class="empty-state">
-                No interest logged this FY yet — use “Log interest” to add the
-                first entry.
+      <!--
+        The error messages sit inside this element. A binding at the ROOT
+        level of a template is dropped by happy-dom's parser, so anything
+        rendered from one is in no test's DOM to assert against.
+      -->
+      <div>
+        ${
+          this.error
+            ? html`<p class="field-error" role="alert" aria-live="polite">
+                Error: ${this.error}
               </p>`
-            : html`<div class="table-wrap">
-                <table class="data-table">
-                  <thead>
-                    <tr>
-                      <th
-                        scope="col"
-                        aria-sort=${this.sortDesc ? 'descending' : 'ascending'}
-                      >
-                        ${dateSortHeader('Month', this.sortDesc, () =>
-                          this.sortByDate(),
+            : ''
+        }
+        ${
+          this.fieldError
+            ? html`<p class="field-error" role="alert" aria-live="polite">
+                ${this.fieldError}
+              </p>`
+            : ''
+        }
+        ${
+          this.banks.length === 0
+            ? html`<p class="empty-state">
+                No active banks — add one in Banks, then fill the monthly grid
+                here.
+              </p>`
+            : months.length === 0
+              ? html`<p class="empty-state">
+                  No interest logged this FY yet — use “Log interest” to add the
+                  first entry.
+                </p>`
+              : html`<div class="table-wrap">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th
+                          scope="col"
+                          aria-sort=${this.sortDesc ? 'descending' : 'ascending'}
+                        >
+                          ${dateSortHeader('Month', this.sortDesc, () =>
+                            this.sortByDate(),
+                          )}
+                        </th>
+                        ${this.banks.map(
+                          (b) =>
+                            html`<th scope="col" class="num">
+                              ${b.bank_code}
+                            </th>`,
                         )}
-                      </th>
-                      ${this.banks.map(
-                        (b) =>
-                          html`<th scope="col" class="num">${b.bank_code}</th>`,
+                        <th scope="col" class="num">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${months.map(
+                        (m) => html`
+                          <tr>
+                            <td>${monthLabel(m)}</td>
+                            ${this.banks.map((b) => {
+                              const hit = this.entryFor(b.id, m);
+                              return html`<td>
+                                <div class="cell-edit">
+                                  <input
+                                    data-month=${m}
+                                    data-bank=${b.id}
+                                    inputmode="decimal"
+                                    aria-label="${b.bank_code} ${monthLabel(m)}"
+                                    .value=${hit ? String(hit.amount) : ''}
+                                    placeholder="0.00"
+                                    @change=${(e: Event) =>
+                                      this.onCell(
+                                        b.id,
+                                        m,
+                                        (e.target as HTMLInputElement).value,
+                                      )}
+                                  />
+                                  ${
+                                    hit
+                                      ? html`<button
+                                          class="btn btn-secondary btn-small"
+                                          aria-label="Edit ${b.bank_code} entry for ${monthLabel(m)}"
+                                          title="Edit date, bank or notes for this entry"
+                                          @click=${() => this.requestEdit(b.id, m)}
+                                        >
+                                          Edit
+                                        </button>`
+                                      : ''
+                                  }
+                                </div>
+                              </td>`;
+                            })}
+                            <td class="num">
+                              ${formatAUD(model.rowTotals[m] ?? 0)}
+                            </td>
+                          </tr>
+                        `,
                       )}
-                      <th scope="col" class="num">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${months.map(
-                      (m) => html`
-                        <tr>
-                          <td>${monthLabel(m)}</td>
-                          ${this.banks.map((b) => {
-                            const hit = this.entryFor(b.id, m);
-                            return html`<td>
-                              <div class="cell-edit">
-                                <input
-                                  data-month=${m}
-                                  data-bank=${b.id}
-                                  inputmode="decimal"
-                                  aria-label="${b.bank_code} ${monthLabel(m)}"
-                                  .value=${hit ? String(hit.amount) : ''}
-                                  placeholder="0.00"
-                                  @change=${(e: Event) =>
-                                    this.onCell(
-                                      b.id,
-                                      m,
-                                      (e.target as HTMLInputElement).value,
-                                    )}
-                                />
-                                ${
-                                  hit
-                                    ? html`<button
-                                        class="btn btn-secondary btn-small"
-                                        aria-label="Edit ${b.bank_code} entry for ${monthLabel(m)}"
-                                        title="Edit date, bank or notes for this entry"
-                                        @click=${() => this.requestEdit(b.id, m)}
-                                      >
-                                        Edit
-                                      </button>`
-                                    : ''
-                                }
-                              </div>
-                            </td>`;
-                          })}
-                          <td class="num">
-                            ${formatAUD(model.rowTotals[m] ?? 0)}
-                          </td>
-                        </tr>
-                      `,
-                    )}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td class="total-label">Total</td>
-                      ${this.banks.map(
-                        (b) =>
-                          html`<td class="num">
-                            ${formatAUD(model.colTotals[b.id] ?? 0)}
-                          </td>`,
-                      )}
-                      <td class="num">${formatAUD(model.grandTotal)}</td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </div>`
-      }
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td class="total-label">Total</td>
+                        ${this.banks.map(
+                          (b) =>
+                            html`<td class="num">
+                              ${formatAUD(model.colTotals[b.id] ?? 0)}
+                            </td>`,
+                        )}
+                        <td class="num">${formatAUD(model.grandTotal)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>`
+        }
+      </div>
     `;
   }
 }

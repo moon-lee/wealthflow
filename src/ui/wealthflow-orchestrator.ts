@@ -1,6 +1,10 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
+import {
+  CANONICAL_SECTION_ORDER,
+  normalizeSectionOrder,
+} from './overview-sections.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -52,6 +56,8 @@ export class WealthOrchestrator extends Base {
   error = '';
   /** Set by the Add Interest / Add Dividend commands so the cursor lands ready to type. */
   focusTarget: string | null = null;
+  showReorder = false;
+  sectionOrder: any[] = [...CANONICAL_SECTION_ORDER];
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
@@ -62,6 +68,14 @@ export class WealthOrchestrator extends Base {
     this.finance = f;
     this.tab = viewForMount(mount);
     if (typeof mount.fy === 'string') this.fy = mount.fy as string;
+    try {
+      const saved = await f.settings?.get?.('wealthflow.overviewSectionOrder');
+      this.sectionOrder = normalizeSectionOrder(
+        typeof saved === 'string' ? JSON.parse(saved) : saved,
+      );
+    } catch {
+      this.sectionOrder = [...CANONICAL_SECTION_ORDER];
+    }
     const focus = typeof mount.focus === 'string' ? mount.focus : null;
     await this.pushFinance();
     if (!focus) return;
@@ -76,8 +90,20 @@ export class WealthOrchestrator extends Base {
 
   navigate(tab: WealthTab): void {
     this.tab = tab;
+    this.showReorder = false;
     (this as any).requestUpdate?.();
     void this.pushFinance();
+  }
+
+  /**
+   * Re-read the current view's data without moving the user.
+   *
+   * A push from the host that carries no `view` is DATA — a refresh — and
+   * retargeting the panel to Overview because someone pressed Refresh would
+   * be wrong.
+   */
+  async refresh(): Promise<void> {
+    await this.pushFinance();
   }
 
   private child(): any {
@@ -100,6 +126,13 @@ export class WealthOrchestrator extends Base {
       } catch {
         /* child without fy */
       }
+      try {
+        if (this.tab === 'overview' && c.sectionOrder !== undefined) {
+          c.sectionOrder = [...this.sectionOrder];
+        }
+      } catch {
+        /* ignore */
+      }
       if (typeof c.setFinance === 'function') {
         try {
           await c.setFinance(this.finance);
@@ -121,6 +154,9 @@ export class WealthOrchestrator extends Base {
     this.addEventListener('fy-changed', this._onFy as EventListener);
     this.addEventListener('wealthflow-navigate', this._onNav as EventListener);
     this.addEventListener('host-navigate', this._onHostNav as EventListener);
+    this.addEventListener('reorder-sections', this._onReorder as EventListener);
+    this.addEventListener('section-order-cancel', this._onReorderDone as EventListener);
+    this.addEventListener('section-order-change', this._onReorderDone as EventListener);
   }
 
   /**
@@ -143,6 +179,9 @@ export class WealthOrchestrator extends Base {
       this._onNav as EventListener,
     );
     this.removeEventListener('host-navigate', this._onHostNav as EventListener);
+    this.removeEventListener('reorder-sections', this._onReorder as EventListener);
+    this.removeEventListener('section-order-cancel', this._onReorderDone as EventListener);
+    this.removeEventListener('section-order-change', this._onReorderDone as EventListener);
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
@@ -167,6 +206,34 @@ export class WealthOrchestrator extends Base {
     void this.init(this.finance, { view: d.view, ...(d.mountData ?? {}) });
   };
 
+  private _onReorder = (e: Event): void => {
+    if (this.tab !== 'overview') return;
+    e.stopPropagation();
+    this.showReorder = true;
+    (this as any).requestUpdate?.();
+  };
+
+  private _onReorderDone = (e: Event): void => {
+    e.stopPropagation();
+    if (e.type === 'section-order-change') {
+      try {
+        const order = (e as CustomEvent).detail;
+        this.sectionOrder = normalizeSectionOrder(order);
+        if (this.finance?.settings?.set) {
+          void this.finance.settings.set(
+            'wealthflow.overviewSectionOrder',
+            JSON.stringify(this.sectionOrder),
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    this.showReorder = false;
+    (this as any).requestUpdate?.();
+    void this.pushFinance();
+  };
+
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
     return html`
@@ -176,6 +243,23 @@ export class WealthOrchestrator extends Base {
             >Wealth Flow · ${TAB_LABELS[this.tab]}</span
           >
           <div class="spacer"></div>
+          ${
+            this.tab === 'overview'
+              ? html`<button
+                  class="filter-btn"
+                  @click=${() => {
+                    this.dispatchEvent(
+                      new CustomEvent('reorder-sections', {
+                        bubbles: true,
+                        composed: true,
+                      }),
+                    );
+                  }}
+                >
+                  ⇅ Reorder Sections
+                </button>`
+              : ''
+          }
           <label class="fy-label" for="fy-select">Finance year</label>
           <select
             id="fy-select"
@@ -204,6 +288,11 @@ export class WealthOrchestrator extends Base {
             ${this.tab === 'stocks' ? html`<stock-list id="child"></stock-list>` : ''}
             ${this.tab === 'trades' ? html`<trades-view id="child"></trades-view>` : ''}
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
+            ${this.showReorder
+              ? html`<reorder-overview-sections-modal
+                  .sectionOrder=${this.sectionOrder}
+                ></reorder-overview-sections-modal>`
+              : ''}
           </div>
         </div>
       </div>

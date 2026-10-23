@@ -13,7 +13,7 @@ import {
   listTrades,
   type Trade,
 } from '../dao/trades.js';
-import { rebuildParcels } from './parcel-service.js';
+import { rebuildStock } from './holding-service.js';
 
 export class DrpValidationError extends Error {
   readonly code = -32019;
@@ -105,8 +105,9 @@ export async function logDividendWithDrp(
 
   const price = round6(drp.amountReinvested / drp.unitsAcquired);
   const existing = await findDrpTrade(finance, row.id);
+  let trade: Trade;
   try {
-    const trade = existing
+    trade = existing
       ? (await updateTrade(finance, existing.id, {
           stock_id: row.stock_id,
           date: row.date,
@@ -130,12 +131,16 @@ export async function logDividendWithDrp(
           source: 'drp',
           dividend_id: row.id,
         });
-    await rebuildParcels(finance, row.stock_id);
-    return { dividend: row, trade };
   } catch (err) {
+    // The coupled write failed, so the dividend side is undone too.
     await compensate(finance, prior, row);
     throw err;
   }
+  // The holding's derived state is rebuilt AFTER the coupled write succeeds.
+  // A failed rebuild is not a reason to undo a valid dividend and trade: the
+  // facts are right, and the derived state can be rebuilt again.
+  await rebuildStock(finance, row.stock_id);
+  return { dividend: row, trade };
 }
 
 /** Undo the dividend side. The trade side never landed, so this is the whole
@@ -174,7 +179,7 @@ export async function deleteDividendWithDrp(
   const stockIds = drp.map((t) => t.stock_id);
   for (const t of drp) await deleteTrade(finance, t.id);
   await deleteDividend(finance, dividendId);
-  for (const id of new Set(stockIds)) await rebuildParcels(finance, id);
+  for (const id of new Set(stockIds)) await rebuildStock(finance, id);
 }
 
 function round6(n: number): number {

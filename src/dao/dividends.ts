@@ -18,6 +18,11 @@ export interface DividendEntry {
   readonly franking: number;
   readonly finance_year: string;
   readonly notes: string | null;
+  /** DRP: the cash reinvested on this distribution. 0 when it was not a
+   *  reinvestment. */
+  readonly amount_reinvested: number;
+  /** DRP: the units that cash bought. 0 when it was not a reinvestment. */
+  readonly units_acquired: number;
 }
 
 export type DividendInput = {
@@ -28,6 +33,12 @@ export type DividendInput = {
   franking?: number;
   finance_year?: string;
   notes?: string | null;
+  /** DRP: the cash reinvested on this distribution. 0 when it was not a
+   *  reinvestment. Captured as its own field — never derived from the
+   *  dividend, which does not reconcile with the reinvestment. */
+  amount_reinvested?: number;
+  /** DRP: the units that cash bought. 0 when it was not a reinvestment. */
+  units_acquired?: number;
 };
 
 export class DividendValidationError extends Error {
@@ -67,6 +78,15 @@ export async function createDividend(
     input.finance_year?.trim() || computeFinanceYear(input.date, fyStart) || '';
   if (!fy)
     throw new DividendValidationError('finance_year could not be determined');
+  // The DRP figures are CAPTURED FIELDS. They are written here rather than
+  // derived from the dividend, because the two do not reconcile: a
+  // reinvestment can cost more or less than the cash that funded it.
+  const amountReinvested = input.amount_reinvested ?? 0;
+  const unitsAcquired = input.units_acquired ?? 0;
+  if (!Number.isFinite(amountReinvested) || amountReinvested < 0)
+    throw new DividendValidationError('amount_reinvested must be ≥ 0');
+  if (!Number.isFinite(unitsAcquired) || unitsAcquired < 0)
+    throw new DividendValidationError('units_acquired must be ≥ 0');
   return (await finance.db.table(TABLE).insert({
     stock_id: input.stock_id,
     date: input.date,
@@ -75,6 +95,8 @@ export async function createDividend(
     franking,
     finance_year: fy,
     notes: input.notes ?? null,
+    amount_reinvested: amountReinvested,
+    units_acquired: unitsAcquired,
   } as Record<string, unknown>)) as unknown as DividendEntry;
 }
 

@@ -47,6 +47,42 @@ describe('trades ui', () => {
     log.remove();
   });
 
+  it('styles the date column like the dividends list does', async () => {
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-09-10',
+      side: 'buy',
+      quantity: 7,
+      price: 110,
+    });
+    const log = document.createElement('trade-log') as any;
+    document.body.appendChild(log);
+    await log.setFinance(f);
+    await log.updateComplete;
+
+    // The shared sort control, not a hand-rolled button. The trade log used
+    // a `sort-btn` class that has no CSS at all, so the header rendered as
+    // the browser's default grey button next to every other log.
+    const header = log.renderRoot.querySelector('th[aria-sort]') as any;
+    expect(header).toBeTruthy();
+    expect(header.getAttribute('aria-sort')).toBe('descending');
+    expect(header.querySelector('.th-sort')).toBeTruthy();
+    expect(header.querySelector('.caret')).toBeTruthy();
+    expect(log.renderRoot.querySelector('.sort-btn')).toBeNull();
+
+    // The date cell carries the same class the dividends list uses.
+    const cell = log.renderRoot.querySelector('tbody td') as any;
+    expect(cell.classList.contains('mono')).toBe(true);
+    expect(cell.textContent.trim()).toBe('2026-09-10');
+    log.remove();
+  });
+
   it('flips the order when the date header is used', async () => {
     const f: any = createMockFinance();
     const s: any = await createStock(f, {
@@ -245,7 +281,7 @@ describe('trades ui', () => {
     form.remove();
   });
 
-  it('keeps a 4dp price and a fractional quantity visible', async () => {
+  it('shows a price to three decimals and keeps the ledger at full precision', async () => {
     const f: any = createMockFinance();
     const s: any = await createStock(f, {
       stock_code: 'VHY',
@@ -264,9 +300,161 @@ describe('trades ui', () => {
     document.body.appendChild(log);
     await log.setFinance(f);
     await log.updateComplete;
+    // The DISPLAY is three decimals, so a column of prices lines up.
+    expect(log.renderRoot.textContent).toContain('$82.707');
+    // The STORED price keeps its fourth decimal: rounding is a display
+    // concern, and the cost base is computed from the exact figure.
+    expect(log.sortedTrades[0].price).toBe(82.7065);
+    // And a fractional quantity survives.
     expect(log.sortedTrades[0].quantity).toBe(0.1504);
-    expect(log.renderRoot.textContent).toContain('82.7065');
+    expect(log.renderRoot.textContent).toContain('0.1504');
     log.remove();
+  });
+
+  it('renders four sections on one page, with no segment control', async () => {
+    const f: any = createMockFinance();
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+    expect(el.renderRoot.querySelectorAll('.section').length).toBe(4);
+    expect(el.renderRoot.querySelector('.segment')).toBeNull();
+    await el.updateComplete;
+    el.remove();
+  });
+
+  it('collapses the parcels ledger by default and leaves the rest open', async () => {
+    const f: any = createMockFinance();
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+    expect(el.collapsed.parcels).toBe(true);
+    expect(el.collapsed.summary).toBe(false);
+    expect(el.collapsed.investment).toBe(false);
+    expect(el.collapsed.trades).toBe(false);
+    await el.updateComplete;
+    el.remove();
+  });
+
+  it('gives every section header a count badge', async () => {
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+    // A stock with no trades has no units, so it is not a holding.
+    expect(el.holdingCount).toBe(0);
+    expect(el.tradeCount).toBe(0);
+    expect(el.parcelCount).toBe(0);
+
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2024-03-15',
+      side: 'buy',
+      quantity: 20,
+      price: 95.4,
+      brokerage: 3,
+    });
+    await el.reload();
+    await el.updateComplete;
+    expect(el.holdingCount).toBe(1);
+    expect(el.tradeCount).toBe(1);
+    expect(el.parcelCount).toBe(1);
+    await el.updateComplete;
+    el.remove();
+  });
+
+  it('still reveals the form when a trade is edited', async () => {
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2024-03-15',
+      side: 'buy',
+      quantity: 20,
+      price: 95.4,
+      brokerage: 3,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+    el.dispatchEvent(
+      new CustomEvent('trade-edit-request', {
+        detail: {
+          trade: {
+            id: 1,
+            stock_id: s.id,
+            date: '2024-03-15',
+            side: 'buy',
+            quantity: 20,
+            price: 95.4,
+            brokerage: 3,
+            source: 'manual',
+            dividend_id: null,
+            notes: null,
+          },
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    await flush();
+    expect(el.showForm).toBe(true);
+    await el.updateComplete;
+    el.remove();
+  });
+
+  it('actually renders the form and the log inside the Trades section', async () => {
+    // A root-level binding in the section's body template used to keep both of
+    // these out of happy-dom's tree, so every test above was blind to them.
+    const f: any = createMockFinance();
+    const s: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    await createTrade(f, {
+      stock_id: s.id,
+      date: '2026-09-10',
+      side: 'buy',
+      quantity: 7,
+      price: 110,
+      brokerage: 3,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+
+    const form = el.renderRoot.querySelector('trade-form');
+    const log = el.renderRoot.querySelector('trade-log') as any;
+    expect(form).toBeTruthy();
+    expect(log).toBeTruthy();
+    await log.updateComplete;
+    expect(log.renderRoot.querySelector('table.hist-table')).toBeTruthy();
+    expect(log.renderRoot.textContent).toContain('VAS');
+    el.remove();
   });
 
   it('rebuilds parcels when a trade event fires', async () => {

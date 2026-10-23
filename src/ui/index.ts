@@ -14,6 +14,9 @@ import { DividendForm } from './dividend-form';
 import { SuperForm } from './super-form';
 import { OverviewView } from './overview-view';
 import { CgtSection } from './cgt-section';
+import { TradesSummary } from './trades-summary';
+import { InvestmentTable } from './investment-table';
+import { ReorderOverviewSectionsModal } from './reorder-overview-sections-modal';
 
 if (typeof customElements !== 'undefined') {
   if (!customElements.get('wealthflow-orchestrator'))
@@ -95,5 +98,20 @@ if (typeof customElements !== 'undefined') {
     customElements.define(
       'cgt-section',
       CgtSection as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('trades-summary'))
+    customElements.define(
+      'trades-summary',
+      TradesSummary as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('investment-table'))
+    customElements.define(
+      'investment-table',
+      InvestmentTable as unknown as CustomElementConstructor,
+    );
+  if (!customElements.get('reorder-overview-sections-modal'))
+    customElements.define(
+      'reorder-overview-sections-modal',
+      ReorderOverviewSectionsModal as unknown as CustomElementConstructor,
     );
 }

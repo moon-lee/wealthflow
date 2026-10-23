@@ -346,24 +346,27 @@ describe('editing replays the allocation and refuses what will not balance', () 
 
   it('restores the units when a sell is deleted', async () => {
     const { f, s } = await holding();
-    const sell: any = await createTrade(f, {
+    // The service owns the whole chain, so a caller no longer has to know the
+    // rebuild order: write, then the derived state follows.
+    const { recordTrade, removeTrade } =
+      await import('../src/services/holding-service.js');
+    const sell: any = await recordTrade(f, {
       stock_id: s.id,
       date: '2026-10-16',
       side: 'sell',
       quantity: 25,
       price: 112,
     });
-    await rebuildDisposals(f, s.id);
     expect(await listDisposals(f)).toHaveLength(2);
-    await deleteTrade(f, sell.id);
-    await rebuildAllParcels(f);
-    await rebuildDisposals(f, s.id);
+    const sharesOf = async () =>
+      (
+        await (
+          await import('../src/dao/stocks.js')
+        ).listStocks(f, { status: 'all' })
+      )[0].shares;
+    expect(await sharesOf()).toBe(10);
+    await removeTrade(f, sell.id);
     expect(await listDisposals(f)).toHaveLength(0);
-    const shares = (
-      await (
-        await import('../src/dao/stocks.js')
-      ).listStocks(f, { status: 'all' })
-    )[0] as any;
-    expect(shares.shares).toBe(35);
+    expect(await sharesOf()).toBe(35);
   });
 });

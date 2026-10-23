@@ -7,7 +7,13 @@ import {
   nextMonthKey,
   nextMonthSameDay,
 } from '../src/utils/finance-year.js';
-import { formatAUD, maskAccount, formatBSB } from '../src/utils/format.js';
+import {
+  formatAUD,
+  maskAccount,
+  formatBSB,
+  formatPrice,
+} from '../src/utils/format.js';
+import { localTodayIso } from '../src/utils/dates.js';
 
 describe('utils', () => {
   it('computes FY for July start', () => {
@@ -51,5 +57,19 @@ describe('utils', () => {
     expect(formatAUD(25.93)).toBe('$25.93');
     expect(maskAccount('1234567')).toBe('•••4567');
     expect(formatBSB('012345')).toBe('012-345');
+  });
+  it('formats a price to three decimals, always the same width', () => {
+    expect(formatPrice(109.02)).toBe('$109.020');
+    expect(formatPrice(1.34)).toBe('$1.340');
+    expect(formatPrice(84.6)).toBe('$84.600');
+    // A DRP price carries four decimals; the display rounds, the store does not.
+    expect(formatPrice(82.7065)).toBe('$82.707');
+    expect(formatPrice(108.8611)).toBe('$108.861');
+  });
+  it('localTodayIso reads the local calendar, not UTC', () => {
+    // Just after local midnight in Australia, the UTC date is still yesterday.
+    // A date input on the trade form must show the day the reader is in.
+    expect(localTodayIso(new Date(2026, 0, 15, 0, 30))).toBe('2026-01-15');
+    expect(localTodayIso(new Date(2026, 11, 31, 23, 30))).toBe('2026-12-31');
   });
 });

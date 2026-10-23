@@ -79,6 +79,28 @@ describe('logDividendWithDrp — the coupled write (spec 6.4)', () => {
     expect(await listTrades(f)).toHaveLength(0);
   });
 
+  it('persists the DRP figures on the dividend row', async () => {
+    // The DRP fields are captured, not derived. If the DAO drops them, the
+    // receipt loses them, and editing it later silently loses the parcel's
+    // origin.
+    const { f, s } = await fund();
+    await logDividendWithDrp(f, div(s), {
+      amountReinvested: 45.34,
+      unitsAcquired: 0.4,
+    });
+    const rows = await listDividends(f);
+    expect(rows[0]!.amount_reinvested).toBeCloseTo(45.34, 4);
+    expect(rows[0]!.units_acquired).toBeCloseTo(0.4, 4);
+  });
+
+  it('records zero for a dividend that was not a reinvestment', async () => {
+    const { f, s } = await fund();
+    await logDividendWithDrp(f, div(s), null);
+    const rows = await listDividends(f);
+    expect(rows[0]!.amount_reinvested).toBe(0);
+    expect(rows[0]!.units_acquired).toBe(0);
+  });
+
   it('treats a zero-unit DRP as income only, and says why', async () => {
     // VHY 16 Jul 2026: a $12.44 DRP that bought nothing.
     const { f, s } = await fund();

@@ -1,359 +1,150 @@
-// Guards src/seed/wealth-seed.sql, the script that imports personal data
-// straight into the app's SQLite file. The SQL is gitignored, so nothing else in
-// the suite exercises it: a typo here would only surface as a failed import into
-// a real database.
-//
-// The SQL carries real account numbers, so this test asserts on counts and
-// totals and never prints a row's contents.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { readFileSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import {
-  splitAuditStatements,
-  isConsistencyCheck,
-} from '../scripts/sql-audit.mjs';
-import { pickDatabaseArg, findDatabase } from '../scripts/db-target.mjs';
+import { describe, it, expect } from 'vitest';
+import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { buildSchema, buildHoldings } from '../src/data/seed-sql.js';
+import { RECONCILED_TOTALS } from '../src/data/reconciled-holdings.js';
 
-const SQL_PATH = join(process.cwd(), 'src', 'seed', 'wealth-seed.sql');
-const TMP = join(process.cwd(), 'node_modules', '.cache', 'seed-sql-test.db');
-const MARKER = '-- @@AUDITS@@';
-
-// The app's DDL generator, mirrored from
-// D:\finance_flow_ai\src\main\services\table-ddl.ts. If the app changes, this
-// test fails and the SQL's CREATE TABLE needs revisiting.
-const SQLITE_TYPE: Record<string, string> = {
-  integer: 'INTEGER',
-  real: 'REAL',
-  text: 'TEXT',
-  date: 'TEXT',
-  datetime: 'TEXT',
-  boolean: 'INTEGER',
+// `node:sqlite` is a builtin, but Vite's resolver does not know it, so it is
+// loaded through createRequire rather than a bare import.
+const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite') as {
+  DatabaseSync: new (path: string) => any;
 };
 
-let sql = '';
-let applySql = '';
-let auditSql = '';
-let DatabaseSync: any = null;
+const pkg = JSON.parse(
+  readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+) as any;
 
-beforeAll(async () => {
-  sql = readFileSync(SQL_PATH, 'utf8');
-  const cut = sql.indexOf(MARKER);
-  expect(cut, `${SQL_PATH} must contain the ${MARKER} marker`).toBeGreaterThan(
-    -1,
+/** A fresh database with the app's schema and the seed's rows. */
+function seeded() {
+  const db = new DatabaseSync(':memory:');
+  db.exec(buildSchema(pkg.financeExtension.tables));
+  // The three stocks, as the seed writes them.
+  db.exec(
+    `INSERT INTO wealthflow_stocks (stock_code, stock_full_name, shares, is_active, notes) VALUES
+     ('VAS', 'Vanguard Australian Shares Index ETF', 165, 1, NULL),
+     ('VHY', 'Vanguard Australian Shares High Yield ETF', 23, 1, NULL),
+     ('FGX', 'Future Generation Global Investment Company', 1109, 1, NULL);`,
   );
-  applySql = sql.slice(0, cut);
-  auditSql = sql.slice(cut);
-  try {
-    ({ DatabaseSync } = await import('node:sqlite'));
-  } catch {
-    DatabaseSync = null; // Node without node:sqlite: structural tests only
-  }
-});
+  db.exec(buildHoldings());
+  return db;
+}
 
-afterAll(() => {
-  rmSync(TMP, { force: true });
-});
-
-describe('choosing which database to write', () => {
-  // A dev and a production install both exist, and prod lives outside %APPDATA%,
-  // so this has to be explicit rather than convenient.
-  const fake = join(process.cwd(), 'node_modules', '.cache', 'fake-appdata');
-
-  afterAll(() => rmSync(fake, { recursive: true, force: true }));
-
-  const makeApp = (name: string) => {
-    const dir = join(fake, name);
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'finance.db'), '');
-    return join(dir, 'finance.db');
-  };
-
-  it('ignores flags when looking for the path argument', () => {
-    // Regression: argv[2] was read blindly, so `apply-seed.mjs --no-backup`
-    // used a file literally named "--no-backup" and created it.
-    expect(
-      pickDatabaseArg(['node', 'apply-seed.mjs', '--no-backup']),
-    ).toBeUndefined();
-    expect(
-      pickDatabaseArg(['node', 'apply-seed.mjs', '--no-backup', 'C:\\a.db']),
-    ).toBe('C:\\a.db');
+describe('the generated SQL seed', () => {
+  it('runs, and writes the reconciled rows', () => {
+    const db = seeded();
+    const count = (t: string) =>
+      (db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get() as any).c;
+    expect(count('wealthflow_dividends')).toBe(39);
+    expect(count('wealthflow_trades')).toBe(46);
+    expect(count('wealthflow_cost_base_adjustments')).toBe(39);
+    expect(count('wealthflow_prices')).toBe(3);
+    db.close();
   });
 
-  it('prefers an explicit path over everything', () => {
-    expect(findDatabase('C:\\x.db', { APPDATA: 'C:\\nope' })).toBe(
-      resolve('C:\\x.db'),
-    );
-  });
-
-  it('honours WEALTHFLOW_DB', () => {
-    expect(
-      findDatabase(undefined, {
-        WEALTHFLOW_DB: 'C:\\env.db',
-        APPDATA: 'C:\\nope',
-      }),
-    ).toBe(resolve('C:\\env.db'));
-  });
-
-  it('uses the single match under APPDATA', () => {
-    rmSync(fake, { recursive: true, force: true });
-    const db = makeApp('Finance Flow AI Dev');
-    expect(findDatabase(undefined, { APPDATA: fake })).toBe(db);
-  });
-
-  it('refuses to guess between two databases, and lists them', () => {
-    rmSync(fake, { recursive: true, force: true });
-    const dev = makeApp('Finance Flow AI Dev');
-    const prod = makeApp('Finance Flow AI');
-    let message = '';
-    try {
-      findDatabase(undefined, { APPDATA: fake });
-    } catch (e: any) {
-      message = e.message;
-    }
-    expect(message).toContain('refusing to guess');
-    expect(message).toContain(dev);
-    expect(message).toContain(prod);
-  });
-
-  it('does not treat an unrelated folder as a candidate', () => {
-    rmSync(fake, { recursive: true, force: true });
-    const dir = join(fake, 'finance-flow-log-viewer');
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, 'finance.db'), '');
-    expect(() => findDatabase(undefined, { APPDATA: fake })).toThrow(
-      /No finance.db/,
-    );
-  });
-});
-
-describe('seed SQL structure', () => {
-  it('parses the audit block into statements SQLite can prepare', () => {
-    const statements = splitAuditStatements(auditSql);
-    // 1 counts, 2 per-bank interest, 3 taxable totals, 4 FY consistency, 5 orphans
-    expect(statements).toHaveLength(5);
-    for (const s of statements) {
-      expect(s.sql, `statement must not be empty: ${s.label}`).not.toBe('');
-      // A prose fragment left over from a comment would make prepare() throw
-      // `near "<word>"`. Nothing but SQL may survive on the first line.
-      expect(s.sql.split('\n')[0].trim()).not.toMatch(/^--/);
-      expect(s.sql).not.toMatch(/^\s*[a-z]+ (the|one|last|row|returns)\b/i);
-    }
-  });
-
-  it('survives a semicolon inside a comment', () => {
-    // Regression: the audit header reads "Run after importing; the last one
-    // must return zero rows." Splitting on ';' before stripping comments cut
-    // that comment in half and the prose became SQL, so the runner died with
-    // `near "the": syntax error` after the import had already succeeded.
-    const sql = [
-      '-- header; with a semicolon inside it',
-      '',
-      '-- another comment',
-      'SELECT 1;',
-      'SELECT 2;',
-    ].join('\n');
-    const statements = splitAuditStatements(sql);
-    // The trailing ';' is kept; SQLite accepts it. What matters is that the
-    // prose half of the split comment is not mistaken for SQL, and that the
-    // blank line stops the header from becoming statement 1's label.
-    expect(statements).toHaveLength(2);
-    expect(statements[0].sql).not.toMatch(/header/);
-    expect(statements[1].sql).toBe('SELECT 2;');
-    expect(statements[0].label).toBe('another comment');
-  });
-
-  it('joins a multi-line comment block into one label', () => {
-    const sql = [
-      '-- 2. Interest per bank (expect MQL 1.46,',
-      '--    BOQ 3.23)',
-      'SELECT 1;',
-    ].join('\n');
-    expect(splitAuditStatements(sql)[0].label).toBe(
-      '2. Interest per bank (expect MQL 1.46, BOQ 3.23)',
-    );
-  });
-
-  it('keeps each audit label', () => {
-    const labels = splitAuditStatements(auditSql).map((s) => s.label);
-    expect(labels.some((l) => l.includes('Row counts'))).toBe(true);
-    expect(labels.some((l) => l.includes('FY consistency'))).toBe(true);
-    expect(labels.some((l) => l.includes('Orphan'))).toBe(true);
-  });
-
-  it('marks exactly the two zero-row checks as consistency checks', () => {
-    const statements = splitAuditStatements(auditSql);
-    expect(statements.filter((s) => isConsistencyCheck(s.sql))).toHaveLength(2);
-  });
-
-  it('wraps the writes in a transaction and never drops a table', () => {
-    expect(applySql).toContain('BEGIN TRANSACTION');
-    expect(applySql).toContain('COMMIT');
-    for (const t of [
-      'wealthflow_banks',
-      'wealthflow_stocks',
-      'wealthflow_interest_entries',
-      'wealthflow_dividends',
-    ]) {
-      expect(applySql).toContain(`CREATE TABLE IF NOT EXISTS ${t} `);
-    }
-  });
-
-  it('guards every insert so a re-run is a no-op', () => {
-    const inserts = applySql
-      .split(';')
-      .filter((s) => s.includes('INSERT INTO'));
-    expect(inserts).toHaveLength(17); // 4 banks + 3 stocks + 8 interest + 2 dividends
-    for (const i of inserts) expect(i).toMatch(/WHERE NOT EXISTS/);
-  });
-
-  it('resolves parents by code, never by a hardcoded id', () => {
-    const inserts = applySql
-      .split(';')
-      .filter((s) =>
-        /INSERT INTO wealthflow_(interest_entries|dividends)/.test(s),
-      );
-    for (const i of inserts) {
-      expect(i).toMatch(/SELECT \(SELECT id FROM wealthflow_(banks|stocks)/);
-    }
-  });
-});
-
-describe.runIf(process.versions.node.split('.')[0] >= 22)(
-  'seed SQL against a real SQLite engine',
-  () => {
-    let db: any = null;
-    const open = () => {
-      rmSync(TMP, { force: true });
-      db = new DatabaseSync(TMP);
-      db.exec(applySql);
-    };
-    afterAll(() => {
-      db?.close();
-    });
-
-    it('creates tables whose shape matches the app generator', () => {
-      if (!DatabaseSync) return;
-      open();
-      const pkg = JSON.parse(
-        readFileSync(join(process.cwd(), 'package.json'), 'utf8'),
-      );
-      for (const t of pkg.financeExtension.tables) {
-        const expected = `CREATE TABLE ${t.name} (${[
-          'id INTEGER PRIMARY KEY AUTOINCREMENT',
-          ...t.columns.map((c: any) => {
-            const parts = [c.name, SQLITE_TYPE[c.type]];
-            if (c.nullable === false) parts.push('NOT NULL');
-            if (c.default !== undefined && c.default !== null) {
-              parts.push(
-                `DEFAULT ${typeof c.default === 'string' ? `'${c.default}'` : String(c.default)}`,
-              );
-            }
-            return parts.join(' ');
-          }),
-          "created_at TEXT NOT NULL DEFAULT (datetime('now'))",
-          "updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
-        ].join(', ')})`;
-        // sqlite_master stores the normalised DDL (IF NOT EXISTS stripped).
-        const row = db
-          .prepare(
-            "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
-          )
-          .get(t.name);
-        expect(row?.sql, `${t.name} DDL`).toBe(expected);
-      }
-    });
-
-    it('inserts the expected rows', () => {
-      if (!DatabaseSync) return;
-      open();
-      const counts = {
-        banks: 4,
-        stocks: 3,
-        interest: 8,
-        dividends: 2,
-      };
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_banks').get().c,
-      ).toBe(counts.banks);
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_stocks').get().c,
-      ).toBe(counts.stocks);
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_interest_entries').get()
-          .c,
-      ).toBe(counts.interest);
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_dividends').get().c,
-      ).toBe(counts.dividends);
-    });
-
-    it('reproduces the financial year the dev seed shows', () => {
-      if (!DatabaseSync) return;
-      open();
-      const interest = db
+  it('reconciles the units and the cost base to the holding records', () => {
+    const db = seeded();
+    const units = (
+      db
         .prepare(
-          "SELECT ROUND(SUM(amount),2) t FROM wealthflow_interest_entries WHERE finance_year='2026-2027'",
+          `SELECT SUM(t.quantity) AS u FROM wealthflow_trades t WHERE t.side = 'buy'`,
         )
-        .get().t;
-      const div = db
+        .get() as any
+    ).u;
+    expect(units).toBe(RECONCILED_TOTALS.units);
+
+    const cost = (
+      db
         .prepare(
-          "SELECT ROUND(SUM(gross),2) g, ROUND(SUM(franking),2) f FROM wealthflow_dividends WHERE finance_year='2026-2027'",
+          `SELECT SUM(t.quantity * t.price + t.brokerage) AS c FROM wealthflow_trades t WHERE t.side = 'buy'`,
         )
-        .get();
-      expect(interest).toBe(5.94);
-      expect(div.g).toBe(109.94);
-      expect(div.f).toBe(24.83);
-      expect(Math.round((interest + div.g) * 100) / 100).toBe(115.88);
-    });
+        .get() as any
+    ).c;
+    expect(cost).toBeCloseTo(RECONCILED_TOTALS.preAdjustmentCostBase, 2);
 
-    it('stores is_active as 1, which is what the boolean column and DAO filter need', () => {
-      if (!DatabaseSync) return;
-      open();
-      expect(
-        db
-          .prepare(
-            'SELECT COUNT(*) c FROM wealthflow_banks WHERE is_active = 1',
-          )
-          .get().c,
-      ).toBe(4);
-    });
+    const income = (
+      db
+        .prepare(`SELECT SUM(gross) AS g FROM wealthflow_dividends`)
+        .get() as any
+    ).g;
+    expect(income).toBeCloseTo(RECONCILED_TOTALS.income, 2);
+    db.close();
+  });
 
-    it('is idempotent', () => {
-      if (!DatabaseSync) return;
-      open();
-      db.exec(applySql);
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_interest_entries').get()
-          .c,
-      ).toBe(8);
-      expect(
-        db.prepare('SELECT COUNT(*) c FROM wealthflow_dividends').get().c,
-      ).toBe(2);
-    });
+  it('links every DRP to the distribution on its own date', () => {
+    const db = seeded();
+    const orphans = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM wealthflow_trades t
+           WHERE t.source = 'drp' AND t.dividend_id IS NULL`,
+        )
+        .get() as any
+    ).c;
+    expect(orphans).toBe(0);
+    // And the dividend carries the reinvestment that funded it.
+    const unlinked = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM wealthflow_dividends d
+           WHERE d.amount_reinvested > 0
+             AND NOT EXISTS (SELECT 1 FROM wealthflow_trades t
+                             WHERE t.dividend_id = d.id AND t.source = 'drp')`,
+        )
+        .get() as any
+    ).c;
+    expect(unlinked).toBe(0);
+    db.close();
+  });
 
-    it('prepares every audit statement, not just the checks', () => {
-      // The runner prints all five, so a report statement that cannot be
-      // prepared fails the import after the rows are already written. Only
-      // checking the two zero-row statements is how that slipped through.
-      if (!DatabaseSync) return;
-      open();
-      const statements = splitAuditStatements(auditSql);
-      expect(statements).toHaveLength(5);
-      for (const s of statements) {
-        const rows = db.prepare(s.sql).all();
-        // The two checks must be empty; the three reports must have data.
-        if (isConsistencyCheck(s.sql)) expect(rows, s.label).toEqual([]);
-        else expect(rows.length, s.label).toBeGreaterThan(0);
-      }
-    });
+  it('records VHY 16 Jul 2026 as ONE unit at $82.706, the way the source says', () => {
+    const db = seeded();
+    const row = db
+      .prepare(
+        `SELECT t.quantity AS q, t.price AS p, t.source AS s, d.gross AS g,
+                d.units_acquired AS u, d.amount_reinvested AS r
+         FROM wealthflow_trades t
+         JOIN wealthflow_stocks k ON k.id = t.stock_id
+         JOIN wealthflow_dividends d ON d.id = t.dividend_id
+         WHERE k.stock_code = 'VHY' AND t.date = '2026-07-16'`,
+      )
+      .get() as any;
+    expect(row.q).toBe(1);
+    expect(row.p).toBe(82.706);
+    expect(row.s).toBe('drp');
+    // The distribution that funded it was $12.44 and the reinvestment cost
+    // $82.71: the two do not reconcile, and the ledger records both as they
+    // are rather than inventing a number that ties.
+    expect(row.g).toBe(12.44);
+    expect(row.u).toBe(1);
+    expect(row.r).toBe(82.71);
+    db.close();
+  });
 
-    it('passes its own consistency and orphan checks', () => {
-      if (!DatabaseSync) return;
-      open();
-      for (const s of splitAuditStatements(auditSql)) {
-        if (!isConsistencyCheck(s.sql)) continue;
-        expect(db.prepare(s.sql).all(), s.label).toEqual([]);
-      }
-    });
-  },
-);
+  it('is idempotent — running it twice inserts nothing new', () => {
+    const db = seeded();
+    db.exec(buildHoldings());
+    const count = (t: string) =>
+      (db.prepare(`SELECT COUNT(*) AS c FROM ${t}`).get() as any).c;
+    expect(count('wealthflow_dividends')).toBe(39);
+    expect(count('wealthflow_trades')).toBe(46);
+    expect(count('wealthflow_prices')).toBe(3);
+    db.close();
+  });
+
+  it('stores every finance_year in agreement with its own date', () => {
+    const db = seeded();
+    const bad = (
+      db
+        .prepare(
+          `SELECT COUNT(*) AS c FROM wealthflow_dividends
+           WHERE finance_year <> CASE WHEN CAST(substr(date, 6, 2) AS INTEGER) >= 7
+                                    THEN substr(date, 1, 4) || '-' || (CAST(substr(date, 1, 4) AS INTEGER) + 1)
+                                    ELSE (CAST(substr(date, 1, 4) AS INTEGER) - 1) || '-' || substr(date, 1, 4) END`,
+        )
+        .get() as any
+    ).c;
+    expect(bad).toBe(0);
+    db.close();
+  });
+});

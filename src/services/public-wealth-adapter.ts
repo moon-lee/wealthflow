@@ -8,6 +8,7 @@ import { sumInterestByBank } from './bank-service.js';
 import { sumDividends } from './stock-service.js';
 import { getSuperTotals } from './super-service.js';
 import type { CapitalGainsSummary } from './capital-gains-service.js';
+import type { PortfolioSummary } from './portfolio-service.js';
 
 const logger = new ExtensionLogger('wealthflow');
 
@@ -66,6 +67,7 @@ export interface PublicWealthService {
   getCapitalGainsSummary(
     financialYear: string,
   ): Promise<CapitalGainsSummary | null>;
+  getPortfolioSummary(financialYear: string): Promise<PortfolioSummary | null>;
 }
 
 export function createPublicWealthAdapter(
@@ -152,6 +154,17 @@ export function createPublicWealthAdapter(
         return await getCapitalGainsSummary(finance, financialYear);
       } catch (err) {
         logger.error('getCapitalGainsSummary failed:', err);
+        return null;
+      }
+    },
+    getPortfolioSummary: async (
+      financialYear: string,
+    ): Promise<PortfolioSummary | null> => {
+      try {
+        const { getPortfolioSummary } = await import('./portfolio-service.js');
+        return await getPortfolioSummary(finance, financialYear);
+      } catch (err) {
+        logger.error('getPortfolioSummary failed:', err);
         return null;
       }
     },

@@ -12,6 +12,12 @@ export function createMockFinance(): import('finance').FinanceApi {
     string,
     Record<string, (p?: unknown) => unknown>
   > = g.__mockServices;
+  // Per-instance: a command registry belongs to the finance object that owns
+  // it, unlike the service registry which is shared across the page.
+  const commandRegistry = new Map<string, (...args: unknown[]) => unknown>();
+  // Per-instance, like the command registry: a setting belongs to the finance
+  // object that wrote it.
+  const settings = new Map<string, unknown>();
   const table = (name: string) => {
     if (!mem.has(name)) mem.set(name, new Map());
     const m = mem.get(name)!;
@@ -55,7 +61,25 @@ export function createMockFinance(): import('finance').FinanceApi {
     };
   };
   return {
-    commands: { registerCommand: () => {}, execute: async () => {} },
+    commands: {
+      // A REAL command registry, mirroring the host. It used to be a stub, so a
+      // command registered in the dev harness did nothing and a panel-side
+      // call through the command bridge silently failed. The dev harness now
+      // wires financeShell.extensions.executeCommand to this, so a button that
+      // reaches the host for work works in dev the same way it does in the app.
+      registerCommand: (
+        id: string,
+        _title: string,
+        handler: (...args: unknown[]) => unknown,
+      ) => {
+        commandRegistry.set(id, handler);
+      },
+      execute: async (id: string, ...args: unknown[]) => {
+        const handler = commandRegistry.get(id);
+        if (!handler) return null;
+        return await handler(...args);
+      },
+    },
     ai: { registerTool: () => {} },
     db: { table } as never,
     services: {
@@ -92,6 +116,13 @@ export function createMockFinance(): import('finance').FinanceApi {
       onBeforeUnmount: () => {},
     },
     events: { on: () => () => {}, emit: async () => {} },
-    settings: { get: async () => null, set: async () => {} },
+    // A real store, not a stub: the AMIT basis is a persisted preference, and
+    // a dev harness whose settings vanish between reads cannot exercise it.
+    settings: {
+      get: async (key: string) => settings.get(key) ?? null,
+      set: async (key: string, value: unknown) => {
+        settings.set(key, value);
+      },
+    },
   } as never;
 }

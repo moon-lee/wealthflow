@@ -1,7 +1,11 @@
 import type { FinanceApi } from 'finance';
 import type { Parcel } from '../dao/parcels.js';
 import { listParcels } from '../dao/parcels.js';
-import { totalAdjustment } from '../dao/cost-base-adjustments.js';
+import { listDisposals } from '../dao/disposals.js';
+import {
+  totalAdjustment,
+  totalAdjustmentAsOf,
+} from '../dao/cost-base-adjustments.js';
 import { allocateFifo, computeDisposal } from './cgt-service.js';
 
 /** 4dp, not 2dp — see spec 9.1: per-parcel shares land below display precision
@@ -19,6 +23,16 @@ export interface AmitRow {
   /** This parcel's slice of the FUND adjustment. Signed. */
   adjustmentShare: number;
   /** What actually leaves the parcel. */
+  costBase: number;
+}
+
+/** The cost base of an open position, before and after the AMIT share. */
+export interface OpenCostBase {
+  /** The open units' share of the pre-adjustment cost base. */
+  preAdjustment: number;
+  /** Their share of the fund's AMIT adjustment. Signed. */
+  amitShare: number;
+  /** What the open position is actually worth, for tax. */
   costBase: number;
 }
 
@@ -42,7 +56,10 @@ export async function allocationFor(
 ): Promise<AmitRow[]> {
   const parcels = await listParcels(finance, { stockId });
   const alloc = allocateFifo(parcels, quantity);
-  const total = await totalAdjustment(finance, stockId);
+  // Only the adjustments that existed by `asOf`. The parameter was already in
+  // the signature and previously ignored for the total; it now means what it
+  // says.
+  const total = await totalAdjustmentAsOf(finance, stockId, asOf);
   // The denominator is the WHOLE holding, not the units being sold. Selling 30
   // of 100 units bears 30% of the fund adjustment; dividing by the selected
   // rows instead would charge the entire adjustment to every partial sale.
@@ -79,6 +96,54 @@ export async function allocationFor(
     );
   }
   return rows;
+}
+
+/**
+ * The cost base of an OPEN position, on the post-AMIT basis.
+ *
+ * Today AMIT is only ever applied at disposal, so an open position has no
+ * adjusted cost base stored anywhere. The portfolio summary needs one to
+ * compute an unrealised gain.
+ *
+ * **What you still hold is what you bought, less what you sold.** It is NOT
+ * the oldest N units: FIFO consumes the oldest units first, so after a
+ * partial sale the remaining units are the newest ones plus the tail of the
+ * oldest parcel. Allocating the oldest N units instead understates the open
+ * cost base and overstates the gain — a wrong tax figure.
+ *
+ * So the open basis is derived from the ledger: the whole fund's acquisition
+ * cost base, less the pre-adjustment cost base the disposals already took.
+ * There is no "how many units" parameter — the ledger knows what is open.
+ */
+export async function openCostBase(
+  finance: FinanceApi,
+  stockId: number,
+  asOf: string,
+): Promise<OpenCostBase> {
+  const [parcels, disposals] = await Promise.all([
+    listParcels(finance, { stockId }),
+    listDisposals(finance, { stockId }),
+  ]);
+  const wholeFundPre = round4(
+    parcels.reduce((s, p) => s + p.quantity * p.price + p.brokerage, 0),
+  );
+  // A disposal's stored cost base is post-AMIT; subtracting its own share
+  // gives the pre-adjustment amount it took, which does not depend on the
+  // AMIT total and so stays correct even if later adjustments arrive.
+  const consumedPre = round4(
+    disposals.reduce((s, d) => s + (d.cost_base - d.amit_share), 0),
+  );
+  const preAdjustment = round4(wholeFundPre - consumedPre);
+  const total = await totalAdjustmentAsOf(finance, stockId, asOf);
+  const amitShare =
+    wholeFundPre > 0 && total !== 0
+      ? round4((total * preAdjustment) / wholeFundPre)
+      : 0;
+  return {
+    preAdjustment,
+    amitShare,
+    costBase: round4(preAdjustment + amitShare),
+  };
 }
 
 /** The fund headline. Spec 9.1: this, not the per-parcel share, is the figure

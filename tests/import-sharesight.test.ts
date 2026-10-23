@@ -65,17 +65,24 @@ describe('import-sharesight', () => {
     }
   });
 
-  it('refuses the one zero-quantity DRP in the real workbook, by name', () => {
-    // VHY 16 Jul 2026: a $12.44 distribution that bought 0.1504 units, recorded
-    // by ShareSight as 0 units and $0.00. Importing it literally would create a
-    // zero-quantity parcel, so the importer stops and says which row.
-    const { accepted, rejected } = parseTrades(
+  it('applies the live-source correction to the stale workbook row, and says so', () => {
+    // The workbook export carries VHY 16 Jul 2026 as 0 units and $0.00. The
+    // owner's copy of that row says 1 unit at $82.706. The source wins, the
+    // correction is recorded, and it is reported - never applied silently.
+    const { accepted, rejected, corrections } = parseTrades(
       readSheet1(readFileSync(WORKBOOK)),
     );
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].code).toBe('VHY');
-    expect(rejected[0].reason).toMatch(/quantity 0 is not a positive number/);
-    expect(accepted.filter((r: any) => r.code === 'VHY')).toHaveLength(4);
+    expect(rejected).toEqual([]);
+    expect(corrections).toHaveLength(1);
+    expect(corrections[0].code).toBe('VHY');
+    expect(corrections[0].date).toBe('2026-07-16');
+    expect(corrections[0].from).toBe('0');
+    expect(corrections[0].to).toBe(1);
+    const vhy = accepted.filter((r: any) => r.code === 'VHY');
+    expect(vhy).toHaveLength(5);
+    const drp = vhy.find((r: any) => r.date === '2026-07-16');
+    expect(drp.quantity).toBe(1);
+    expect(drp.price).toBe(82.706);
   });
 
   it('passes its own audit against the real workbook', () => {
@@ -174,10 +181,12 @@ describe('import-sharesight', () => {
   });
 
   it('flags a zero-quantity DRP instead of importing a zero-cost parcel', () => {
+    // Not the corrected row: an uncorrected zero-quantity DRP must still be
+    // refused by name rather than written as a zero-cost parcel.
     const rows = [
       {
         Code: 'VHY',
-        Date: '2026-07-16',
+        Date: '2026-10-16',
         Type: 'Reinvestment',
         Qty: '0',
         Price: '82.706',

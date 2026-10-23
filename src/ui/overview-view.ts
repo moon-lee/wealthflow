@@ -153,6 +153,10 @@ export class OverviewView extends Base {
     (this as any).requestUpdate?.();
   }
 
+  private sectionIndex(id: string): number {
+    return 0;
+  }
+
   /**
    * Take each section's record count for the folded-section badge. Runs after
    * the children have settled, and re-renders, because the first pass has
@@ -699,7 +703,7 @@ export class OverviewView extends Base {
                      below are where its parts come from. Four cards, so the
                      two that make up the gross sit beside the gross itself
                      rather than being repeated inside its caption. -->
-                <div class="section flush">
+                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('combined') : 0}">
                   <div class="section-header">
                     <h3 class="section-title">
                       Combined taxable — FY ${this.fy}
@@ -750,7 +754,7 @@ export class OverviewView extends Base {
                 </div>
 
                 <!-- Dividends -->
-                <div class="section flush">
+                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('dividends') : 0}">
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('dividends')}
@@ -787,7 +791,7 @@ export class OverviewView extends Base {
                 </div>
 
                 <!-- Interest -->
-                <div class="section flush">
+                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('interest') : 0}">
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('interest')}
@@ -838,10 +842,12 @@ export class OverviewView extends Base {
                 </div>
 
                 <!-- Capital gains -->
-                <cgt-section></cgt-section>
+                <div style="order:${this.sectionIndex ? this.sectionIndex('cgt') : 0}">
+                  <cgt-section></cgt-section>
+                </div>
 
                 <!-- Superannuation -->
-                <div class="section flush">
+                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('super') : 0}">
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('super')}
@@ -925,11 +931,7 @@ export class OverviewView extends Base {
                                 <tr>
                                   <th
                                     scope="col"
-                                    aria-sort=${
-                                      this.superSortDesc
-                                        ? 'descending'
-                                        : 'ascending'
-                                    }
+                                    aria-sort=${this.superSortDesc ? 'descending' : 'ascending'}
                                   >
                                     ${dateSortHeader(
                                       'Date',

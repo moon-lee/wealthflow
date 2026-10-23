@@ -179,9 +179,18 @@ DROP TABLE wealthflow_banks;
 DROP TABLE wealthflow_stocks;
 ```
 
-Dropping and recreating is also the way to change the schema later: the app only
-runs `CREATE TABLE IF NOT EXISTS`, so it will never migrate a table that already
-exists.
+Dropping and recreating is also the way to change the schema later. The app
+creates missing tables, and it does add new columns to an existing table
+(`ALTER TABLE ... ADD COLUMN`), but it **refuses** a `NOT NULL` column with no
+default — so such a column would break the install, and the table has to be
+dropped and recreated instead.
+
+> **Correction.** This used to say the app "will never migrate a table that
+> already exists". That was wrong: the host's `createExtensionTables` issues
+> `ALTER TABLE ... ADD COLUMN` for any manifest column the live table is
+> missing. The refusal is only for a `NOT NULL` column with no default.
+
+## Changing the seed data
 
 ## Changing the seed data
 

@@ -2,9 +2,10 @@ import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import type { Trade } from '../dao/trades.js';
-import { createTrade, updateTrade } from '../dao/trades.js';
+import { recordTrade, amendTrade } from '../services/holding-service.js';
 import { previewSell, type Allocation } from '../services/trade-service.js';
 import { formatAUD } from '../utils/format.js';
+import { localTodayIso } from '../utils/dates.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -40,10 +41,14 @@ export class TradeForm extends Base {
   brokerage = '';
   /** Live FIFO preview, recomputed on every change while side === 'sell'. */
   allocation: Allocation[] = [];
+  /** True while a save is in flight, so one click cannot write two rows. */
+  saving = false;
 
   async setFinance(f: any): Promise<void> {
     this.finance = f;
     await this.loadStocks();
+    if (!this.date) this.date = localTodayIso();
+    (this as any).requestUpdate?.();
   }
 
   private async loadStocks(): Promise<void> {
@@ -88,12 +93,35 @@ export class TradeForm extends Base {
   editTrade(t: Trade | null): void {
     this.editId = t?.id ?? null;
     this.side = t?.side ?? 'buy';
-    this.stockId = t?.stock_id ?? this.stockId;
-    this.date = t?.date ?? '';
+    // Ensure stocks loaded
+    if (!this.stocks.length && this.finance) {
+      void this.loadStocks().then(() => {
+        this.stockId = t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : 0);
+        this.date = t?.date ?? localTodayIso();
+        this.quantity = t ? String(t.quantity) : '';
+        this.price = t ? String(t.price) : '';
+        this.brokerage = t ? String(t.brokerage) : '';
+        this.error = '';
+        this.previewError = '';
+        this.allocation = [];
+        this.saving = false;
+        if (this.side === 'sell') this.brokerage = '';
+        void this.refreshPreview();
+        (this as any).requestUpdate?.();
+      });
+      return;
+    }
+    this.stockId = t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : this.stockId);
+    // A new trade is almost always today's, so the field starts filled.
+    this.date = t?.date ?? localTodayIso();
     this.quantity = t ? String(t.quantity) : '';
     this.price = t ? String(t.price) : '';
     this.brokerage = t ? String(t.brokerage) : '';
     this.error = '';
+    this.previewError = '';
+    this.allocation = [];
+    this.saving = false;
+    if (this.side === 'sell') this.brokerage = '';
     void this.refreshPreview();
     (this as any).requestUpdate?.();
   }
@@ -109,8 +137,10 @@ export class TradeForm extends Base {
 
   private async onSubmit(e: Event): Promise<void> {
     e?.preventDefault?.();
-    if (!this.finance) return;
+    if (!this.finance || this.saving) return;
+    this.saving = true;
     this.error = '';
+    (this as any).requestUpdate?.();
     const input = {
       stock_id: this.stockId,
       date: this.date,
@@ -123,7 +153,7 @@ export class TradeForm extends Base {
       // Refuse BEFORE writing, so a history that cannot balance never lands.
       await this.assertWouldBalance();
       if (this.editId == null) {
-        await createTrade(this.finance, input);
+        await recordTrade(this.finance, input);
         this.dispatchEvent(
           new CustomEvent('trade-create', {
             detail: input,
@@ -132,7 +162,7 @@ export class TradeForm extends Base {
           }),
         );
       } else {
-        await updateTrade(this.finance, this.editId, input);
+        await amendTrade(this.finance, this.editId, input);
         this.dispatchEvent(
           new CustomEvent('trade-edit', {
             detail: input,
@@ -146,6 +176,9 @@ export class TradeForm extends Base {
       // Never swallow it: the whole point of a ledger is that a figure you
       // typed is either stored or visibly refused.
       this.error = String(err?.message || err);
+    } finally {
+      // A second click while this one is in flight would write the row twice.
+      this.saving = false;
       (this as any).requestUpdate?.();
     }
   }
@@ -157,9 +190,44 @@ export class TradeForm extends Base {
     previewSell(parcels, Number(this.quantity), Number(this.price) || 0);
   }
 
+  /** What a buy will cost, before it is saved. Brokerage is part of the cost. */
+  get buyTotal(): number {
+    const q = Number(this.quantity) || 0;
+    const p = Number(this.price) || 0;
+    const b = Number(this.brokerage) || 0;
+    return q * p + b;
+  }
+
   private onInput(field: string, value: string | number): void {
     (this as any)[field] = value;
+    // The message was about the value that has just been replaced.
+    if (this.error) this.error = '';
+    // A sell's tax preview is the reason to look at this form; a quantity that
+    // never moves it makes it look broken.
+    if (
+      this.side === 'sell' &&
+      (field === 'quantity' || field === 'price' || field === 'stockId')
+    )
+      void this.refreshPreview();
     (this as any).requestUpdate?.();
+  }
+
+  private onStockChange(e: Event): void {
+    this.onInput('stockId', Number((e.target as HTMLSelectElement).value));
+  }
+
+  /**
+   * The Save button says what it is doing. `saving` also disables it, so one
+   * click cannot write two ledger rows.
+   */
+  private get saveLabel(): string {
+    if (this.saving) return 'Saving…';
+    return this.editId == null ? 'Save' : 'Save changes';
+  }
+
+  /** Clearing a blank form is "Clear"; abandoning an edit is not. */
+  private get resetLabel(): string {
+    return this.editId == null ? 'Clear' : 'Cancel edit';
   }
 
   override render(): unknown {
@@ -195,15 +263,19 @@ export class TradeForm extends Base {
             }
           </h3>
           <div class="header-actions">
-            <button class="btn btn-secondary btn-small" type="submit">
-              Save
+            <button
+              class="btn btn-secondary btn-small"
+              type="submit"
+              ?disabled=${this.saving}
+            >
+              ${this.saveLabel}
             </button>
             <button
               class="btn btn-secondary btn-small"
               type="button"
               @click=${() => this.editTrade(null)}
             >
-              Hide form
+              ${this.resetLabel}
             </button>
           </div>
         </div>
@@ -213,83 +285,89 @@ export class TradeForm extends Base {
               ? html`<p class="field-error">Error: ${this.error}</p>`
               : ''
           }
-          <div class="stat-grid cols-4">
-            <div>
-              <div class="stat-label">Date</div>
+          <div class="stat-grid trade-form-grid">
+            <label>
+              <span>Date</span>
               <input
                 type="date"
+                required
                 .value=${this.date}
-                @input=${(e: Event) =>
-                  this.onInput('date', (e.target as HTMLInputElement).value)}
+                @input=${(e: Event) => this.onInput('date', (e.target as HTMLInputElement).value)}
               />
-            </div>
-            <div>
-              <div class="stat-label">Stock</div>
-              <select
-                @change=${(e: Event) =>
-                  this.onInput(
-                    'stockId',
-                    Number((e.target as HTMLSelectElement).value),
-                  )}
-              >
+            </label>
+            <label>
+              <span>Stock</span>
+              <select @change=${(e: Event) => this.onStockChange(e)}>
                 ${this.stocks.map(
                   (s) =>
                     html`<option
                       value=${s.id}
                       ?selected=${s.id === this.stockId}
                     >
-                      ${s.stock_code} — ${s.stock_full_name}
+                      ${s.stock_code}
                     </option>`,
                 )}
               </select>
-            </div>
-            <div>
-              <div class="stat-label">Quantity</div>
+            </label>
+            <label>
+              <span>Quantity</span>
               <input
+                type="number"
                 inputmode="decimal"
+                step="any"
+                min="0"
+                required
+                placeholder="0"
                 .value=${this.quantity}
-                @input=${(e: Event) =>
-                  this.onInput(
-                    'quantity',
-                    (e.target as HTMLInputElement).value,
-                  )}
+                @input=${(e: Event) => this.onInput('quantity', (e.target as HTMLInputElement).value)}
               />
-            </div>
-            <div>
-              <div class="stat-label">Price</div>
+            </label>
+            <label>
+              <span>Price</span>
               <input
+                type="number"
                 inputmode="decimal"
+                step="0.001"
+                min="0"
+                required
+                placeholder="0.000"
                 .value=${this.price}
-                @input=${(e: Event) =>
-                  this.onInput('price', (e.target as HTMLInputElement).value)}
+                @input=${(e: Event) => this.onInput('price', (e.target as HTMLInputElement).value)}
               />
-            </div>
+            </label>
             <div>
-              <div class="stat-label">Brokerage</div>
-              <input
-                inputmode="decimal"
-                ?readonly=${this.side === 'sell'}
-                .value=${this.brokerage}
-                @input=${(e: Event) => {
-                  this.onInput(
-                    'brokerage',
-                    (e.target as HTMLInputElement).value,
-                  );
-                  void this.refreshPreview();
-                }}
-              />
+              <label>
+                <span>Brokerage</span>
+                <input
+                  type="number"
+                  inputmode="decimal"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  ?readonly=${this.side === 'sell'}
+                  .value=${this.brokerage}
+                  @input=${(e: Event) => this.onInput('brokerage', (e.target as HTMLInputElement).value)}
+                />
+              </label>
               ${
                 this.side === 'sell'
-                  ? html`<p class="muted">
-                      Selling costs are capital costs, not part of cost base —
-                      out of scope for now, so the field is closed rather than
-                      quietly ignored.
+                  ? html`<p class="muted trade-form-hint">
+                      Selling costs aren't part of cost base, so this field is
+                      closed.
                     </p>`
                   : ''
               }
             </div>
           </div>
 
+          ${
+            this.side === 'buy' && (this.quantity !== '' || this.price !== '')
+              ? html`<div class="trade-form-total">
+                  <span class="muted">Total cost</span>
+                  <strong>${formatAUD(this.buyTotal)}</strong>
+                </div>`
+              : ''
+          }
           ${this.side === 'sell' ? this.renderPreview() : ''}
         </div>
       </form>
@@ -298,7 +376,7 @@ export class TradeForm extends Base {
 
   private renderPreview(): unknown {
     return html`
-      <div class="section-body preview">
+      <div class="section-body portfolio-preview">
         <div class="section-title">FIFO allocation preview</div>
         ${
           this.previewError

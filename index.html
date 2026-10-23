@@ -30,6 +30,7 @@
         TAB_LABELS,
       } from '/src/ui/wealthflow-orchestrator.ts';
       import * as main from '/src/main.ts';
+      import { listenForHostPush } from '/src/main.ts';
 
       // ---- one entry per real view, in the same order as the app's nav ----
       // These mirror package.json#financeExtension.contributions.navigation:
@@ -54,16 +55,50 @@
       });
 
       const finance = createMockFinance();
+      // The price endpoints send no CORS headers, so this page cannot read
+      // them directly. The dev server proxies them instead, and this points
+      // the price service at those routes. In the app no proxy is needed: the
+      // fetch is host-side, and Node has no CORS.
+      const priceService = await import('/src/services/price-service.ts');
+      priceService.setPriceEndpoints({
+        asx: '/proxy/asx',
+        yahoo: '/proxy/yahoo',
+      });
       // Dev console hook for the gitignored seed module:
       //   const m = await import('/src/seed/wealth-seed.ts');
       //   await m.seedWealthflow(window.__finance);
       window.__finance = finance;
+      // The dev stand-in for the host's command bridge. In the app a panel
+      // reaches a host command through globalThis.financeShell, which the host
+      // owns; here the mock's command registry plays that part, so a button
+      // that delegates work to the host works in dev the way it does in the app.
+      window.financeShell = {
+        extensions: {
+          executeCommand: async (commandId, ...args) => {
+            const result = await finance.commands.execute(commandId, ...args);
+            return {
+              executed: result !== null && result !== undefined,
+              result,
+            };
+          },
+        },
+      };
       // Dev console helper for the public domain service, so a cross-extension
       // consumer can be exercised without a second extension in the page.
       // Params go in as an array because the host spreads them positionally:
       //   await __svc('getOverviewSummary', '2026-2027')
       window.__svc = (method, ...args) =>
         finance.services.invoke('wealthflow', method, args);
+      // Dev console helper for the host-side price fetch. The real path is the
+      // "Update prices" button, which calls the host command through the
+      // shell bridge; this runs the same service directly:
+      //   await __prices()
+      window.__prices = async () => {
+        const m = await import('/src/services/price-service.ts');
+        const r = await m.updatePrices(finance);
+        console.info('[wealthflow] prices', r);
+        return r;
+      };
       // Child views are FY-driven and the orchestrator takes an explicit FY in
       // its mount payload, so the page has to hand one over — which is what
       // panel-bootstrap passes in the real app.
@@ -72,6 +107,10 @@
       // retargets it in place rather than tearing the element down and back up.
       const panel = document.createElement('wealthflow-orchestrator');
       document.getElementById('app').appendChild(panel);
+      // The host's panel pushes (a Refresh, for one) arrive as a
+      // 'mount-update' on #app. The dev harness owns its own panel, so it
+      // registers the listener the app would have registered for it.
+      main.listenForHostPush(document.getElementById('app'), panel, finance);
 
       // ---- ?seed (or ?seed=1) loads src/seed/wealth-seed.ts before mount ----
       // The seed module is gitignored, so a missing file is not an error: the

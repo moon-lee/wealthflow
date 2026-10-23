@@ -77,6 +77,24 @@ export async function totalAdjustment(
   return round4(rows.reduce((s, r) => s + r.amount, 0));
 }
 
+/**
+ * The signed total as it stood on `asOf` — adjustments dated after that day
+ * did not exist yet, so a snapshot of that date must not carry them.
+ *
+ * Date comparison is lexicographic because every date is `YYYY-MM-DD`.
+ */
+export async function totalAdjustmentAsOf(
+  finance: FinanceApi,
+  stockId: number,
+  asOf: string,
+): Promise<number> {
+  const rows = await listAdjustments(finance, stockId);
+  const sum = rows
+    .filter((r) => r.date <= asOf)
+    .reduce((s, r) => s + r.amount, 0);
+  return round4(sum);
+}
+
 export async function deleteAdjustmentsForStock(
   finance: FinanceApi,
   stockId: number,

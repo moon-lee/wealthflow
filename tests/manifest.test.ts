@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import pkg from '../package.json';
 
 describe('manifest', () => {
-  it('declares single view, 7 commands, 10 tables', () => {
+  it('declares single view, 8 commands, 11 tables', () => {
     const fe: any = (pkg as any).financeExtension;
     expect(fe.id).toBe('wealthflow');
     expect(fe.contributions.views).toHaveLength(1);
@@ -17,6 +17,7 @@ describe('manifest', () => {
         'wealthflow.show-overview',
         'wealthflow.show-stocks',
         'wealthflow.show-trades',
+        'wealthflow.update-prices',
       ].sort(),
     );
     expect(fe.tables.map((t: any) => t.name).sort()).toEqual(
@@ -28,6 +29,7 @@ describe('manifest', () => {
         'wealthflow_disposals',
         'wealthflow_interest_entries',
         'wealthflow_parcels',
+        'wealthflow_prices',
         'wealthflow_stocks',
         'wealthflow_super_entries',
         'wealthflow_trades',
@@ -89,6 +91,19 @@ describe('manifest', () => {
     );
     for (const evt of ['super-create', 'super-edit', 'super-delete'])
       expect(fe.contributions.allowedUiEvents).toContain(evt);
+  });
+
+  it('declares wealthflow_prices as an append-only price history', () => {
+    const fe: any = (pkg as any).financeExtension;
+    const t = fe.tables.find((x: any) => x.name === 'wealthflow_prices');
+    expect(t).toBeDefined();
+    expect(t.columns.map((c: any) => c.name).sort()).toEqual(
+      ['as_at', 'price', 'source', 'stock_id'].sort(),
+    );
+    // A price of 0 is not a price, and a price without a date cannot be
+    // "as of" anything.
+    expect(t.columns.find((c: any) => c.name === 'price').nullable).toBe(false);
+    expect(t.columns.find((c: any) => c.name === 'as_at').nullable).toBe(false);
   });
 
   it('declares AMIT adjustments as fund-level, not parcel-level', () => {

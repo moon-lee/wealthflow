@@ -183,24 +183,31 @@ export class DividendLog extends Base {
           ${this.entries.length === 1 ? 'receipt' : 'receipts'}</span
         >
       </div>
-      ${
-        this.error
-          ? html`<p class="field-error" role="alert" aria-live="polite">
-              Error: ${this.error}
-            </p>`
-          : ''
-      }
-      ${
-        this.entries.length === 0
-          ? html`<p class="empty-state">
-              ${
-                filtered
-                  ? 'No receipts match this filter.'
-                  : 'No dividends logged this FY yet — use “Log dividend” to add the first one.'
-              }
-            </p>`
-          : this.renderTable(gross, franking, filtered)
-      }
+      <!--
+        Both conditionals sit inside this element. A binding at the ROOT
+        level of a template is dropped by happy-dom's parser, so the table
+        below would be in no test's DOM to assert against.
+      -->
+      <div>
+        ${
+          this.error
+            ? html`<p class="field-error" role="alert" aria-live="polite">
+                Error: ${this.error}
+              </p>`
+            : ''
+        }
+        ${
+          this.entries.length === 0
+            ? html`<p class="empty-state">
+                ${
+                  filtered
+                    ? 'No receipts match this filter.'
+                    : 'No dividends logged this FY yet — use "Log dividend" to add the first one.'
+                }
+              </p>`
+            : this.renderTable(gross, franking, filtered)
+        }
+      </div>
     `;
   }
 

@@ -5,15 +5,52 @@ import { readSheet1 } from './xlsx-read.mjs';
 export const HELD_CODES = ['VAS', 'VHY', 'FGX'];
 
 /**
- * Reconciled against docs/AllTradesReport.xlsx on 2026-10-17. The importer
- * refuses to write unless every figure below matches, so a parsing regression
- * cannot quietly install a wrong ledger.
+ * Reconciled against docs/AllTradesReport.xlsx on 2026-10-17, and against the
+ * owner's copy of the VHY rows on 2026-10-22. The importer refuses to write
+ * unless every figure below matches, so a parsing regression cannot quietly
+ * install a wrong ledger.
  */
 export const EXPECTED = {
   VAS: { rows: 32, units: 165, costBase: 15238.16 },
-  VHY: { rows: 5, units: 22, costBase: 1541.17 },
+  // VHY's third reinvestment (16 Jul 2026) bought ONE unit at $82.706, not
+  // zero: the source row the owner supplied says so.
+  VHY: { rows: 5, units: 23, costBase: 1623.88 },
   FGX: { rows: 9, units: 1109, costBase: 1284.08 },
 };
+
+/**
+ * Rows the workbook has wrong, corrected against the live source.
+ *
+ * `docs/AllTradesReport.xlsx` is a STATIC EXPORT. One of its rows has since
+ * been corrected at the source, and the export still carries the old value:
+ *
+ *   VHY | 16 Jul 2026 | Reinvestment | Qty "0" | Price 82.706 | Value "0"
+ *
+ * The owner's copy of that row reads:
+ *
+ *   VHY | 16 Jul 2026 | Reinvestment | 1 | AU$82.706 | - | AU$82.71
+ *
+ * So the workbook says the reinvestment bought nothing and the source says it
+ * bought one unit. The source wins, and this table is where that is written
+ * down - with the reason - rather than being a silent special case in the
+ * parser. Every correction applied is reported by the run harness.
+ */
+export const CORRECTIONS = [
+  {
+    code: 'VHY',
+    date: '2026-07-16',
+    type: 'Reinvestment',
+    qty: 1,
+    value: 82.71,
+    reason:
+      'the workbook export predates the source correcting this row from 0 units to 1 unit at $82.706',
+  },
+];
+
+const correctionFor = (code, date, type) =>
+  CORRECTIONS.find(
+    (c) => c.code === code && c.date === date && c.type === type,
+  );
 
 const sheetRowOf = (row, i) => (Number.isFinite(row.__row) ? row.__row : i + 1);
 const ACCEPTED_TYPES = { Buy: 'buy', Reinvestment: 'buy' };
@@ -21,6 +58,7 @@ const ACCEPTED_TYPES = { Buy: 'buy', Reinvestment: 'buy' };
 export function parseTrades(rows) {
   const accepted = [];
   const rejected = [];
+  const corrections = [];
   const heldCounts = {};
   for (const c of HELD_CODES) heldCounts[c] = { rows: 0 };
   rows.forEach((row, i) => {
@@ -41,11 +79,27 @@ export function parseTrades(rows) {
       });
       return;
     }
-    const quantity = Number(row.Qty);
+    let quantity = Number(row.Qty);
     const price = Number(row.Price);
     const brokerage =
       row.Brokerage === '' || row.Brokerage == null ? 0 : Number(row.Brokerage);
     const date = (row.Date ?? '').trim();
+
+    // A correction from the live source wins over the static export, and it is
+    // applied BEFORE validation - otherwise a row the workbook says is empty
+    // would be refused and the correction would never take effect.
+    const correction = correctionFor(code, date, type);
+    if (correction) {
+      corrections.push({
+        row: sheetRowOf(row, i),
+        code,
+        date,
+        from: row.Qty,
+        to: correction.qty,
+        reason: correction.reason,
+      });
+      quantity = correction.qty;
+    }
 
     if (!Number.isFinite(quantity) || quantity <= 0) {
       rejected.push({
@@ -81,7 +135,7 @@ export function parseTrades(rows) {
       source: type === 'Reinvestment' ? 'drp' : 'import',
     });
   });
-  return { accepted, rejected, heldCounts };
+  return { accepted, rejected, heldCounts, corrections };
 }
 
 function round2(n) {
@@ -135,7 +189,7 @@ export function audit(parsed) {
 if (process.argv[1] && process.argv[1].endsWith('import-sharesight.mjs')) {
   const path = process.argv[2] ?? 'docs/AllTradesReport.xlsx';
   const rows = readSheet1(readFileSync(path));
-  const { accepted, rejected, heldCounts } = parseTrades(rows);
+  const { accepted, rejected, heldCounts, corrections } = parseTrades(rows);
 
   console.log(`\nsource: ${path}`);
   console.log(`held codes: ${HELD_CODES.join(', ')}\n`);
@@ -144,6 +198,15 @@ if (process.argv[1] && process.argv[1].endsWith('import-sharesight.mjs')) {
     console.log(
       `  ${code}  ${String(s.rows).padStart(3)} rows  ${String(s.units).padStart(6)} units  $${s.costBase.toFixed(2)}`,
     );
+  }
+  if (corrections.length) {
+    console.log(
+      '\ncorrections applied — the workbook disagrees with the live source:',
+    );
+    for (const c of corrections)
+      console.log(
+        `  row ${c.row}  ${c.code} ${c.date}  qty ${c.from} -> ${c.to}  (${c.reason})`,
+      );
   }
   if (rejected.length) {
     console.log('\nrejected — the importer does not skip these silently:');

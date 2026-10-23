@@ -1,13 +1,13 @@
 {
   "name": "wealthflow",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.2.5",
+    "version": "0.2.6",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
     "activationEvents": [
@@ -51,6 +51,10 @@
         {
           "id": "wealthflow.refresh",
           "title": "Refresh Wealth Flow"
+        },
+        {
+          "id": "wealthflow.update-prices",
+          "title": "Wealth Flow: Update Prices"
         }
       ],
       "navigation": [
@@ -94,6 +98,13 @@
           "pattern": "^#[0-9A-Fa-f]{6}$",
           "formatHint": "#RRGGBB",
           "placeholder": "#10B981"
+        },
+        {
+          "key": "wealthflow.amitBasis",
+          "type": "enum",
+          "enumOptions": ["pre", "post"],
+          "label": "Cost base the Investment gains are measured against. 'pre' is what you paid, before AMIT adjustments; 'post' is your tax cost base. The Capital gains section always uses 'post'.",
+          "default": "pre"
         }
       ],
       "allowedCommands": [
@@ -103,7 +114,8 @@
         "wealthflow.add-dividend",
         "wealthflow.show-overview",
         "wealthflow.show-trades",
-        "wealthflow.refresh"
+        "wealthflow.refresh",
+        "wealthflow.update-prices"
       ],
       "allowedUiEvents": [
         "bank-create",
@@ -538,6 +550,32 @@
             "type": "real",
             "nullable": false,
             "default": 0
+          }
+        ]
+      },
+      {
+        "name": "wealthflow_prices",
+        "columns": [
+          {
+            "name": "stock_id",
+            "type": "integer",
+            "nullable": false
+          },
+          {
+            "name": "price",
+            "type": "real",
+            "nullable": false
+          },
+          {
+            "name": "as_at",
+            "type": "date",
+            "nullable": false
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "nullable": false,
+            "default": "manual"
           }
         ]
       }

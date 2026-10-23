@@ -24,3 +24,14 @@ export function monthsBetween(from: string, to: string): number {
 export function todayIso(now: Date = new Date()): string {
   return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-${String(now.getUTCDate()).padStart(2, '0')}`;
 }
+
+/**
+ * Today as `YYYY-MM-DD` on the LOCAL calendar.
+ *
+ * `todayIso` is UTC on purpose — a financial year must not move with the
+ * clock. A date input is different: a reader in Australia at 9am is still on
+ * yesterday's UTC date, and prefilling yesterday would be wrong by a day.
+ */
+export function localTodayIso(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}

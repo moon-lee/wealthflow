@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
+import { portfolioStyles } from '../styles/portfolio-styles.js';
 import { formatAUD } from '../utils/format.js';
 import type { CapitalGainsSummary } from '../services/capital-gains-service.js';
 import { getCapitalGainsSummary } from '../services/capital-gains-service.js';
@@ -23,7 +24,7 @@ function plural(n: number, word: string): string {
 export class CgtSection extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
-      ? ([sharedStyles, wealthflowStyles] as any)
+      ? ([sharedStyles, wealthflowStyles, portfolioStyles] as any)
       : [];
   finance: any = null;
   fy = '';
@@ -129,67 +130,80 @@ export class CgtSection extends Base {
       s.sellCount === 0 && s.grossGain === 0 && s.lossesApplied === 0;
     return html`
       <div class="section-summary">
-        <div class="stat-grid cols-4">
-          <div class="stat">
-            <div class="stat-label">Gross capital gain</div>
-            <div class="stat-value">${formatAUD(s.grossGain)}</div>
-            <div class="stat-note">before losses and discount</div>
+        <div class="portfolio-cards cols-4">
+          <div class="portfolio-card">
+            <div class="portfolio-card-label">Gross capital gain</div>
+            <div class="portfolio-card-value">${formatAUD(s.grossGain)}</div>
+            <div class="portfolio-card-note">before losses and discount</div>
           </div>
-          <div class="stat">
-            <div class="stat-label">Losses applied</div>
-            <div class="stat-value">${formatAUD(s.lossesApplied)}</div>
-            <div class="stat-note">offset against gains first</div>
+          <div class="portfolio-card">
+            <div class="portfolio-card-label">Losses applied</div>
+            <div class="portfolio-card-value">
+              ${formatAUD(s.lossesApplied)}
+            </div>
+            <div class="portfolio-card-note">offset against gains first</div>
           </div>
-          <div class="stat">
-            <div class="stat-label">50% discount</div>
-            <div class="stat-value">${formatAUD(s.adjustment)}</div>
-            <div class="stat-note">parcels held 12+ months</div>
+          <div class="portfolio-card">
+            <div class="portfolio-card-label">50% discount</div>
+            <div class="portfolio-card-value">${formatAUD(s.adjustment)}</div>
+            <div class="portfolio-card-note">parcels held 12+ months</div>
           </div>
-          <div class="stat">
-            <div class="stat-label">Net capital gain</div>
-            <div class="stat-value ok">${formatAUD(s.netGain)}</div>
-            <div class="stat-note">reportable — FY ${s.financialYear}</div>
+          <div class="portfolio-card">
+            <div class="portfolio-card-label">Net capital gain</div>
+            <div class="portfolio-card-value is-ok">
+              ${formatAUD(s.netGain)}
+            </div>
+            <div class="portfolio-card-note">
+              reportable — FY ${s.financialYear}
+            </div>
           </div>
         </div>
       </div>
 
-      ${
-        none
-          ? html`<p class="muted">
-              No disposals recorded this financial year.
-            </p>`
-          : html`
-              <div class="table-wrap">
-                <table class="hist-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Stock</th>
-                      <th scope="col" class="num">Disposals</th>
-                      <th scope="col" class="num">Proceeds</th>
-                      <th scope="col" class="num">Cost base</th>
-                      <th scope="col" class="num">Nominal</th>
-                      <th scope="col" class="num">Discount</th>
-                      <th scope="col" class="num">Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${s.byStock.map(
-                      (r) =>
-                        html`<tr>
-                          <td>${r.stockCode}</td>
-                          <td class="num">${r.disposals}</td>
-                          <td class="num">${formatAUD(r.proceeds)}</td>
-                          <td class="num">${formatAUD(r.costBase)}</td>
-                          <td class="num">${formatAUD(r.nominalGain)}</td>
-                          <td class="num">${formatAUD(r.adjustment)}</td>
-                          <td class="num">${formatAUD(r.netGain)}</td>
-                        </tr>`,
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            `
-      }
+      <!--
+        The table sits inside this element. A binding at the ROOT level of a
+        template is dropped by happy-dom's parser, so the disposals table was
+        in no test's DOM to assert against.
+      -->
+      <div>
+        ${
+          none
+            ? html`<p class="muted">
+                No disposals recorded this financial year.
+              </p>`
+            : html`
+                <div class="table-wrap">
+                  <table class="hist-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Stock</th>
+                        <th scope="col" class="num">Disposals</th>
+                        <th scope="col" class="num">Proceeds</th>
+                        <th scope="col" class="num">Cost base</th>
+                        <th scope="col" class="num">Nominal</th>
+                        <th scope="col" class="num">Discount</th>
+                        <th scope="col" class="num">Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${s.byStock.map(
+                        (r) =>
+                          html`<tr>
+                            <td>${r.stockCode}</td>
+                            <td class="num">${r.disposals}</td>
+                            <td class="num">${formatAUD(r.proceeds)}</td>
+                            <td class="num">${formatAUD(r.costBase)}</td>
+                            <td class="num">${formatAUD(r.nominalGain)}</td>
+                            <td class="num">${formatAUD(r.adjustment)}</td>
+                            <td class="num">${formatAUD(r.netGain)}</td>
+                          </tr>`,
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              `
+        }
+      </div>
 
       <p class="muted">
         Losses are offset against gains <em>before</em> the 50% discount, and
