@@ -129,6 +129,9 @@ export class WealthOrchestrator extends Base {
       try {
         if (this.tab === 'overview' && c.sectionOrder !== undefined) {
           c.sectionOrder = [...this.sectionOrder];
+          // A save reassigns the order on a mounted child; without this the
+          // new array sits there until something else happens to re-render.
+          (c as any).requestUpdate?.();
         }
       } catch {
         /* ignore */
@@ -155,8 +158,14 @@ export class WealthOrchestrator extends Base {
     this.addEventListener('wealthflow-navigate', this._onNav as EventListener);
     this.addEventListener('host-navigate', this._onHostNav as EventListener);
     this.addEventListener('reorder-sections', this._onReorder as EventListener);
-    this.addEventListener('section-order-cancel', this._onReorderDone as EventListener);
-    this.addEventListener('section-order-change', this._onReorderDone as EventListener);
+    this.addEventListener(
+      'section-order-cancel',
+      this._onReorderDone as EventListener,
+    );
+    this.addEventListener(
+      'section-order-change',
+      this._onReorderDone as EventListener,
+    );
   }
 
   /**
@@ -179,9 +188,18 @@ export class WealthOrchestrator extends Base {
       this._onNav as EventListener,
     );
     this.removeEventListener('host-navigate', this._onHostNav as EventListener);
-    this.removeEventListener('reorder-sections', this._onReorder as EventListener);
-    this.removeEventListener('section-order-cancel', this._onReorderDone as EventListener);
-    this.removeEventListener('section-order-change', this._onReorderDone as EventListener);
+    this.removeEventListener(
+      'reorder-sections',
+      this._onReorder as EventListener,
+    );
+    this.removeEventListener(
+      'section-order-cancel',
+      this._onReorderDone as EventListener,
+    );
+    this.removeEventListener(
+      'section-order-change',
+      this._onReorderDone as EventListener,
+    );
     (super.disconnectedCallback as (() => void) | undefined)?.call(this);
   }
 
@@ -243,23 +261,6 @@ export class WealthOrchestrator extends Base {
             >Wealth Flow · ${TAB_LABELS[this.tab]}</span
           >
           <div class="spacer"></div>
-          ${
-            this.tab === 'overview'
-              ? html`<button
-                  class="filter-btn"
-                  @click=${() => {
-                    this.dispatchEvent(
-                      new CustomEvent('reorder-sections', {
-                        bubbles: true,
-                        composed: true,
-                      }),
-                    );
-                  }}
-                >
-                  ⇅ Reorder Sections
-                </button>`
-              : ''
-          }
           <label class="fy-label" for="fy-select">Finance year</label>
           <select
             id="fy-select"
@@ -280,6 +281,23 @@ export class WealthOrchestrator extends Base {
               (f) => html`<option value=${f}>FY ${f}</option>`,
             )}
           </select>
+          ${
+            this.tab === 'overview'
+              ? html`<button
+                  class="filter-btn"
+                  @click=${() => {
+                    this.dispatchEvent(
+                      new CustomEvent('reorder-sections', {
+                        bubbles: true,
+                        composed: true,
+                      }),
+                    );
+                  }}
+                >
+                  ⇅ Reorder Sections
+                </button>`
+              : ''
+          }
         </div>
         <div class="view-container">
           <div class="view-container-inner">
@@ -288,11 +306,13 @@ export class WealthOrchestrator extends Base {
             ${this.tab === 'stocks' ? html`<stock-list id="child"></stock-list>` : ''}
             ${this.tab === 'trades' ? html`<trades-view id="child"></trades-view>` : ''}
             ${this.tab === 'overview' ? html`<overview-view id="child"></overview-view>` : ''}
-            ${this.showReorder
-              ? html`<reorder-overview-sections-modal
-                  .sectionOrder=${this.sectionOrder}
-                ></reorder-overview-sections-modal>`
-              : ''}
+            ${
+              this.showReorder
+                ? html`<reorder-overview-sections-modal
+                    .sectionOrder=${this.sectionOrder}
+                  ></reorder-overview-sections-modal>`
+                : ''
+            }
           </div>
         </div>
       </div>

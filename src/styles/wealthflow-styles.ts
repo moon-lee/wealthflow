@@ -825,6 +825,21 @@ export const wealthflowStyles = css`
     grid-template-columns: 0.9fr 1.7fr 0.8fr 0.8fr 0.8fr;
     gap: 12px;
   }
+  /* A number in this form reads as a number: right-aligned on tabular digits,
+     so quantity, price and brokerage line up under each other and with the
+     money columns below. Text fields keep the left edge. */
+  .trade-form-grid input[type='number'] {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  /* Native spinners sit on top of the last digit and would eat the column. */
+  .trade-form-grid input[type='number']::-webkit-outer-spin-button,
+  .trade-form-grid input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
   @media (max-width: 760px) {
     .trade-form-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -950,6 +965,89 @@ export const wealthflowStyles = css`
   .order-stack {
     display: flex;
     flex-direction: column;
+  }
+
+  /* ===== Reorder Sections modal =====
+     One row per Overview section. The top and bottom of the list carry a
+     coloured edge so you can see where a move will land, and the arrow
+     buttons take the accent colour to read as actions rather than labels. */
+  .reorder-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 10px;
+    border: 1px solid var(--ff-bg-input, #3c3c3c);
+    border-left: 4px solid var(--ff-bg-input, #3c3c3c);
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+  .reorder-item.is-first {
+    border-left-color: var(--ff-teal, #4ec9b0);
+  }
+  .reorder-item.is-last {
+    border-left-color: var(--ff-accent, #007acc);
+  }
+  .reorder-label {
+    flex: 1;
+  }
+  .reorder-up {
+    background: var(--ff-accent, #007acc);
+    color: var(--ff-text-strong, #fff);
+  }
+  .reorder-down {
+    background: var(--ff-accent-hover, #1177bb);
+    color: var(--ff-text-strong, #fff);
+  }
+
+  /* ===== Parcels =====
+     One card per tracked stock, abreast while there is room and wrapping
+     under it. The selected card keeps the accent border that the inline
+     style used to paint. */
+  .parcel-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .parcel-card {
+    flex: 1 1 180px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    text-align: left;
+  }
+  .parcel-card.is-selected {
+    border-color: var(--ff-accent, #007acc);
+  }
+  .parcel-card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .parcel-card-code {
+    font-weight: 600;
+    color: var(--ff-text, #d4d4d4);
+  }
+  .parcel-card-name {
+    font-size: var(--ff-font-sm, 12px);
+  }
+  .parcel-card-note {
+    margin-top: 4px;
+  }
+  .parcel-card-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 6px;
+    color: var(--ff-text, #d4d4d4);
+  }
+  .parcel-group-detail {
+    margin-top: 12px;
   }
 
   /* ===== Topbar dialect (mirrors expenseflow) =====

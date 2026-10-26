@@ -1,13 +1,13 @@
 {
   "name": "wealthflow",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "type": "module",
   "main": "src/main.ts",
   "financeExtension": {
     "id": "wealthflow",
     "displayName": "Wealth Flow",
-    "version": "0.2.6",
+    "version": "0.2.7",
     "description": "Bank interest + stock dividends by financial year.",
     "themeColor": "#10B981",
     "activationEvents": [
@@ -102,7 +102,10 @@
         {
           "key": "wealthflow.amitBasis",
           "type": "enum",
-          "enumOptions": ["pre", "post"],
+          "enumOptions": [
+            "pre",
+            "post"
+          ],
           "label": "Cost base the Investment gains are measured against. 'pre' is what you paid, before AMIT adjustments; 'post' is your tax cost base. The Capital gains section always uses 'post'.",
           "default": "pre"
         }

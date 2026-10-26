@@ -243,6 +243,14 @@ the parcel ledger keeps its grouped-by-holding, expand-to-lot form with the
 discount countdown. What changes is that they stop sharing a segment control and
 stop hiding behind each other.
 
+**The parcel lot table sorts by Acquired.** The column header is the same
+`.th-sort` control the Overview logs use: a caret states the current order and
+`aria-sort` says it to a screen reader. Latest first is the default, so the most
+recent lot is the first thing you see; one click flips to oldest first, which is
+FIFO's reading order — the lot a sale consumes first. Same-day lots break by id,
+and a sort returns to page one, since page two of the old order is rarely page two
+of the new one.
+
 **Consequences:**
 
 - **No manifest navigation change.** `wealthflow.show-trades` already opens this
@@ -256,7 +264,8 @@ stop hiding behind each other.
   responsibilities and are reused as-is; two new elements, `trades-summary` and
   `investment-table`, are added alongside them.
 - **The Trades section header** is the ONLY owner of the form's visibility: one
-  "Log buy / Hide form" button. The form's own header carries Save and Clear —
+  "Log trade / Hide form" button, and the form starts hidden — the log is what
+  the page opens on. The form's own header carries Save and Clear —
   "Cancel edit" while amending — and never a second Hide.
 - **The Parcels section header** keeps the "N parcels" badge.
 
@@ -274,6 +283,16 @@ Quantity and Price are `required`, each field is wrapped in its own `<label>`, a
 a buy shows a running total cost before it is saved. Editing a field clears a stale
 error, a sell refreshes the FIFO preview while the quantity is typed, and the Save
 button disables itself while a save is in flight so one click cannot write two rows.
+
+**The form reads like the table under it.** The Stock selector lists codes only
+(`VAS`, not `VAS — Vanguard Australian Shares`): the code is what the log and the
+parcels show, and a full name widens the menu until the value is what scrolls out
+of view. Quantity, Price and Brokerage are `type="number"` with `min="0"`,
+right-aligned on tabular figures so the three line up with each other and with the
+money columns below, and their native spinners are hidden. Price takes
+`step="any"` because a DRP reinvestment price carries four decimals (`81.4095` in
+the reconciled history); a fixed step would make an existing trade invalid the
+moment it is opened, and the browser would swallow Save without an error.
 
 
 **Section headers and collapse.** Each of the four sections has its own header,

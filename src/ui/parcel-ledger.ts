@@ -16,6 +16,7 @@ import {
 } from '../services/parcel-service.js';
 import { addMonths, monthsBetween, todayIso } from '../utils/dates.js';
 import { formatAUD, formatPrice } from '../utils/format.js';
+import { dateSortHeader } from './sort-header.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -80,9 +81,11 @@ export class ParcelLedger extends Base {
   parcels: Parcel[] = [];
   disposals: DisposalRow[] = [];
   stocks: { id: number; stock_code: string; stock_full_name: string }[] = [];
-  expanded = new Set<number>();
+  /** The card whose parcels are open; null when every card is closed. */
   selectedStockId: number | null = null;
   page = 0;
+  /** Acquired-column order. True is latest-first, the default. */
+  acquiredSortDesc = true;
   readonly pageSize = 10;
 
   get groups(): ParcelGroup[] {
@@ -116,14 +119,7 @@ export class ParcelLedger extends Base {
     (this as any).requestUpdate?.();
   }
 
-  toggleGroup(stockId: number): void {
-    const next = new Set(this.expanded);
-    if (next.has(stockId)) next.delete(stockId);
-    else next.add(stockId);
-    this.expanded = next;
-    (this as any).requestUpdate?.();
-  }
-
+  /** A second click on the open card closes it. */
   selectStock(stockId: number): void {
     if (this.selectedStockId === stockId) {
       this.selectedStockId = null;
@@ -136,12 +132,27 @@ export class ParcelLedger extends Base {
     (this as any).requestUpdate?.();
   }
 
-  /** Oldest first — that is FIFO's order, so the top row is what a sale eats. */
+  /** Flip the Acquired order and return to page one: page 3 of the old order
+   * is rarely page 3 of the new one. */
+  sortByAcquired(): void {
+    this.acquiredSortDesc = !this.acquiredSortDesc;
+    this.page = 0;
+    (this as any).requestUpdate?.();
+  }
+
+  /** Latest first by default, like the logs. The header flips it to oldest
+   * first, which is FIFO's reading order. */
   expandedParcels(stockId: number): ParcelRow[] {
+    const dir = this.acquiredSortDesc ? -1 : 1;
     return this.parcels
       .filter((p) => p.stock_id === stockId)
       .slice()
-      .sort((a, b) => (a.acquired_date < b.acquired_date ? -1 : 1))
+      .sort((a, b) => {
+        if (a.acquired_date !== b.acquired_date)
+          return (a.acquired_date < b.acquired_date ? -1 : 1) * dir;
+        // Same-day parcels break by id, so paging cannot show one twice.
+        return (a.id - b.id) * dir;
+      })
       .map((p) => {
         const costBase = parcelCostBase(p);
         // How much of the lot is LEFT. A lot that was partly sold shows what
@@ -180,18 +191,22 @@ export class ParcelLedger extends Base {
             : ''
         }
         <p class="muted">
-          Derived from your trade history — parcels are never edited by
-          hand. Change a trade and this rebuilds.
+          Derived from your trade history — parcels are never edited by hand.
+          Change a trade and this rebuilds.
         </p>
-        <div class="parcel-cards" style="display:flex; gap:12px; margin:12px 0;">
+        <div class="parcel-cards">
           ${cardGroups.map((g) => this.renderCard(g))}
         </div>
-        ${this.selectedStockId
-          ? (() => {
-              const g = this.groups.find((x) => x.stockId === this.selectedStockId);
-              return g ? this.renderGroupDetail(g) : '';
-            })()
-          : ''}
+        ${
+          this.selectedStockId
+            ? (() => {
+                const g = this.groups.find(
+                  (x) => x.stockId === this.selectedStockId,
+                );
+                return g ? this.renderGroupDetail(g) : '';
+              })()
+            : ''
+        }
       </div>
     `;
   }
@@ -201,17 +216,16 @@ export class ParcelLedger extends Base {
     return html`
       <button
         type="button"
-        class="btn btn-secondary parcel-card"
-        style="flex:1; text-align:left; justify-content:flex-start; padding:12px 16px; border-radius:8px; ${selected ? 'border-color: var(--ff-accent);' : ''}"
+        class="btn btn-secondary parcel-card${selected ? ' is-selected' : ''}"
         @click=${() => this.selectStock(g.stockId)}
       >
-        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:4px;">
-          <div style="font-weight:600; color: var(--ff-text);">${g.stockCode}</div>
-          <div class="muted" style="font-size:12px;">${g.stockName}</div>
+        <div class="parcel-card-body">
+          <div class="parcel-card-code">${g.stockCode}</div>
+          <div class="muted parcel-card-name">${g.stockName}</div>
           ${
             g.notTracked
-              ? html`<div class="muted" style="margin-top:4px;">not yet tracked</div>`
-              : html`<div style="margin-top:6px; display:flex; gap:12px; flex-wrap:wrap; color: var(--ff-text);">
+              ? html`<div class="muted parcel-card-note">not yet tracked</div>`
+              : html`<div class="parcel-card-stats">
                   <span>${qty(g.units)} units</span>
                   <span>${g.parcelCount} parcels</span>
                   <span>avg ${formatPrice(g.avgCost)}</span>
@@ -229,67 +243,80 @@ export class ParcelLedger extends Base {
     const start = this.page * this.pageSize;
     const pageRows = rows.slice(start, start + this.pageSize);
     return html`
-      <div class="parcel-group-detail" style="margin-top:12px;">
+      <div class="parcel-group-detail">
         ${
           rows.length
             ? html`
-                <table class="hist-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">Acquired</th>
-                      <th scope="col" class="num">Units</th>
-                      <th scope="col" class="num">Cost base</th>
-                      <th scope="col" class="num">Per unit</th>
-                      <th scope="col" class="num">Held</th>
-                      <th scope="col">50% discount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    ${pageRows.map(
-                      (p) =>
-                        html`<tr>
-                          <td class="mono">${p.acquired_date}</td>
-                          <td class="num">${qty(p.remaining)}</td>
-                          <td class="num">${formatAUD(p.costBase)}</td>
-                          <td class="num">${formatPrice(p.perUnit)}</td>
-                          <td class="num">${p.heldLabel}</td>
-                          <td class=${p.discountClass}>${p.discountLabel}</td>
-                        </tr>`,
-                    )}
-                  </tbody>
-                </table>
-                ${pages > 1
-                  ? html`<div class="table-pager">
-                      <span class="muted"
-                        >Page ${this.page + 1} of ${pages} · ${rows.length}
-                        parcels</span
-                      >
-                      <div class="pager-actions">
-                        <button
-                          class="btn btn-secondary btn-small"
-                          type="button"
-                          ?disabled=${this.page === 0}
-                          @click=${() => {
-                            this.page = Math.max(0, this.page - 1);
-                            (this as any).requestUpdate?.();
-                          }}
+                <div>
+                  <table class="hist-table">
+                    <thead>
+                      <tr>
+                        <th
+                          scope="col"
+                          aria-sort=${this.acquiredSortDesc ? 'descending' : 'ascending'}
                         >
-                          Previous
-                        </button>
-                        <button
-                          class="btn btn-secondary btn-small"
-                          type="button"
-                          ?disabled=${this.page >= pages - 1}
-                          @click=${() => {
-                            this.page = Math.min(pages - 1, this.page + 1);
-                            (this as any).requestUpdate?.();
-                          }}
-                        >
-                          Next
-                        </button>
-                      </div>
-                    </div>`
-                  : ''}
+                          ${dateSortHeader(
+                            'Acquired',
+                            this.acquiredSortDesc,
+                            () => this.sortByAcquired(),
+                          )}
+                        </th>
+                        <th scope="col" class="num">Units</th>
+                        <th scope="col" class="num">Cost base</th>
+                        <th scope="col" class="num">Per unit</th>
+                        <th scope="col" class="num">Held</th>
+                        <th scope="col">50% discount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${pageRows.map(
+                        (p) =>
+                          html`<tr>
+                            <td class="mono">${p.acquired_date}</td>
+                            <td class="num">${qty(p.remaining)}</td>
+                            <td class="num">${formatAUD(p.costBase)}</td>
+                            <td class="num">${formatPrice(p.perUnit)}</td>
+                            <td class="num">${p.heldLabel}</td>
+                            <td class=${p.discountClass}>${p.discountLabel}</td>
+                          </tr>`,
+                      )}
+                    </tbody>
+                  </table>
+                  ${
+                    pages > 1
+                      ? html`<div class="table-pager">
+                          <span class="muted"
+                            >Page ${this.page + 1} of ${pages} · ${rows.length}
+                            parcels</span
+                          >
+                          <div class="pager-actions">
+                            <button
+                              class="btn btn-secondary btn-small"
+                              type="button"
+                              ?disabled=${this.page === 0}
+                              @click=${() => {
+                                this.page = Math.max(0, this.page - 1);
+                                (this as any).requestUpdate?.();
+                              }}
+                            >
+                              Previous
+                            </button>
+                            <button
+                              class="btn btn-secondary btn-small"
+                              type="button"
+                              ?disabled=${this.page >= pages - 1}
+                              @click=${() => {
+                                this.page = Math.min(pages - 1, this.page + 1);
+                                (this as any).requestUpdate?.();
+                              }}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>`
+                      : ''
+                  }
+                </div>
               `
             : html`<p class="muted">No parcels.</p>`
         }

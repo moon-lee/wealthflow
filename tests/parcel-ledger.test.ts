@@ -65,7 +65,7 @@ describe('parcel ledger', () => {
     el.remove();
   });
 
-  it('lists a group oldest first, because that is FIFO order', async () => {
+  it('lists a group latest first, the default order', async () => {
     const f: any = createMockFinance();
     const v: any = await createStock(f, {
       stock_code: 'VAS',
@@ -90,11 +90,11 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
+    el.selectStock(v.id);
     await el.updateComplete;
     expect(el.expandedParcels(v.id).map((p: any) => p.acquired_date)).toEqual([
-      '2021-09-28',
       '2026-09-10',
+      '2021-09-28',
     ]);
     el.remove();
   });
@@ -116,7 +116,7 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
+    el.selectStock(v.id);
     await el.updateComplete;
     expect(el.expandedParcels(v.id)[0].discountLabel).toBe('In 11 months');
     el.remove();
@@ -138,7 +138,7 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
+    el.selectStock(v.id);
     await el.updateComplete;
     expect(el.expandedParcels(v.id)[0].discountLabel).toBe('Eligible today');
     el.remove();
@@ -161,7 +161,7 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
+    el.selectStock(v.id);
     await el.updateComplete;
     expect(el.expandedParcels(v.id)[0].quantity).toBe(0.1504);
     expect(el.renderRoot.textContent).toContain('0.1504');
@@ -185,7 +185,7 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
+    el.selectStock(v.id);
     await el.updateComplete;
     // The same class the dividends list and the trade log use for a date
     // cell, so the two read as one product.
@@ -195,7 +195,62 @@ describe('parcel ledger', () => {
     el.remove();
   });
 
-  it('collapses and expands a group', async () => {
+  it('sorts the Acquired column and returns to page one', async () => {
+    const f: any = createMockFinance();
+    const v: any = await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    for (let day = 1; day <= 12; day++) {
+      await createTrade(f, {
+        stock_id: v.id,
+        date: `2024-01-${String(day).padStart(2, '0')}`,
+        side: 'buy',
+        quantity: 1,
+        price: 100,
+        brokerage: 0,
+      });
+    }
+    await rebuildParcels(f, v.id);
+    const el = await mount(f);
+    el.selectStock(v.id);
+    await el.updateComplete;
+
+    const dates = (): string[] =>
+      [...el.renderRoot.querySelectorAll('tbody tr td:first-child')].map(
+        (td: any) => td.textContent.trim(),
+      );
+    const sortButton = (): any => el.renderRoot.querySelector('th .th-sort');
+    const sortState = (): string =>
+      (el.renderRoot.querySelector('th[aria-sort]') as any)?.getAttribute(
+        'aria-sort',
+      );
+
+    // Latest first is the default, and the header says so.
+    expect(sortState()).toBe('descending');
+    expect(dates()[0]).toBe('2024-01-12');
+
+    // Page two of the old order is not page two of the new one, so a sort
+    // returns to the first page.
+    el.page = 1;
+    await el.updateComplete;
+    expect(el.page).toBe(1);
+    sortButton().click();
+    await el.updateComplete;
+
+    expect(el.page).toBe(0);
+    expect(sortState()).toBe('ascending');
+    expect(dates()[0]).toBe('2024-01-01');
+
+    sortButton().click();
+    await el.updateComplete;
+    expect(sortState()).toBe('descending');
+    expect(dates()[0]).toBe('2024-01-12');
+    el.remove();
+  });
+
+  it('opens one card at a time and closes it on a second click', async () => {
     const f: any = createMockFinance();
     const v: any = await createStock(f, {
       stock_code: 'VAS',
@@ -211,10 +266,10 @@ describe('parcel ledger', () => {
     });
     await rebuildParcels(f, v.id);
     const el = await mount(f);
-    el.toggleGroup(v.id);
-    expect(el.expanded.has(v.id)).toBe(true);
-    el.toggleGroup(v.id);
-    expect(el.expanded.has(v.id)).toBe(false);
+    el.selectStock(v.id);
+    expect(el.selectedStockId).toBe(v.id);
+    el.selectStock(v.id);
+    expect(el.selectedStockId).toBe(null);
     el.remove();
   });
 });

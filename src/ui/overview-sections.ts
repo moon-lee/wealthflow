@@ -2,8 +2,8 @@ export const CANONICAL_SECTION_ORDER = [
   'combined',
   'dividends',
   'interest',
-  'cgt',
   'super',
+  'cgt',
 ] as const;
 
 export type OverviewSectionId = (typeof CANONICAL_SECTION_ORDER)[number];

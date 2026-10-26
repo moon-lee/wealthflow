@@ -124,11 +124,18 @@ describe('orchestrator: trades tab', () => {
       'Trades',
       'Parcels',
     ]);
-    // The contextual action sits on the Trades section's own header row.
-    const tradesHeader = [
+    // The contextual action sits on the Trades section's own header row, and
+    // the form it opens starts closed.
+    const action = [
       ...v.renderRoot.querySelectorAll('.section'),
-    ][2]?.querySelector('.header-actions button');
-    expect(tradesHeader?.textContent.trim()).toBe('Hide form');
+    ][2]?.querySelector('.header-actions button') as any;
+    expect(action?.textContent.trim()).toBe('Log trade');
+    action.click();
+    await v.updateComplete;
+    const reopened = [
+      ...v.renderRoot.querySelectorAll('.section'),
+    ][2]?.querySelector('.header-actions button') as any;
+    expect(reopened?.textContent.trim()).toBe('Hide form');
     v.remove();
   });
 

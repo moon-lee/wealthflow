@@ -18,6 +18,10 @@ import type {
   InterestRepeatOutcome,
   InterestRepeatPlan,
 } from '../services/bank-service.js';
+import {
+  CANONICAL_SECTION_ORDER,
+  type OverviewSectionId,
+} from './overview-sections.js';
 const Base =
   typeof HTMLElement !== 'undefined'
     ? LitElement
@@ -67,6 +71,12 @@ export class OverviewView extends Base {
   };
   /** Zero-based page of the superannuation log; clamped on every reload. */
   superPage = 0;
+  /**
+   * The order the Reorder Sections modal saved. The orchestrator assigns it
+   * before the first load and again on every save; each section carries its
+   * index as a CSS `order` inside the flex `.order-stack`.
+   */
+  sectionOrder: OverviewSectionId[] = [...CANONICAL_SECTION_ORDER];
   /** Date order for the super log. Newest first, the order a log is read in. */
   superSortDesc = true;
   /** Which log sections are folded away, per section so one stays open. */
@@ -154,7 +164,12 @@ export class OverviewView extends Base {
   }
 
   private sectionIndex(id: string): number {
-    return 0;
+    const chosen = this.sectionOrder.indexOf(id as OverviewSectionId);
+    if (chosen >= 0) return chosen;
+    // A section the saved order predates keeps its canonical place rather
+    // than colliding with index 0.
+    const canonical = CANONICAL_SECTION_ORDER.indexOf(id as OverviewSectionId);
+    return canonical >= 0 ? canonical : this.sectionOrder.length;
   }
 
   /**
@@ -703,7 +718,10 @@ export class OverviewView extends Base {
                      below are where its parts come from. Four cards, so the
                      two that make up the gross sit beside the gross itself
                      rather than being repeated inside its caption. -->
-                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('combined') : 0}">
+                <div
+                  class="section flush"
+                  style="order:${this.sectionIndex('combined')}"
+                >
                   <div class="section-header">
                     <h3 class="section-title">
                       Combined taxable — FY ${this.fy}
@@ -754,7 +772,10 @@ export class OverviewView extends Base {
                 </div>
 
                 <!-- Dividends -->
-                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('dividends') : 0}">
+                <div
+                  class="section flush"
+                  style="order:${this.sectionIndex('dividends')}"
+                >
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('dividends')}
@@ -791,7 +812,10 @@ export class OverviewView extends Base {
                 </div>
 
                 <!-- Interest -->
-                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('interest') : 0}">
+                <div
+                  class="section flush"
+                  style="order:${this.sectionIndex('interest')}"
+                >
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('interest')}
@@ -841,13 +865,11 @@ export class OverviewView extends Base {
                   </div>
                 </div>
 
-                <!-- Capital gains -->
-                <div style="order:${this.sectionIndex ? this.sectionIndex('cgt') : 0}">
-                  <cgt-section></cgt-section>
-                </div>
-
                 <!-- Superannuation -->
-                <div class="section flush" style="order:${this.sectionIndex ? this.sectionIndex('super') : 0}">
+                <div
+                  class="section flush"
+                  style="order:${this.sectionIndex('super')}"
+                >
                   <div
                     class="section-header is-toggle"
                     @click=${() => this.toggleSection('super')}
@@ -977,6 +999,11 @@ export class OverviewView extends Base {
                           </div>`
                     }
                   </div>
+                </div>
+
+                <!-- Capital gains -->
+                <div style="order:${this.sectionIndex('cgt')}">
+                  <cgt-section></cgt-section>
                 </div>
               `
         }

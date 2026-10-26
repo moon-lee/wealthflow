@@ -67,4 +67,13 @@ describe('portfolio styles', () => {
   it('aligns money columns on the decimal', () => {
     expect(String(portfolioStyles)).toContain('tabular-nums');
   });
+
+  it('right-aligns the numeric fields in the trade form', () => {
+    // The form sits above a table of money. A number field that hugs the left
+    // edge reads as text, and the digits stop lining up column to column.
+    const css = String(wealthflowStyles);
+    expect(css).toMatch(
+      /\.trade-form-grid input\[type='number'\]\s*\{[^}]*text-align:\s*right/,
+    );
+  });
 });

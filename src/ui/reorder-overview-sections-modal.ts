@@ -1,4 +1,4 @@
-import { LitElement, css, html } from 'lit';
+import { LitElement, html } from 'lit';
 import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import {
@@ -16,40 +16,7 @@ const Base =
 export class ReorderOverviewSectionsModal extends Base {
   static override styles =
     typeof HTMLElement !== 'undefined'
-      ? ([
-          sharedStyles,
-          wealthflowStyles,
-          css`
-            .item {
-              display: flex;
-              align-items: center;
-              justify-content: space-between;
-              gap: 12px;
-              padding: 6px 10px;
-              border: 1px solid var(--ff-bg-input, #3c3c3c);
-              border-left: 4px solid var(--ff-bg-input, #3c3c3c);
-              border-radius: 4px;
-              margin-bottom: 6px;
-            }
-            .item.first {
-              border-left-color: var(--ff-teal, #4ec9b0);
-            }
-            .item.last {
-              border-left-color: var(--ff-accent, #007acc);
-            }
-            .item .label {
-              flex: 1;
-            }
-            .up {
-              background: var(--ff-accent, #007acc);
-              color: var(--ff-text-strong, #fff);
-            }
-            .down {
-              background: var(--ff-accent-hover, #1177bb);
-              color: var(--ff-text-strong, #fff);
-            }
-          `,
-        ] as any)
+      ? ([sharedStyles, wealthflowStyles] as any)
       : [];
 
   sectionOrder: OverviewSectionId[] = [...CANONICAL_SECTION_ORDER];
@@ -85,18 +52,18 @@ export class ReorderOverviewSectionsModal extends Base {
           ${this.order.map(
             (id, i) =>
               html` <div
-                class="item ${i === 0 ? 'first' : ''} ${i === this.order.length - 1 ? 'last' : ''}"
+                class="reorder-item ${i === 0 ? 'is-first' : ''} ${i === this.order.length - 1 ? 'is-last' : ''}"
               >
-                <span class="label">${SECTION_LABELS[id] ?? id}</span>
+                <span class="reorder-label">${SECTION_LABELS[id] ?? id}</span>
                 <button
-                  class="up"
+                  class="reorder-up"
                   ?disabled=${i === 0}
                   @click=${() => this.move(i, -1)}
                 >
                   ▲
                 </button>
                 <button
-                  class="down"
+                  class="reorder-down"
                   ?disabled=${i === this.order.length - 1}
                   @click=${() => this.move(i, 1)}
                 >

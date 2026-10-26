@@ -79,7 +79,10 @@ describe('trade form controls', () => {
     const view: any = document.createElement('trades-view');
     document.body.appendChild(view);
     await view.setFinance(f);
+    view.showForm = true;
+    view.requestUpdate?.();
     await view.updateComplete;
+    await view.pushToChildren();
 
     // Both roots: the section header's button and the form's own header. A
     // query on the view alone cannot see the form's shadow root, and that is
@@ -94,6 +97,55 @@ describe('trade form controls', () => {
     expect(hide).toHaveLength(1);
     expect(view.renderRoot.contains(hide[0])).toBe(true);
     view.remove();
+  });
+
+  it('offers stocks by code only, not by full name', async () => {
+    const f: any = createMockFinance();
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'Vanguard Australian Shares',
+      shares: 0,
+    });
+    await createStock(f, {
+      stock_code: 'VHY',
+      stock_full_name: 'Vanguard Australian Shares High Yield',
+      shares: 0,
+    });
+    const form = await formFor(f);
+
+    const select = form.renderRoot.querySelector('select') as any;
+    expect(select).toBeTruthy();
+    expect(
+      Array.from(select.options)
+        .map((o: any) => o.textContent.trim())
+        .sort(),
+    ).toEqual(['VAS', 'VHY']);
+    form.remove();
+  });
+
+  it('uses number inputs for quantity, price and brokerage', async () => {
+    const f: any = createMockFinance();
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    const form = await formFor(f);
+
+    const nums = [
+      ...form.renderRoot.querySelectorAll('input[type="number"]'),
+    ] as any[];
+    expect(nums).toHaveLength(3);
+    for (const input of nums) {
+      expect(input.getAttribute('min')).toBe('0');
+    }
+    // A DRP reinvestment price carries four decimals (81.4095 in the ledger),
+    // so a fixed price step would make an existing trade invalid the moment it
+    // is opened, and native validation would swallow Save. Brokerage is money,
+    // so it keeps a cent step.
+    const steps = nums.map((n) => n.getAttribute('step'));
+    expect(steps).toEqual(['any', 'any', '0.01']);
+    form.remove();
   });
 
   it('prefills a new trade with the local date', async () => {

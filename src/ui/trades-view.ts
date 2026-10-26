@@ -271,10 +271,10 @@ export class TradesView extends Base {
           'trades',
           'Trades',
           `${this.tradeCount} trade${this.tradeCount === 1 ? '' : 's'}`,
-            // A bare wrapper: the binding must sit inside an element, or
-            // happy-dom's parser drops it and neither the form nor the log is
-            // ever in the test DOM.
-            html`<div>
+          // A bare wrapper: the binding must sit inside an element, or
+          // happy-dom's parser drops it and neither the form nor the log is
+          // ever in the test DOM.
+          html`<div>
               ${this.showForm ? html`<trade-form></trade-form>` : ''}
             </div>
             <trade-log></trade-log>`,
@@ -286,7 +286,9 @@ export class TradesView extends Base {
               (this as any).requestUpdate?.();
               if (this.showForm) {
                 await this.pushToChildren();
-                const form = (this as any).renderRoot?.querySelector('trade-form');
+                const form = (this as any).renderRoot?.querySelector(
+                  'trade-form',
+                );
                 if (form?.editTrade) form.editTrade(null);
               }
             }}

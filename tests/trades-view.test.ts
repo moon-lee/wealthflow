@@ -445,7 +445,11 @@ describe('trades ui', () => {
     const el: any = document.createElement('trades-view');
     document.body.appendChild(el);
     await el.setFinance(f);
+    // The form starts hidden; open it the way the header does.
+    el.showForm = true;
+    el.requestUpdate?.();
     await el.updateComplete;
+    await el.pushToChildren();
 
     const form = el.renderRoot.querySelector('trade-form');
     const log = el.renderRoot.querySelector('trade-log') as any;
@@ -454,6 +458,42 @@ describe('trades ui', () => {
     await log.updateComplete;
     expect(log.renderRoot.querySelector('table.hist-table')).toBeTruthy();
     expect(log.renderRoot.textContent).toContain('VAS');
+    el.remove();
+  });
+
+  it('starts with the form hidden and opens it with Log trade', async () => {
+    const f: any = createMockFinance();
+    await createStock(f, {
+      stock_code: 'VAS',
+      stock_full_name: 'V',
+      shares: 0,
+    });
+    const el: any = document.createElement('trades-view');
+    document.body.appendChild(el);
+    await el.setFinance(f);
+    await el.updateComplete;
+
+    expect(el.showForm).toBe(false);
+    expect(el.renderRoot.querySelector('trade-form')).toBeNull();
+    const button = [...el.renderRoot.querySelectorAll('button')].find(
+      (b: any) => b.textContent.trim() === 'Log trade',
+    ) as any;
+    expect(button).toBeTruthy();
+    expect(
+      [...el.renderRoot.querySelectorAll('button')].some(
+        (b: any) => b.textContent.trim() === 'Log buy',
+      ),
+    ).toBe(false);
+
+    button.click();
+    await el.updateComplete;
+    expect(el.showForm).toBe(true);
+    expect(el.renderRoot.querySelector('trade-form')).toBeTruthy();
+    expect(
+      [...el.renderRoot.querySelectorAll('button')].some(
+        (b: any) => b.textContent.trim() === 'Hide form',
+      ),
+    ).toBe(true);
     el.remove();
   });
 

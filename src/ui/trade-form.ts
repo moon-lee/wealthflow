@@ -96,7 +96,8 @@ export class TradeForm extends Base {
     // Ensure stocks loaded
     if (!this.stocks.length && this.finance) {
       void this.loadStocks().then(() => {
-        this.stockId = t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : 0);
+        this.stockId =
+          t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : 0);
         this.date = t?.date ?? localTodayIso();
         this.quantity = t ? String(t.quantity) : '';
         this.price = t ? String(t.price) : '';
@@ -111,7 +112,8 @@ export class TradeForm extends Base {
       });
       return;
     }
-    this.stockId = t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : this.stockId);
+    this.stockId =
+      t?.stock_id ?? (this.stocks.length ? this.stocks[0].id : this.stockId);
     // A new trade is almost always today's, so the field starts filled.
     this.date = t?.date ?? localTodayIso();
     this.quantity = t ? String(t.quantity) : '';
@@ -327,7 +329,7 @@ export class TradeForm extends Base {
               <input
                 type="number"
                 inputmode="decimal"
-                step="0.001"
+                step="any"
                 min="0"
                 required
                 placeholder="0.000"
