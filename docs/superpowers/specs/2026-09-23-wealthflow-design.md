@@ -163,6 +163,7 @@ invoke('wealthflow', 'getOverviewSummary', ['2025-2026']);
 ## 8. Activation & lifecycle
 
 * `activate(finance)`: read settings, register service + commands, `requestMount('wealthflow', …)` in Host context; panel context mounts the orchestrator (dual-context shape mirrors `salary-history/src/main.ts`).
+* **Retarget precedence.** The panel is created with the mount data of whatever opened it (the Activity Bar's `openCommand` carries `{ view: 'overview' }`). A later sidebar click arrives as `mount-update`; the pushed view wins over that opening mount, and the rest of the base (e.g. `fy`) is kept. `focus` is one-shot — only a push that names one may grab the cursor. Spreading the opening mount last pins every click to the first view, which reads as dead navigation.
 * `deactivate()`: unregister service, clear timers/subscriptions.
 * No `db-changed` subscription (single writer; refresh is the future consumer's problem).
 

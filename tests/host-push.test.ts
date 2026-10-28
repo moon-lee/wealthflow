@@ -45,6 +45,57 @@ describe('the host push', () => {
     expect(inited).toBe(1);
     expect(refreshed).toBe(0);
   });
+
+  it('lets a retarget win over the view the panel opened with', async () => {
+    // The panel is created from the Activity Bar, whose openCommand mounts
+    // `{ view: 'overview' }`. That initial view is part of the base the
+    // listener carries, and it must not override a later sidebar click —
+    // otherwise Banks, Stocks and Trades all reopen Overview and look dead.
+    const app = document.createElement('div');
+    const mounts: Array<Record<string, unknown>> = [];
+    const el = {
+      init: async (_f: any, mount: Record<string, unknown>) => {
+        mounts.push(mount);
+      },
+    };
+    listenForHostPush(app, el, {} as any, { view: 'overview' });
+    app.dispatchEvent(
+      new CustomEvent('mount-update', { detail: { view: 'stocks' } }),
+    );
+    expect(mounts).toEqual([{ view: 'stocks' }]);
+  });
+
+  it('keeps the rest of the base, but not a spent focus target', async () => {
+    const app = document.createElement('div');
+    const mounts: Array<Record<string, unknown>> = [];
+    const el = {
+      init: async (_f: any, mount: Record<string, unknown>) => {
+        mounts.push(mount);
+      },
+    };
+    // Opened from Add Interest: the initial mount carries a one-shot focus.
+    listenForHostPush(app, el, {} as any, {
+      view: 'overview',
+      focus: 'interest',
+      fy: '2025-2026',
+    });
+    app.dispatchEvent(
+      new CustomEvent('mount-update', { detail: { view: 'trades' } }),
+    );
+    // A plain retarget must not replay the cursor grab...
+    expect(mounts[0]).toEqual({ view: 'trades', fy: '2025-2026' });
+    // ...but a push that carries its own focus still gets it.
+    app.dispatchEvent(
+      new CustomEvent('mount-update', {
+        detail: { view: 'overview', focus: 'dividend' },
+      }),
+    );
+    expect(mounts[1]).toEqual({
+      view: 'overview',
+      focus: 'dividend',
+      fy: '2025-2026',
+    });
+  });
 });
 
 describe('the price editor fetches on open', () => {

@@ -159,11 +159,19 @@ export function listenForHostPush(
 ): void {
   app.addEventListener('mount-update', (e: Event) => {
     const detail = (e as CustomEvent).detail as
-      { view?: string } | Record<string, unknown>;
+      Record<string, unknown> | undefined;
     if (typeof el.init !== 'function') return;
-    const view = (detail as { view?: string })?.view;
+    const view = detail?.view;
     if (typeof view === 'string') {
-      void el.init(finance, { view, ...base });
+      // The push wins over the mount the panel opened with. The panel is
+      // created from the Activity Bar, whose openCommand carries
+      // `{ view: 'overview' }`; spreading that base last pinned every later
+      // sidebar click to the opening view, so Banks, Stocks and Trades looked
+      // dead. The rest of the base (e.g. `fy`) still applies.
+      const next: Record<string, unknown> = { ...base, ...detail, view };
+      // `focus` is one-shot: only a push that names one may grab the cursor.
+      if (!detail || !('focus' in detail)) delete next.focus;
+      void el.init(finance, next);
       return;
     }
     if (typeof el.refresh === 'function') void el.refresh();

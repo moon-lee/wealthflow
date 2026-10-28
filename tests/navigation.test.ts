@@ -146,7 +146,10 @@ describe('orchestrator click navigation', () => {
     ).createMockFinance();
     finance.commands.registerCommand = () => {};
     document.body.innerHTML = '<div id="app"></div>';
-    await activate(finance, { viewId: 'wealthflow' });
+    // The real panel is created from the Activity Bar, whose openCommand
+    // carries the opening view in mountData — reproduce that, because the
+    // initial view used to override every later retarget.
+    await activate(finance, { viewId: 'wealthflow', view: 'overview' });
     await new Promise((r) => setTimeout(r, 0));
     const app = document.getElementById('app')!;
     const orch = app.querySelector('wealthflow-orchestrator') as any;
