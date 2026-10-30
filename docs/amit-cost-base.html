@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AMIT cost base adjustments — how to know they are right</title>
+    <style>
+      :root {
+        --ink: #0f172a;
+        --muted: #5b6478;
+        --faint: #8a93a6;
+        --line: #e2e8f0;
+        --line-strong: #cbd5e1;
+        --bg: #f6f8fb;
+        --card: #ffffff;
+        --accent: #2495ff;
+        --accent-soft: #eaf4ff;
+        --ok: #0b7a55;
+        --ok-soft: #e7f6ef;
+        --warn: #a45b06;
+        --warn-soft: #fdf3e3;
+        --danger: #b42318;
+        --danger-soft: #fdeceb;
+        --radius: 14px;
+        --shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.06);
+        --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+        --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        margin: 0;
+        padding: 48px 20px 72px;
+        background:
+          radial-gradient(900px 380px at 12% -8%, #e8f3ff 0%, transparent 60%),
+          radial-gradient(700px 320px at 92% 0%, #eef7f2 0%, transparent 55%),
+          var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.6;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .page {
+        max-width: 980px;
+        margin: 0 auto;
+      }
+
+      /* ---------- header ---------- */
+      .eyebrow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      .eyebrow::before {
+        content: "";
+        width: 22px;
+        height: 2px;
+        background: var(--accent);
+        border-radius: 2px;
+      }
+
+      h1 {
+        margin: 14px 0 12px;
+        font-size: clamp(30px, 4.4vw, 44px);
+        line-height: 1.12;
+        letter-spacing: -0.02em;
+        font-weight: 800;
+      }
+
+      .lede {
+        margin: 0;
+        max-width: 66ch;
+        font-size: 18px;
+        color: var(--muted);
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 22px;
+      }
+
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 6px 12px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.75);
+        font-size: 12.5px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .chip b {
+        color: var(--ink);
+        font-weight: 600;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--ok);
+        box-shadow: 0 0 0 3px var(--ok-soft);
+      }
+
+      /* ---------- layout ---------- */
+      section {
+        margin-top: 44px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: baseline;
+        gap: 14px;
+        margin-bottom: 6px;
+      }
+
+      .num {
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        padding-top: 6px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 23px;
+        letter-spacing: -0.01em;
+        font-weight: 750;
+      }
+
+      .section-sub {
+        margin: 0 0 18px 44px;
+        color: var(--muted);
+        font-size: 15px;
+        max-width: 74ch;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 22px 24px;
+      }
+
+      .card + .card {
+        margin-top: 14px;
+      }
+
+      .card h3 {
+        margin: 0 0 6px;
+        font-size: 16px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+
+      .card p {
+        margin: 8px 0 0;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+
+      .card p:first-of-type {
+        margin-top: 0;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        border-radius: 7px;
+        font-size: 12px;
+        font-weight: 800;
+        flex: 0 0 auto;
+      }
+
+      .badge.ok {
+        background: var(--ok-soft);
+        color: var(--ok);
+      }
+
+      .badge.warn {
+        background: var(--warn-soft);
+        color: var(--warn);
+      }
+
+      .badge.info {
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+
+      /* ---------- callout ---------- */
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 26px;
+      }
+
+      .split .card {
+        margin-top: 0;
+        padding: 20px 22px;
+      }
+
+      .split .card p {
+        margin-top: 4px;
+      }
+
+      .kicker {
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      .verdict {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        margin-top: 8px;
+        font-size: 19px;
+        font-weight: 750;
+        letter-spacing: -0.01em;
+      }
+
+      .verdict.ok {
+        color: var(--ok);
+      }
+
+      .verdict.warn {
+        color: var(--warn);
+      }
+
+      /* ---------- tables ---------- */
+      .table-wrap {
+        overflow-x: auto;
+        margin-top: 14px;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14.5px;
+      }
+
+      caption {
+        caption-side: top;
+        text-align: left;
+        font-size: 12.5px;
+        color: var(--faint);
+        padding-bottom: 8px;
+      }
+
+      th {
+        text-align: left;
+        font-size: 11.5px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+        padding: 0 12px 9px;
+        border-bottom: 1px solid var(--line-strong);
+        white-space: nowrap;
+      }
+
+      td {
+        padding: 11px 12px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: middle;
+      }
+
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      .r {
+        text-align: right;
+        font-family: var(--mono);
+        font-size: 13.5px;
+        white-space: nowrap;
+      }
+
+      th.r {
+        text-align: right;
+      }
+
+      tbody tr:hover {
+        background: #fafcff;
+      }
+
+      tfoot td {
+        border-top: 2px solid var(--line-strong);
+        font-weight: 700;
+        background: #fbfdff;
+      }
+
+      .tick {
+        color: var(--ok);
+        font-weight: 700;
+      }
+
+      .neg {
+        color: var(--danger);
+      }
+
+      .pos {
+        color: var(--ok);
+      }
+
+      tr.flag {
+        background: var(--warn-soft);
+      }
+
+      tr.flag:hover {
+        background: #fbeed9;
+      }
+
+      tr.flag td:first-child {
+        box-shadow: inset 3px 0 0 var(--warn);
+      }
+
+      /* ---------- flow ---------- */
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        margin-top: 18px;
+        flex-wrap: wrap;
+      }
+
+      .flow-box {
+        flex: 1 1 190px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        padding: 14px 16px;
+        background: #fbfdff;
+      }
+
+      .flow-box .kicker {
+        margin-bottom: 4px;
+      }
+
+      .flow-box strong {
+        display: block;
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .flow-box small {
+        display: block;
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12.5px;
+        line-height: 1.45;
+      }
+
+      .flow-arrow {
+        align-self: center;
+        padding: 0 12px;
+        color: var(--line-strong);
+        font-size: 20px;
+        flex: 0 0 auto;
+      }
+
+      /* ---------- steps ---------- */
+      ol.steps {
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: step;
+      }
+
+      ol.steps li {
+        counter-increment: step;
+        position: relative;
+        padding: 0 0 16px 46px;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+
+      ol.steps li::before {
+        content: counter(step);
+        position: absolute;
+        left: 0;
+        top: -2px;
+        width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 800;
+        font-size: 13px;
+      }
+
+      ol.steps li:last-child {
+        padding-bottom: 0;
+      }
+
+      ol.steps b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      /* ---------- notes ---------- */
+      .note {
+        display: grid;
+        grid-template-columns: 4px 1fr;
+        gap: 16px;
+        padding: 16px 18px;
+        border-radius: 12px;
+        background: var(--warn-soft);
+        border: 1px solid #f3dcb6;
+      }
+
+      .note .bar {
+        border-radius: 4px;
+        background: var(--warn);
+      }
+
+      .note p {
+        margin: 0;
+        color: #6d3d04;
+        font-size: 14.5px;
+      }
+
+      .note p + p {
+        margin-top: 8px;
+      }
+
+      .note b {
+        color: #553004;
+      }
+
+      .note.info {
+        background: var(--accent-soft);
+        border-color: #cbe5ff;
+      }
+
+      .note.info .bar {
+        background: var(--accent);
+      }
+
+      .note.info p,
+      .note.info b {
+        color: #0b4a7d;
+      }
+
+      /* ---------- list ---------- */
+      ul.clean {
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      ul.clean li {
+        position: relative;
+        padding: 0 0 12px 26px;
+        color: var(--muted);
+        font-size: 14.5px;
+      }
+
+      ul.clean li::before {
+        content: "";
+        position: absolute;
+        left: 6px;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--accent);
+      }
+
+      ul.clean li:last-child {
+        padding-bottom: 0;
+      }
+
+      ul.clean b {
+        color: var(--ink);
+        font-weight: 650;
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.88em;
+        background: #f1f5fa;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 1px 5px;
+        color: #26405c;
+        white-space: nowrap;
+      }
+
+      /* ---------- footer ---------- */
+      footer {
+        margin-top: 52px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line-strong);
+        color: var(--faint);
+        font-size: 13px;
+      }
+
+      footer h4 {
+        margin: 0 0 8px;
+        font-size: 11.5px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--faint);
+      }
+
+      footer ul {
+        margin: 0;
+        padding-left: 18px;
+      }
+
+      footer li {
+        margin-bottom: 4px;
+      }
+
+      /* ---------- responsive ---------- */
+      @media (max-width: 760px) {
+        body {
+          padding: 32px 16px 56px;
+        }
+
+        .split {
+          grid-template-columns: 1fr;
+        }
+
+        .section-sub {
+          margin-left: 0;
+        }
+
+        .flow-arrow {
+          transform: rotate(90deg);
+          padding: 4px 0;
+          width: 100%;
+          text-align: center;
+        }
+
+        .card {
+          padding: 18px;
+        }
+      }
+
+      /* ---------- print ---------- */
+      @media print {
+        body {
+          background: #fff;
+          padding: 0;
+          font-size: 11pt;
+        }
+
+        .card {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+
+        section {
+          break-inside: avoid;
+        }
+
+        .table-wrap {
+          overflow: visible;
+        }
+
+        tbody tr:hover {
+          background: transparent;
+        }
+
+        footer {
+          break-before: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div class="eyebrow">Wealthflow · data verification</div>
+        <h1>AMIT cost base adjustments:<br />how to know they’re right</h1>
+        <p class="lede">
+          There are two different questions hiding in “is this correct?”. The app
+          can prove the numbers are consistent. Only Vanguard’s annual tax
+          statement can prove the numbers are true.
+        </p>
+        <div class="meta">
+          <span class="chip"><span class="dot"></span> Live DB verified</span>
+          <span class="chip"><b>29 Oct 2026</b></span>
+          <span class="chip">39 rows · 3 funds</span>
+          <span class="chip">VAS / VHY / FGX</span>
+        </div>
+      </header>
+
+      <!-- TL;DR -->
+      <div class="split">
+        <div class="card">
+          <div class="kicker">Question 1</div>
+          <div class="verdict ok">✓ Internally consistent</div>
+          <p>
+            Every adjustment pairs with a distribution, the per-fund totals sum
+            to the published figures, and the cost-base arithmetic closes. All
+            checks pass on the live database.
+          </p>
+        </div>
+        <div class="card">
+          <div class="kicker">Question 2</div>
+          <div class="verdict warn">! Actually right</div>
+          <p>
+            The amounts are only as good as their source. That means the
+            <b>AMMA</b> — the AMIT member annual statement from Vanguard — not
+            the app.
+          </p>
+        </div>
+      </div>
+
+      <!-- 01 -->
+      <section>
+        <div class="section-head">
+          <span class="num">01</span>
+          <h2>What the number is supposed to be</h2>
+        </div>
+        <p class="section-sub">
+          One signed, fund-level dollar amount per distribution — never per unit,
+          never a closing balance, never written onto a single parcel.
+        </p>
+        <div class="card">
+          <div class="flow">
+            <div class="flow-box">
+              <div class="kicker">Source</div>
+              <strong>AMMA / ShareSight</strong>
+              <small>“Cost base adj.” on each distribution line</small>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+              <div class="kicker">Stored</div>
+              <strong>One row per distribution</strong>
+              <small>stock + date + signed amount, 4dp</small>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+              <div class="kicker">Applied</div>
+              <strong>Pro-rata across parcels</strong>
+              <small>weighted on cost base, once only</small>
+            </div>
+          </div>
+          <p style="margin-top: 16px">
+            Negative reduces cost base, positive adds to it. A
+            <b>0.00 row is a real answer</b> — the statement prints zero every
+            year — while a blank field means “not recorded”. Dropping the zeros
+            would make “did I record every distribution?” unanswerable.
+          </p>
+        </div>
+      </section>
+
+      <!-- 02 -->
+      <section>
+        <div class="section-head">
+          <span class="num">02</span>
+          <h2>The four checks, and their results</h2>
+        </div>
+        <p class="section-sub">
+          Run against <code>D:\Finance Flow Product\data\finance.db</code> on 29
+          Oct 2026.
+        </p>
+
+        <!-- 2a -->
+        <div class="card">
+          <h3><span class="badge ok">1</span> One row per distribution</h3>
+          <p>
+            39 rows, all 39 paired to a dividend on the same stock and date. The
+            last gap — VHY’s −0.04 sitting one day early — was corrected on
+            29 Oct.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th>Adjustment date</th>
+                  <th class="r">Amount</th>
+                  <th>Matching distribution</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>VAS</b></td>
+                  <td class="r">2026-07-16</td>
+                  <td class="r pos">+0.55</td>
+                  <td class="r">2026-07-16 · 97.90</td>
+                  <td><span class="tick">✓ paired</span></td>
+                </tr>
+                <tr>
+                  <td><b>VHY</b></td>
+                  <td class="r">2026-07-17</td>
+                  <td class="r neg">−0.04</td>
+                  <td class="r">2026-07-17 · 12.04</td>
+                  <td><span class="tick">✓ paired</span></td>
+                </tr>
+                <tr>
+                  <td><b>VAS</b></td>
+                  <td class="r">2026-10-16</td>
+                  <td class="r">0.00</td>
+                  <td class="r">2026-10-16 · 286.22</td>
+                  <td><span class="tick">✓ paired</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            The pairing matters because the dividend form edits the adjustment by
+            date: a row a day away from its dividend is invisible to the form and
+            can be duplicated by a later edit.
+          </p>
+        </div>
+
+        <!-- 2b -->
+        <div class="card">
+          <h3>
+            <span class="badge ok">2</span> Fund total = the published cost base
+          </h3>
+          <p>
+            This is the strongest evidence: three independent figures reproduce
+            the source exactly, and FGX is zero because it is an LIC, not an
+            AMIT.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <caption>
+                “Docs” = docs/Vanguard … .md, which reconciles to ShareSight.
+              </caption>
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th class="r">Parcels cost base</th>
+                  <th class="r">AMIT rows</th>
+                  <th class="r">Post-AMIT</th>
+                  <th class="r">Docs</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>VAS</b></td>
+                  <td class="r">15,238.16</td>
+                  <td class="r neg">−4.43</td>
+                  <td class="r"><b>15,233.73</b></td>
+                  <td class="r">15,233.73</td>
+                  <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                  <td><b>VHY</b></td>
+                  <td class="r">1,623.88</td>
+                  <td class="r neg">−10.83</td>
+                  <td class="r"><b>1,613.05</b></td>
+                  <td class="r">1,613.05</td>
+                  <td><span class="tick">✓</span></td>
+                </tr>
+                <tr>
+                  <td><b>FGX</b></td>
+                  <td class="r">1,284.08</td>
+                  <td class="r">0.00</td>
+                  <td class="r"><b>1,284.08</b></td>
+                  <td class="r">1,284.08</td>
+                  <td><span class="tick">✓</span></td>
+                </tr>
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td>Portfolio</td>
+                  <td class="r">18,146.12</td>
+                  <td class="r neg">−15.26</td>
+                  <td class="r">18,130.86</td>
+                  <td class="r" colspan="2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2c -->
+        <div class="card">
+          <h3>
+            <span class="badge info">3</span> Per financial year — the sheet to
+            hold against each AMMA
+          </h3>
+          <p>
+            Print this section. Compare each fund’s yearly total to the “AMIT
+            cost base net amount” on that year’s statement.
+          </p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fund</th>
+                  <th>Financial year</th>
+                  <th class="r">Rows</th>
+                  <th class="r">AMIT adjustment</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td rowspan="6"><b>VAS</b></td>
+                  <td>2021-22</td>
+                  <td class="r">3</td>
+                  <td class="r neg">−3.54</td>
+                </tr>
+                <tr>
+                  <td>2022-23</td>
+                  <td class="r">4</td>
+                  <td class="r neg">−1.87</td>
+                </tr>
+                <tr>
+                  <td>2023-24</td>
+                  <td class="r">4</td>
+                  <td class="r pos">+0.43</td>
+                </tr>
+                <tr>
+                  <td>2024-25</td>
+                  <td class="r">4</td>
+                  <td class="r">0.00</td>
+                </tr>
+                <tr>
+                  <td>2025-26</td>
+                  <td class="r">4</td>
+                  <td class="r">0.00</td>
+                </tr>
+                <tr>
+                  <td>2026-27</td>
+                  <td class="r">2</td>
+                  <td class="r pos">+0.55</td>
+                </tr>
+                <tr>
+                  <td rowspan="4"><b>VHY</b></td>
+                  <td>2023-24</td>
+                  <td class="r">2</td>
+                  <td class="r neg">−6.59</td>
+                </tr>
+                <tr>
+                  <td>2024-25</td>
+                  <td class="r">4</td>
+                  <td class="r neg">−4.20</td>
+                </tr>
+                <tr>
+                  <td>2025-26</td>
+                  <td class="r">4</td>
+                  <td class="r">0.00</td>
+                </tr>
+                <tr>
+                  <td>2026-27</td>
+                  <td class="r">2</td>
+                  <td class="r neg">−0.04</td>
+                </tr>
+                <tr>
+                  <td><b>FGX</b></td>
+                  <td>2023-24 → 2025-26</td>
+                  <td class="r">6</td>
+                  <td class="r">0.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="note info" style="margin-top: 16px">
+            <div class="bar"></div>
+            <div>
+              <p>
+                If a year disagrees, <b>fix that distribution’s row</b> — never
+                a total. The fund total is the sum of the rows by construction.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2d -->
+        <div class="card">
+          <h3>
+            <span class="badge ok">4</span> Conservation at disposal
+          </h3>
+          <p>
+            The per-parcel shares must sum back to the fund total, and the whole
+            total is apportioned <b>once</b> — never re-applied per historical
+            row, which would make the answer depend on entry order.
+          </p>
+          <ul class="clean">
+            <li>
+              <b>Open positions</b> use the same basis: whole-fund cost base
+              less the pre-AMIT cost base disposals already took.
+            </li>
+            <li>
+              <b>Realised and unrealised</b> gains therefore sit on one footing
+              — no “sold on post, holding on pre” split.
+            </li>
+            <li>
+              <b>The toggle is honest:</b> Post-AMIT moves the Investment table
+              and the Trades summary by exactly <b>$15.26</b>, asserted in
+              <code>tests/amit-basis.test.ts</code>.
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 03 -->
+      <section>
+        <div class="section-head">
+          <span class="num">03</span>
+          <h2>The external check — the only real proof</h2>
+        </div>
+        <p class="section-sub">
+          Do this once a year, per fund, when the AMMA arrives. It takes a few
+          minutes and closes the question completely.
+        </p>
+        <div class="card">
+          <ol class="steps">
+            <li>
+              Open the fund’s <b>AMIT member annual statement</b> (Vanguard
+              portal or the registry’s tax statement).
+            </li>
+            <li>
+              Find <b>“AMIT cost base net amount”</b> — the yearly net
+              adjustment, not the per-unit figure.
+            </li>
+            <li>
+              Compare it to that fund’s row in <b>check 3</b>. Match → nothing
+              to do. Differ → edit the individual distribution.
+            </li>
+            <li>
+              If the statement shows a <b>zero</b>, keep the 0.00 row. Do not
+              delete it: the row is the evidence you checked.
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- 04 -->
+      <section>
+        <div class="section-head">
+          <span class="num">04</span>
+          <h2>What is still uncertain in this data</h2>
+        </div>
+        <p class="section-sub">
+          Honest limits — none of these is an error, but each is a place where a
+          later statement could change a number.
+        </p>
+
+        <div class="card">
+          <h3><span class="badge warn">A</span> 26 of 39 rows are 0.00</h3>
+          <p>
+            A recorded zero, not a blank: 12 VAS, 8 VHY, 6 FGX (a LIC, so always
+            nil). Only right where the statement says 0.00 — which the docs
+            confirm for VAS Oct 2023 → Apr 2026 and VHY Oct 2024 → Apr 2026.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge warn">B</span> Oct 2026 distributions are unconfirmed</h3>
+          <p>
+            VAS and VHY 2026-10-16 came from ShareSight company-event data and
+            are flagged unconfirmed in the docs. Their 0.00 adjustments may
+            change once Vanguard publishes.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge warn">C</span> FY2026-27 mixes two sources</h3>
+          <p>
+            The two live dividends are your own figures (VAS 97.90 / VHY 12.04),
+            while the AMIT rows attached to them (+0.55 VAS, −0.04 VHY) came from
+            the seed. If that year’s AMMA disagrees, these are the rows to
+            correct.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge ok">D</span> FGX is not an AMIT</h3>
+          <p>
+            Six rows, all 0.00 — correct by construction. An LIC produces no
+            AMIT adjustment, ever. Don’t add rows there.
+          </p>
+        </div>
+      </section>
+
+      <!-- 05 -->
+      <section>
+        <div class="section-head">
+          <span class="num">05</span>
+          <h2>Two small things that would close the gap</h2>
+        </div>
+        <p class="section-sub">One done, one still open. Neither changes a total.</p>
+
+        <div class="card">
+          <h3><span class="badge ok">✓</span> VHY’s −0.04 moved to 2026-07-17</h3>
+          <p>
+            Done 29 Oct: one UPDATE, totals unchanged, so all 39 adjustments now
+            pair with a distribution. Backup kept beside the database.
+          </p>
+        </div>
+
+        <div class="card">
+          <h3><span class="badge info">2</span> Add <code>scripts/audit-amit.mjs</code></h3>
+          <p>
+            Prints pairing, per-fund totals, per-FY sums and orphans. Re-run it
+            each year when the AMMAs land, instead of re-deriving this page by
+            hand.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <h4>Sources</h4>
+        <ul>
+          <li><code>src/services/amit-service.ts</code> — pro-rata allocation, open cost base</li>
+          <li><code>src/dao/cost-base-adjustments.ts</code> — signed amounts, zero vs blank</li>
+          <li><code>tests/amit-basis.test.ts</code> — the $15.26 toggle invariant</li>
+          <li><code>docs/Vanguard Australian Shares Index Etf.md</code> · <code>…High Yield Etf.md</code> · <code>Future Gen Aust.md</code></li>
+          <li>Live database: <code>D:\Finance Flow Product\data\finance.db</code></li>
+        </ul>
+        <p style="margin-top: 14px">
+          Generated 29 Oct 2026 from the live database, updated after the VHY
+          date fix. Figures are personal financial data — do not commit or share
+          without deciding where this file belongs.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
