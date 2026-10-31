@@ -6,8 +6,8 @@ import { formatAUD } from '../utils/format.js';
 import { monthLabel } from '../utils/finance-year.js';
 import type { DividendEntry } from '../dao/dividends.js';
 import type { InterestEntry } from '../dao/interest-entries.js';
-import type { SuperEntry } from '../dao/super-entries.js';
-import { superKindLabel } from '../dao/super-entries.js';
+import type { SuperEntry, SuperKind } from '../dao/super-entries.js';
+import { SUPER_KINDS, superKindLabel } from '../dao/super-entries.js';
 import { byDate, dateSortHeader } from './sort-header.js';
 import type { DividendForm } from './dividend-form.js';
 import type { InterestForm } from './interest-form.js';
@@ -71,6 +71,13 @@ export class OverviewView extends Base {
   };
   /** Zero-based page of the superannuation log; clamped on every reload. */
   superPage = 0;
+  /**
+   * Which entry type the superannuation log is showing. `all` is the default:
+   * the log is a ledger, and hiding rows before the person asks is how a
+   * missing entry goes unnoticed. The summary cards stay unfiltered — they are
+   * already one card per type.
+   */
+  superKindFilter: SuperKind | 'all' = 'all';
   /**
    * The order the Reorder Sections modal saved. The orchestrator assigns it
    * before the first load and again on every save; each section carries its
@@ -234,6 +241,111 @@ export class OverviewView extends Base {
     (this as any).requestUpdate?.();
   }
 
+  /** Read the Entry header's list and apply it. */
+  private pickSuperKind(e: Event): void {
+    this.setSuperFilter(
+      (e.target as HTMLSelectElement).value as SuperKind | 'all',
+    );
+  }
+
+  /**
+   * The superannuation log: the entry-type filter in the Entry column header,
+   * the rows for the current page, and the pager. Kept out of `render()`
+   * because at that depth Prettier splits the header's bindings across lines,
+   * and a split `attr=${...}` binding silently misaligns every later Lit part.
+   */
+  private renderSuperLog(): unknown {
+    if (this.superEntries.length === 0)
+      return html`<p class="muted">
+        No super entries this FY yet — log a balance, a private contribution, or
+        an SG contribution.
+      </p>`;
+    const filterClass =
+      this.superKindFilter === 'all' ? 'th-filter' : 'th-filter active';
+    const filterLabel =
+      this.superKindFilter === 'all'
+        ? 'All'
+        : superKindLabel(this.superKindFilter);
+    return html`<div class="table-wrap">
+      <table class="hist-table">
+        <thead>
+          <tr>
+            <th
+              scope="col"
+              aria-sort=${this.superSortDesc ? 'descending' : 'ascending'}
+            >
+              ${dateSortHeader('Date', this.superSortDesc, () =>
+                this.sortSuperByDate(),
+              )}
+            </th>
+            <th scope="col" class="filter-th">
+              <span class=${filterClass} aria-hidden="true">
+                Entry
+                <span class="current">${filterLabel}</span>
+                <span class="caret">▾</span>
+              </span>
+              <select
+                class="col-filter"
+                aria-label="Filter entries by type"
+                @change=${(e: Event) => this.pickSuperKind(e)}
+              >
+                <option value="all" ?selected=${this.superKindFilter === 'all'}>
+                  All
+                </option>
+                ${SUPER_KINDS.map(
+                  (k) =>
+                    html`<option
+                      value=${k}
+                      ?selected=${this.superKindFilter === k}
+                    >
+                      ${superKindLabel(k)}
+                    </option>`,
+                )}
+              </select>
+            </th>
+            <th scope="col" class="num">Amount</th>
+            <th scope="col" class="num">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${
+            this.filteredSuperEntries.length === 0
+              ? html`<tr>
+                  <td colspan="4" class="muted">
+                    No ${this.superFilterNoun} entries this FY.
+                  </td>
+                </tr>`
+              : this.superPageRows.map(
+                  (e) =>
+                    html`<tr>
+                      <td>${e.date}</td>
+                      <td>${superKindLabel(e.kind)}</td>
+                      <td class="num money">${formatAUD(Number(e.amount))}</td>
+                      <td class="actions">
+                        <button
+                          class="btn btn-secondary btn-small"
+                          type="button"
+                          @click=${() => this.requestSuperEdit(e)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          class="btn btn-secondary btn-small"
+                          type="button"
+                          @click=${() => this.deleteSuperEntry(e)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>`,
+                )
+          }
+        </tbody>
+      </table>
+      ${this.renderSuperPager()}
+    </div>`;
+  }
+
   /**
    * Pager for the superannuation log. Nothing at all when the FY fits on one
    * page — a disabled Next on a 12-row FY is a control that can only lie.
@@ -241,7 +353,7 @@ export class OverviewView extends Base {
   private renderSuperPager(): unknown {
     const pages = this.superPages;
     if (pages <= 1) return '';
-    const n = this.superEntries.length;
+    const n = this.filteredSuperEntries.length;
     return html`
       <div class="table-pager">
         <span class="muted">
@@ -286,7 +398,73 @@ export class OverviewView extends Base {
 
   /** Total pages of the superannuation log; always at least one. */
   private get superPages(): number {
-    return Math.max(1, Math.ceil(this.superEntries.length / SUPER_PAGE_SIZE));
+    return Math.max(
+      1,
+      Math.ceil(this.filteredSuperEntries.length / SUPER_PAGE_SIZE),
+    );
+  }
+
+  /**
+   * The log narrowed to one entry type, or the whole year. The filter is a view
+   * concern: the rows are already in memory for the FY, so this costs no read
+   * and the summary figures cannot drift from it.
+   */
+  private get filteredSuperEntries(): SuperEntry[] {
+    if (this.superKindFilter === 'all') return this.superEntries;
+    return this.superEntries.filter((e) => e.kind === this.superKindFilter);
+  }
+
+  /**
+   * The word the empty state uses for the selected type. `superKindLabel` is
+   * title case ("SG contribution"), which reads wrong mid-sentence, and
+   * lowercasing it gives "sg".
+   */
+  private get superFilterNoun(): string {
+    switch (this.superKindFilter) {
+      case 'balance':
+        return 'balance';
+      case 'contribution':
+        return 'private contribution';
+      case 'sg':
+        return 'SG';
+      default:
+        return 'super';
+    }
+  }
+
+  /** Show one entry type. Returns to page 1: page 3 of the old list is an
+   *  arbitrary window on the new one. */
+  private setSuperFilter(kind: SuperKind | 'all'): void {
+    if (this.superKindFilter === kind) return;
+    this.superKindFilter = kind;
+    this.superPage = 0;
+    (this as any).requestUpdate?.();
+  }
+
+  /** The class for a summary card, marked while its type is the filter. */
+  private superCardClass(kind: SuperKind): string {
+    return `stat stat-card${this.superKindFilter === kind ? ' is-active' : ''}`;
+  }
+
+  /** `aria-pressed` for a summary card, as the attribute's string. */
+  private superCardPressed(kind: SuperKind): string {
+    return this.superKindFilter === kind ? 'true' : 'false';
+  }
+
+  /**
+   * A summary card that doubles as the log's entry-type filter.
+   *
+   * The figure stays a figure — the latest balance, the FY totals — and the
+   * click narrows the log to the rows it came from. Clicking the active card
+   * again restores the whole ledger, so the card is not a one-way door. A
+   * folded section is opened first: filtering a log you cannot see does
+   * nothing for the person who clicked.
+   */
+  private toggleSuperCard(kind: SuperKind): void {
+    if (this.collapsed.super === true)
+      this.collapsed = { ...this.collapsed, super: false };
+    this.setSuperFilter(this.superKindFilter === kind ? 'all' : kind);
+    (this as any).requestUpdate?.();
   }
 
   /**
@@ -296,7 +474,7 @@ export class OverviewView extends Base {
    */
   private get superPageRows(): SuperEntry[] {
     const start = this.superPage * SUPER_PAGE_SIZE;
-    return this.superEntries
+    return this.filteredSuperEntries
       .slice()
       .sort(byDate(this.superSortDesc))
       .slice(start, start + SUPER_PAGE_SIZE);
@@ -896,7 +1074,13 @@ export class OverviewView extends Base {
                        readable however far the entries below are folded away. -->
                   <div class="section-summary">
                     <div class="stat-grid cols-3">
-                      <div class="stat">
+                      <button
+                        type="button"
+                        class=${this.superCardClass('balance')}
+                        aria-pressed=${this.superCardPressed('balance')}
+                        aria-controls="wf-body-super"
+                        @click=${() => this.toggleSuperCard('balance')}
+                      >
                         <div class="stat-label">Latest super balance</div>
                         <div class="stat-value">
                           ${formatAUD(s.super.balance?.amount ?? 0)}
@@ -908,8 +1092,14 @@ export class OverviewView extends Base {
                               : 'no balance logged'
                           }
                         </div>
-                      </div>
-                      <div class="stat">
+                      </button>
+                      <button
+                        type="button"
+                        class=${this.superCardClass('contribution')}
+                        aria-pressed=${this.superCardPressed('contribution')}
+                        aria-controls="wf-body-super"
+                        @click=${() => this.toggleSuperCard('contribution')}
+                      >
                         <div class="stat-label">Private contributions</div>
                         <div class="stat-value">
                           ${formatAUD(s.super.contributions.total)}
@@ -921,8 +1111,14 @@ export class OverviewView extends Base {
                               : `${s.super.contributions.count} entries — tax deductible`
                           }
                         </div>
-                      </div>
-                      <div class="stat">
+                      </button>
+                      <button
+                        type="button"
+                        class=${this.superCardClass('sg')}
+                        aria-pressed=${this.superCardPressed('sg')}
+                        aria-controls="wf-body-super"
+                        @click=${() => this.toggleSuperCard('sg')}
+                      >
                         <div class="stat-label">SG contributions</div>
                         <div class="stat-value">${formatAUD(sgTotal)}</div>
                         <div class="stat-note">
@@ -932,7 +1128,7 @@ export class OverviewView extends Base {
                               : `${s.super.sg?.count ?? 0} employer entries`
                           }
                         </div>
-                      </div>
+                      </button>
                     </div>
                   </div>
                   <div
@@ -941,63 +1137,7 @@ export class OverviewView extends Base {
                     ?hidden=${this.collapsed.super === true}
                   >
                     ${this.showSuperForm ? html`<super-form></super-form>` : ''}
-                    ${
-                      this.superEntries.length === 0
-                        ? html`<p class="muted">
-                            No super entries this FY yet — log a balance, a
-                            private contribution, or an SG contribution.
-                          </p>`
-                        : html`<div class="table-wrap">
-                            <table class="hist-table">
-                              <thead>
-                                <tr>
-                                  <th
-                                    scope="col"
-                                    aria-sort=${this.superSortDesc ? 'descending' : 'ascending'}
-                                  >
-                                    ${dateSortHeader(
-                                      'Date',
-                                      this.superSortDesc,
-                                      () => this.sortSuperByDate(),
-                                    )}
-                                  </th>
-                                  <th scope="col">Entry</th>
-                                  <th scope="col" class="num">Amount</th>
-                                  <th scope="col" class="num">Actions</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                ${this.superPageRows.map(
-                                  (e) =>
-                                    html`<tr>
-                                      <td>${e.date}</td>
-                                      <td>${superKindLabel(e.kind)}</td>
-                                      <td class="num money">
-                                        ${formatAUD(Number(e.amount))}
-                                      </td>
-                                      <td class="actions">
-                                        <button
-                                          class="btn btn-secondary btn-small"
-                                          type="button"
-                                          @click=${() => this.requestSuperEdit(e)}
-                                        >
-                                          Edit
-                                        </button>
-                                        <button
-                                          class="btn btn-secondary btn-small"
-                                          type="button"
-                                          @click=${() => this.deleteSuperEntry(e)}
-                                        >
-                                          Delete
-                                        </button>
-                                      </td>
-                                    </tr>`,
-                                )}
-                              </tbody>
-                            </table>
-                            ${this.renderSuperPager()}
-                          </div>`
-                    }
+                    ${this.renderSuperLog()}
                   </div>
                 </div>
 

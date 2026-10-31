@@ -487,6 +487,55 @@ export const wealthflowStyles = css`
     color: var(--ff-accent, #007acc);
   }
 
+  /* A filter in a log's column header, beside the Date sorter. The whole cell
+     is the control: a transparent native select covers it, so a click anywhere
+     on the column name opens the OS list. A native popup also escapes the
+     table's horizontal scroll, which an absolutely-positioned custom list would
+     not. The visible label states the current filter; the accent marks a
+     narrowed view. */
+  .filter-th {
+    position: relative;
+  }
+  .th-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+  }
+  .th-filter .current {
+    /* Keep the selection clear of the column name; the caret stays tight to
+       the value it belongs to. */
+    margin-left: 8px;
+    color: var(--ff-text-strong, #fff);
+    font-weight: 600;
+  }
+  .th-filter.active .current,
+  .th-filter.active .caret {
+    color: var(--ff-accent, #007acc);
+  }
+  .th-filter .caret {
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.5;
+  }
+  .th-filter.active .caret {
+    opacity: 1;
+  }
+  .filter-th:hover .th-filter {
+    color: var(--ff-text-strong, #fff);
+  }
+  .col-filter {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .col-filter option {
+    background: var(--ff-bg-input, #3c3c3c);
+    color: var(--ff-text, #d4d4d4);
+  }
   /* Pager under a paged log. Hidden entirely when the FY fits on one page, so
      the common case has no dead control in it. */
   .table-pager {
@@ -871,12 +920,45 @@ export const wealthflowStyles = css`
     color: var(--ff-text-strong, #fff);
     font-variant-numeric: tabular-nums;
   }
+  /* The summary cards are the same object as a parcel card: a surface a step
+     lighter than the panel, rounded, with the border lighting up under the
+     mouse. Combined taxable and Superannuation both read this rule. */
   .stat {
-    background: var(--ff-bg-subpanel, #2a2a2a);
+    background: var(--ff-bg-input, #3c3c3c);
     border: 1px solid var(--ff-border, #3e3e3e);
-    border-radius: 6px;
-    padding: 12px 14px;
+    border-radius: var(--ff-radius-xl, 8px);
+    padding: 12px 16px;
     min-width: 0;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+  .stat:hover {
+    background: var(--ff-bg-input-hover, #4a4a4a);
+    border-color: var(--ff-accent, #007acc);
+  }
+  /* The Superannuation cards double as the log's entry-type filter: the
+     figure stays a figure, and the card is the control. */
+  .stat-card {
+    display: block;
+    width: 100%;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    appearance: none;
+  }
+  .stat-card:focus-visible {
+    outline: 2px solid var(--ff-accent, #007acc);
+    outline-offset: 2px;
+  }
+  /* Active outranks hover: the accent stays on the label after the mouse
+     leaves, so "this log is filtered" is not mistaken for "the mouse is here". */
+  .stat-card.is-active {
+    border-color: var(--ff-accent, #007acc);
+  }
+  .stat-card.is-active .stat-label {
+    color: var(--ff-accent, #007acc);
   }
   /* Caption inside a card, so a card carries its own "where this comes from"
      instead of a footnote stranded under the grid. */

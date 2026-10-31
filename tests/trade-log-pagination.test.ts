@@ -147,6 +147,40 @@ describe('trade log paging', () => {
 });
 
 describe('trade log stock filter', () => {
+  it('puts the stock filter in the Stock column header', async () => {
+    const f: any = createMockFinance();
+    await seed(f, 'VAS', dates(2));
+    const log = await logFor(f);
+
+    // The old strip above the table is gone; the filter moved into the table.
+    expect(log.renderRoot.querySelector('.log-filters')).toBeNull();
+    const select = log.renderRoot.querySelector('.col-filter') as any;
+    expect(select).toBeTruthy();
+    expect(select.closest('th')?.textContent).toContain('Stock');
+    // The header states the current choice, not just the column name.
+    expect(
+      select
+        .closest('th')
+        ?.querySelector('.th-filter .current')
+        ?.textContent?.trim(),
+    ).toBe('All stocks');
+    log.remove();
+  });
+
+  it('shows a plain Stock header when the log is empty', async () => {
+    const f: any = createMockFinance();
+    const log = await logFor(f);
+
+    // Nothing to filter: an option that selects no rows is a control that can
+    // only lie, so the header goes back to a label.
+    expect(log.renderRoot.querySelector('.col-filter')).toBeNull();
+    const stockTh = [...log.renderRoot.querySelectorAll('th')].find(
+      (h: any) => h.textContent?.trim() === 'Stock',
+    );
+    expect(stockTh).toBeTruthy();
+    log.remove();
+  });
+
   it('narrows the log to one stock and starts again at page one', async () => {
     const f: any = createMockFinance();
     await seed(f, 'VAS', dates(12));
@@ -197,6 +231,12 @@ describe('trade log stock filter', () => {
     await log.updateComplete;
     expect(log.stockFilter).toBe(vas.id);
     expect(log.filteredCount).toBe(2);
+    expect(
+      select
+        .closest('th')
+        ?.querySelector('.th-filter .current')
+        ?.textContent?.trim(),
+    ).toBe('VAS');
 
     select.value = 'all';
     select.dispatchEvent(new Event('change'));

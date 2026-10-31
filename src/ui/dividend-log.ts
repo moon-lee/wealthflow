@@ -5,7 +5,6 @@ import { ExtensionLogger } from 'finance-logger';
 import { formatAUD } from '../utils/format.js';
 import {
   DIVIDEND_LABELS,
-  DIVIDEND_TYPES,
   listDividends,
   deleteDividend,
   type DividendEntry,
@@ -36,7 +35,6 @@ export class DividendLog extends Base {
   /** Date order for the table. Newest first, the order a log is read in. */
   sortDesc = true;
   stockFilter: number | 'all' = 'all';
-  typeFilter: string | 'all' = 'all';
   error = '';
 
   /**
@@ -71,7 +69,6 @@ export class DividendLog extends Base {
       this.entries = await listDividends(this.finance, {
         financeYear: this.fy || undefined,
         ...(this.stockFilter === 'all' ? {} : { stockId: this.stockFilter }),
-        ...(this.typeFilter === 'all' ? {} : { type: this.typeFilter }),
       });
     } catch (e: any) {
       logger.error('dividend log reload failed:', e);
@@ -128,6 +125,12 @@ export class DividendLog extends Base {
     void this.reload();
   }
 
+  private pickStock(e: Event): void {
+    const v = (e.target as HTMLSelectElement).value;
+    this.stockFilter = v === 'all' ? 'all' : Number(v);
+    this.onFilterChange();
+  }
+
   override render(): unknown {
     if (typeof HTMLElement === 'undefined') return html``;
     const gross = this.entries.reduce((s, e) => s + Number(e.gross ?? 0), 0);
@@ -135,58 +138,12 @@ export class DividendLog extends Base {
       (s, e) => s + Number(e.franking ?? 0),
       0,
     );
-    const filtered = this.stockFilter !== 'all' || this.typeFilter !== 'all';
+    const filtered = this.stockFilter !== 'all';
     return html`
-      <div class="log-filters">
-        <label
-          ><span>Stock</span>
-          <select
-            aria-label="Filter by stock"
-            @change=${(e: Event) => {
-              const v = (e.target as HTMLSelectElement).value;
-              this.stockFilter = v === 'all' ? 'all' : Number(v);
-              this.onFilterChange();
-            }}
-          >
-            <option value="all">All stocks</option>
-            ${this.stocks.map(
-              (s) =>
-                html`<option
-                  value=${s.id}
-                  ?selected=${this.stockFilter === s.id}
-                >
-                  ${s.stock_code}${s.is_active ? '' : ' (inactive)'}
-                </option>`,
-            )}
-          </select>
-        </label>
-        <label
-          ><span>Type</span>
-          <select
-            aria-label="Filter by type"
-            @change=${(e: Event) => {
-              this.typeFilter = (e.target as HTMLSelectElement).value;
-              this.onFilterChange();
-            }}
-          >
-            <option value="all">All types</option>
-            ${DIVIDEND_TYPES.map(
-              (t) =>
-                html`<option value=${t} ?selected=${this.typeFilter === t}>
-                  ${DIVIDEND_LABELS[t]}
-                </option>`,
-            )}
-          </select>
-        </label>
-        <span class="rate-badge"
-          >${this.entries.length}
-          ${this.entries.length === 1 ? 'receipt' : 'receipts'}</span
-        >
-      </div>
       <!--
-        Both conditionals sit inside this element. A binding at the ROOT
-        level of a template is dropped by happy-dom's parser, so the table
-        below would be in no test's DOM to assert against.
+        The conditionals sit inside this element. A binding at the ROOT level
+        of a template is dropped by happy-dom's parser, so anything rendered
+        from one is in no test's DOM to assert against.
       -->
       <div>
         ${
@@ -197,13 +154,10 @@ export class DividendLog extends Base {
             : ''
         }
         ${
-          this.entries.length === 0
+          this.entries.length === 0 && !filtered
             ? html`<p class="empty-state">
-                ${
-                  filtered
-                    ? 'No receipts match this filter.'
-                    : 'No dividends logged this FY yet — use "Log dividend" to add the first one.'
-                }
+                No dividends logged this FY yet — use "Log dividend" to add the
+                first one.
               </p>`
             : this.renderTable(gross, franking, filtered)
         }
@@ -217,6 +171,12 @@ export class DividendLog extends Base {
     filtered: boolean,
   ): unknown {
     const round2 = (n: number) => Math.round(n * 100) / 100;
+    const stockLabel =
+      this.stockFilter === 'all'
+        ? 'All stocks'
+        : this.stockName(this.stockFilter);
+    const stockClass =
+      this.stockFilter === 'all' ? 'th-filter' : 'th-filter active';
     return html`
       <div class="table-wrap">
         <table class="data-table">
@@ -230,7 +190,31 @@ export class DividendLog extends Base {
                   this.sortByDate(),
                 )}
               </th>
-              <th scope="col">Holding</th>
+              <th scope="col" class="filter-th">
+                <span class=${stockClass} aria-hidden="true">
+                  Holding
+                  <span class="current">${stockLabel}</span>
+                  <span class="caret">▾</span>
+                </span>
+                <select
+                  class="col-filter"
+                  aria-label="Filter by stock"
+                  @change=${(e: Event) => this.pickStock(e)}
+                >
+                  <option value="all" ?selected=${this.stockFilter === 'all'}>
+                    All stocks
+                  </option>
+                  ${this.stocks.map(
+                    (s) =>
+                      html`<option
+                        value=${s.id}
+                        ?selected=${this.stockFilter === s.id}
+                      >
+                        ${s.stock_code}${s.is_active ? '' : ' (inactive)'}
+                      </option>`,
+                  )}
+                </select>
+              </th>
               <th scope="col">Type</th>
               <th scope="col" class="num">Gross</th>
               <th scope="col" class="num">Franking</th>
@@ -238,44 +222,54 @@ export class DividendLog extends Base {
             </tr>
           </thead>
           <tbody>
-            ${this.sortedEntries.map(
-              (e) => html`
-                <tr>
-                  <td class="mono">${e.date}</td>
-                  <td>
-                    <span class="row-code">${this.stockName(e.stock_id)}</span>
-                    ${
-                      this.stockFullName(e.stock_id)
-                        ? html`<span class="row-sub"
-                            >${this.stockFullName(e.stock_id)}</span
-                          >`
-                        : ''
-                    }
-                  </td>
-                  <td>${DIVIDEND_LABELS[e.type]}</td>
-                  <td class="num">${formatAUD(Number(e.gross))}</td>
-                  <td class="num">${formatAUD(Number(e.franking))}</td>
-                  <td>
-                    <div class="row-actions">
-                      <button
-                        class="btn btn-secondary btn-small"
-                        aria-label="Edit ${this.stockName(e.stock_id)} dividend on ${e.date}"
-                        @click=${() => this.requestEdit(e)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        class="btn btn-secondary btn-small"
-                        aria-label="Delete ${this.stockName(e.stock_id)} dividend on ${e.date}"
-                        @click=${() => this.onDelete(e)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              `,
-            )}
+            ${
+              this.entries.length === 0
+                ? html`<tr>
+                    <td colspan="6" class="muted">
+                      No receipts match this filter.
+                    </td>
+                  </tr>`
+                : this.sortedEntries.map(
+                    (e) => html`
+                      <tr>
+                        <td class="mono">${e.date}</td>
+                        <td>
+                          <span class="row-code"
+                            >${this.stockName(e.stock_id)}</span
+                          >
+                          ${
+                            this.stockFullName(e.stock_id)
+                              ? html`<span class="row-sub"
+                                  >${this.stockFullName(e.stock_id)}</span
+                                >`
+                              : ''
+                          }
+                        </td>
+                        <td>${DIVIDEND_LABELS[e.type]}</td>
+                        <td class="num">${formatAUD(Number(e.gross))}</td>
+                        <td class="num">${formatAUD(Number(e.franking))}</td>
+                        <td>
+                          <div class="row-actions">
+                            <button
+                              class="btn btn-secondary btn-small"
+                              aria-label="Edit ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                              @click=${() => this.requestEdit(e)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              class="btn btn-secondary btn-small"
+                              aria-label="Delete ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                              @click=${() => this.onDelete(e)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    `,
+                  )
+            }
           </tbody>
           <tfoot>
             <tr>

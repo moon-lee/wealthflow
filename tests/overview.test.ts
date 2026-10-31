@@ -21,6 +21,43 @@ function superCard(root: ShadowRoot): HTMLElement {
   ) as HTMLElement;
 }
 
+/** One Superannuation summary card, by its label. */
+function superCardByText(root: ShadowRoot, label: string): HTMLButtonElement {
+  const el = [...root.querySelectorAll('.section-summary .stat-card')].find(
+    (card: any) => card.textContent?.includes(label),
+  ) as HTMLButtonElement | undefined;
+  if (!el) throw new Error(`no superannuation card for ${label}`);
+  return el;
+}
+
+/**
+ * The entry-type filter, which lives in the log's Entry column header the way
+ * the Date sorter lives in its own. A transparent native `<select>` covers the
+ * cell, so the OS draws the list and the table's `overflow-x: auto` cannot clip
+ * it.
+ */
+function superFilter(root: ShadowRoot): HTMLSelectElement {
+  // Scoped to the super section: the dividends table has header filters of its
+  // own, and it comes first in the DOM.
+  const el = root.querySelector(
+    '#wf-body-super .col-filter',
+  ) as HTMLSelectElement | null;
+  if (!el) throw new Error('superannuation entry filter is not rendered');
+  return el;
+}
+
+/** Pick an option the way the native list does: set the value, then fire. */
+async function chooseSuper(
+  view: any,
+  root: ShadowRoot,
+  value: string,
+): Promise<void> {
+  const select = superFilter(root);
+  select.value = value;
+  select.dispatchEvent(new Event('change'));
+  await view.updateComplete;
+}
+
 /**
  * Every static chunk and primitive value in a rendered Lit template, including
  * nested ones. happy-dom drops a nested `tfoot` from the shadow root, so this
@@ -267,7 +304,6 @@ describe('overview-view', () => {
     const log = root.querySelector('dividend-log') as any;
     expect(log).toBeTruthy();
     expect(log.stockFilter).toBe('all');
-    expect(log.typeFilter).toBe('all');
     expect(log.entries).toHaveLength(1);
     // No section chrome of its own — the host states the FY once.
     expect(log.shadowRoot?.querySelector('h3')).toBeNull();
@@ -1641,5 +1677,254 @@ describe('overview-view', () => {
     } finally {
       g.__mockServices?.delete('wealthflow');
     }
+  });
+
+  it('filters the superannuation log by entry type from its column header', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    const add = (date: string, kind: string, amount: number) =>
+      createSuperEntry(finance, { date, kind, amount }, '07-01');
+    await add('2025-07-05', 'balance', 100000);
+    await add('2025-07-10', 'sg', 200);
+    await add('2025-07-15', 'contribution', 500);
+
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const kinds = () => el.superPageRows.map((e: any) => e.kind);
+
+    // Same place, same affordance as the Date sorter: the column name is the
+    // control, not a toolbar above the table.
+    const th = superFilter(root).closest('th') as HTMLTableCellElement;
+    expect(th?.textContent).toContain('Entry');
+    expect(th?.querySelector('.th-sort')).toBeNull();
+
+    // Default is the whole ledger, newest first, every type present.
+    expect(superFilter(root).value).toBe('all');
+    expect(th?.querySelector('.th-filter .current')?.textContent?.trim()).toBe(
+      'All',
+    );
+    expect(
+      [...superFilter(root).options].map((o) => o.textContent?.trim()),
+    ).toEqual(['All', 'Balance', 'Private contribution', 'SG contribution']);
+    expect(kinds()).toEqual(['contribution', 'sg', 'balance']);
+
+    await chooseSuper(el, root, 'sg');
+    expect(el.superKindFilter).toBe('sg');
+    expect(kinds()).toEqual(['sg']);
+    // The header keeps showing the choice after Lit re-renders, rather than
+    // snapping back to the first option.
+    expect(superFilter(root).value).toBe('sg');
+    expect(th?.querySelector('.th-filter .current')?.textContent?.trim()).toBe(
+      'SG contribution',
+    );
+
+    // Back to everything: the filter must not be a one-way door.
+    await chooseSuper(el, root, 'all');
+    expect(kinds()).toHaveLength(3);
+    expect(superFilter(root).value).toBe('all');
+    el.remove();
+  });
+
+  it('counts only the filtered rows in the superannuation pager', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    // 13 private contributions + 1 SG: two pages in total, one page per type.
+    for (let i = 1; i <= 13; i++)
+      await createSuperEntry(
+        finance,
+        {
+          date: `2025-07-${String(i).padStart(2, '0')}`,
+          kind: 'contribution',
+          amount: 100 + i,
+        },
+        '07-01',
+      );
+    await createSuperEntry(
+      finance,
+      { date: '2025-08-01', kind: 'sg', amount: 200 },
+      '07-01',
+    );
+
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const pageLine = () =>
+      root
+        .querySelector('.table-pager .muted')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim();
+
+    expect(pageLine()).toBe('Page 1 of 2 · 14 entries');
+
+    // One SG row: nothing to page through, so the pager must disappear rather
+    // than claim a second page of a one-row list.
+    await chooseSuper(el, root, 'sg');
+    expect(root.querySelector('.table-pager')).toBeNull();
+
+    // 13 contributions still need two pages, and the count has to be theirs.
+    await chooseSuper(el, root, 'contribution');
+    expect(pageLine()).toBe('Page 1 of 2 · 13 entries');
+    el.remove();
+  });
+
+  it('names the type when the filter has no rows, and keeps the filter', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    await createSuperEntry(
+      finance,
+      { date: '2025-09-01', kind: 'contribution', amount: 1000 },
+      '07-01',
+    );
+
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+
+    await chooseSuper(el, root, 'sg');
+    // The filter has to survive its own empty result, or there is no way back.
+    expect(superFilter(root).value).toBe('sg');
+    // Lit keeps the template's indentation in textContent; the browser collapses
+    // it, so compare the sentence, not the whitespace.
+    expect(root.textContent?.replace(/\s+/g, ' ')).toContain(
+      'No SG entries this FY.',
+    );
+    el.remove();
+  });
+
+  it('filters the log from a superannuation card, leaving the figure in place', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    const add = (date: string, kind: string, amount: number) =>
+      createSuperEntry(finance, { date, kind, amount }, '07-01');
+    await add('2025-07-05', 'balance', 100000);
+    await add('2025-07-10', 'sg', 200);
+    await add('2025-07-15', 'contribution', 500);
+
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+    const kinds = () => el.superPageRows.map((e: any) => e.kind);
+
+    // The card is a control now, but its figure is unchanged: it still shows
+    // the latest balance, not the sum of every balance entry.
+    const balance = superCardByText(root, 'Latest super balance');
+    expect(balance.tagName).toBe('BUTTON');
+    expect(balance.textContent).toContain('$100,000.00');
+    expect(balance.getAttribute('aria-pressed')).toBe('false');
+
+    balance.click();
+    await el.updateComplete;
+    expect(el.superKindFilter).toBe('balance');
+    expect(kinds()).toEqual(['balance']);
+    // The header filter states the card's choice: one state, two ways in.
+    expect(superFilter(root).value).toBe('balance');
+    expect(
+      superCardByText(root, 'Latest super balance').getAttribute(
+        'aria-pressed',
+      ),
+    ).toBe('true');
+    expect(superCardByText(root, 'Latest super balance').textContent).toContain(
+      '$100,000.00',
+    );
+
+    // Each card narrows to the rows its figure came from.
+    superCardByText(root, 'Private contributions').click();
+    await el.updateComplete;
+    expect(el.superKindFilter).toBe('contribution');
+    expect(kinds()).toEqual(['contribution']);
+    expect(superFilter(root).value).toBe('contribution');
+    expect(
+      superCardByText(root, 'Private contributions').textContent,
+    ).toContain('$500.00');
+
+    // Clicking the active card again restores the whole ledger.
+    superCardByText(root, 'Private contributions').click();
+    await el.updateComplete;
+    expect(el.superKindFilter).toBe('all');
+    expect(kinds()).toHaveLength(3);
+    expect(superFilter(root).value).toBe('all');
+
+    superCardByText(root, 'SG contributions').click();
+    await el.updateComplete;
+    expect(kinds()).toEqual(['sg']);
+    expect(superFilter(root).value).toBe('sg');
+    el.remove();
+  });
+
+  it('opens the section when a card filters while it is folded', async () => {
+    await import('../src/ui/overview-view.js');
+    await import('../src/ui/dividend-log.js');
+    await import('../src/ui/dividend-form.js');
+    await import('../src/ui/interest-grid.js');
+    await import('../src/ui/interest-form.js');
+    const { createSuperEntry } = await import('../src/dao/super-entries.js');
+    const finance: any = createMockFinance();
+    await createSuperEntry(
+      finance,
+      { date: '2025-07-10', kind: 'sg', amount: 200 },
+      '07-01',
+    );
+
+    const el = document.createElement('overview-view') as any;
+    document.body.appendChild(el);
+    el.fy = '2025-2026';
+    await el.setFinance(finance);
+    await el.updateComplete;
+    await new Promise((r) => setTimeout(r, 0));
+    await el.updateComplete;
+    const root = el.renderRoot as ShadowRoot;
+
+    toggle(el, root, 'super');
+    await el.updateComplete;
+    expect(el.collapsed.super).toBe(true);
+
+    superCardByText(root, 'SG contributions').click();
+    await el.updateComplete;
+    // A filter on a log the person cannot see is a no-op, so the card opens
+    // the section it filters.
+    expect(el.collapsed.super).toBe(false);
+    expect(el.superKindFilter).toBe('sg');
+    el.remove();
   });
 });

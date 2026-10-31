@@ -68,6 +68,60 @@ describe('portfolio styles', () => {
     expect(String(portfolioStyles)).toContain('tabular-nums');
   });
 
+  /**
+   * One rule block, from its selector to its closing brace. Used to compare
+   * declarations between two stylesheets without matching the whole file.
+   */
+  function rule(css: string, selector: string): string {
+    const start = css.indexOf(selector);
+    if (start < 0) throw new Error(`no ${selector} rule`);
+    return css.slice(start, css.indexOf('}', start) + 1);
+  }
+
+  it('gives the summary cards the parcel card surface', () => {
+    // A parcel card is the reference: a surface a step lighter than the panel,
+    // a rounded border, and a highlight under the mouse. The other card rows —
+    // Trades Summary, Combined taxable, Superannuation, Capital gains — are
+    // the same object and must not read as a different product.
+    const wealth = String(wealthflowStyles);
+    const portfolio = String(portfolioStyles);
+    for (const block of [
+      rule(wealth, '.stat {'),
+      rule(portfolio, '.portfolio-card {'),
+    ]) {
+      expect(block).toMatch(/background:\s*var\(--ff-bg-input[,)]/);
+      expect(block).toMatch(/border:\s*1px solid var\(--ff-border[,)]/);
+      expect(block).toMatch(/border-radius:\s*var\(--ff-radius-xl,\s*8px\)/);
+    }
+  });
+
+  it('highlights a summary card under the mouse', () => {
+    const wealth = String(wealthflowStyles);
+    const portfolio = String(portfolioStyles);
+    for (const css of [wealth, portfolio]) {
+      const hover = rule(
+        css,
+        css === wealth ? '.stat:hover {' : '.portfolio-card:hover {',
+      );
+      expect(hover).toMatch(/background:\s*var\(--ff-bg-input-hover/);
+      expect(hover).toMatch(/border-color:\s*var\(--ff-accent/);
+    }
+  });
+
+  it('stands each portfolio card on its own instead of sharing one strip', () => {
+    // The parcel cards are separate tiles with a gap. A single bordered strip
+    // with hairline dividers is a different object, so the container keeps no
+    // chrome of its own and each card carries its own border.
+    const portfolio = String(portfolioStyles);
+    const cards = rule(portfolio, '.portfolio-cards {');
+    expect(cards).toMatch(/gap:\s*12px/);
+    expect(cards).not.toMatch(/border:/);
+    expect(cards).not.toMatch(/background:/);
+    const card = rule(portfolio, '.portfolio-card {');
+    expect(card).not.toMatch(/border-left/);
+    expect(portfolio).not.toContain('.portfolio-card:first-child');
+  });
+
   it('right-aligns the numeric fields in the trade form', () => {
     // The form sits above a table of money. A number field that hugs the left
     // edge reads as text, and the digits stop lining up column to column.

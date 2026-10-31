@@ -28,9 +28,8 @@ const PAGE_SIZE = 10;
  * `sortedTrades`, because the test DOM drops tbody rows and the order has to
  * be assertable where it is decided rather than where it is rendered.
  *
- * It also owns its pager and its stock filter: paging is a property of this
- * list, not of the page around it, and a filter that lived in the section
- * header would only exist while this log does not.
+ * It also owns its pager and its stock filter, which sits in the Stock column
+ * header: both are properties of this list, not of the page around it.
  */
 export class TradeLog extends Base {
   static override styles =
@@ -171,38 +170,40 @@ export class TradeLog extends Base {
   }
 
   /**
-   * The Stock filter. It lists only the codes this log holds: an option that
-   * selects no rows is a control that can only lie.
+   * The Stock filter, in the Stock column header. It lists only the codes this
+   * log holds: an option that selects no rows is a control that can only lie.
+   * With no trades there is nothing to narrow, so the header stays a label.
    *
    * The select carries no `.value` binding — lit commits that before the
    * `<option>` children exist — so each option declares its own `selected`.
    */
-  private renderFilters(): unknown {
-    if (this.trades.length === 0) return '';
-    return html`
-      <div class="log-filters" style="margin-top: 12px;">
-        <label
-          ><span>Stock</span>
-          <select
-            aria-label="Filter trades by stock"
-            @change=${(e: Event) => this.onFilterChange(e)}
-          >
-            <option value="all" ?selected=${this.stockFilter == null}>
-              All stocks
-            </option>
-            ${this.filterStocks.map(
-              (s) =>
-                html`<option
-                  value=${s.id}
-                  ?selected=${this.stockFilter === s.id}
-                >
-                  ${s.code}
-                </option>`,
-            )}
-          </select>
-        </label>
-      </div>
-    `;
+  private renderStockHeader(): unknown {
+    if (this.trades.length === 0) return html`<th scope="col">Stock</th>`;
+    const label =
+      this.stockFilter == null ? 'All stocks' : this.code(this.stockFilter);
+    const cls = this.stockFilter == null ? 'th-filter' : 'th-filter active';
+    return html`<th scope="col" class="filter-th">
+      <span class=${cls} aria-hidden="true">
+        Stock
+        <span class="current">${label}</span>
+        <span class="caret">▾</span>
+      </span>
+      <select
+        class="col-filter"
+        aria-label="Filter trades by stock"
+        @change=${(e: Event) => this.onFilterChange(e)}
+      >
+        <option value="all" ?selected=${this.stockFilter == null}>
+          All stocks
+        </option>
+        ${this.filterStocks.map(
+          (s) =>
+            html`<option value=${s.id} ?selected=${this.stockFilter === s.id}>
+              ${s.code}
+            </option>`,
+        )}
+      </select>
+    </th>`;
   }
 
   /**
@@ -245,7 +246,6 @@ export class TradeLog extends Base {
     const rows = this.pageRows;
     return html`
       <div>
-        ${this.renderFilters()}
         ${
           this.error
             ? html`<p class="field-error">Error: ${this.error}</p>`
@@ -253,6 +253,24 @@ export class TradeLog extends Base {
         }
         <div class="table-wrap">
           <table class="hist-table">
+            <!--
+              table-layout: fixed splits an unmeasured table into equal
+              columns, which gave "buy"/"sell" as much room as the Stock code
+              and the header filter above it. These widths hand the narrow
+              values what they need and the rest to Stock and the money
+              columns. Percentages keep the table inside the panel at any
+              width; they add up to 100.
+            -->
+            <colgroup>
+              <col style="width: 12%" />
+              <col style="width: 22%" />
+              <col style="width: 7%" />
+              <col style="width: 8%" />
+              <col style="width: 13%" />
+              <col style="width: 13%" />
+              <col style="width: 13%" />
+              <col style="width: 12%" />
+            </colgroup>
             <thead>
               <tr>
                 <th
@@ -263,7 +281,7 @@ export class TradeLog extends Base {
                     this.sortByDate(),
                   )}
                 </th>
-                <th scope="col">Stock</th>
+                ${this.renderStockHeader()}
                 <th scope="col">Side</th>
                 <th scope="col" class="num">Qty</th>
                 <th scope="col" class="num">Price</th>

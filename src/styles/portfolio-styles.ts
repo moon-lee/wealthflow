@@ -15,28 +15,31 @@ import { css } from 'lit';
  */
 export const portfolioStyles = css`
   /* ---- The card row -------------------------------------------------- */
+  /* Separate tiles with a gap, the way the parcel cards sit: each card carries
+     its own surface and border, so the row needs no container chrome. */
   .portfolio-cards {
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 0;
-    background: var(--ff-bg-panel);
-    border: 1px solid var(--ff-border);
-    border-radius: var(--ff-radius-lg);
-    overflow: hidden;
+    gap: 12px;
   }
 
   .portfolio-card {
     display: flex;
     flex-direction: column;
     gap: var(--ff-space-1);
-    padding: var(--ff-space-4);
-    /* A hairline between cards, the way the reference separates them. */
-    border-left: 1px solid var(--ff-border);
+    padding: 12px 16px;
+    background: var(--ff-bg-input);
+    border: 1px solid var(--ff-border);
+    border-radius: var(--ff-radius-xl, 8px);
     min-width: 0;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
   }
 
-  .portfolio-card:first-child {
-    border-left: none;
+  .portfolio-card:hover {
+    background: var(--ff-bg-input-hover);
+    border-color: var(--ff-accent);
   }
 
   /* A four-card row — the Overview's capital gains, which has four cards
@@ -400,13 +403,6 @@ export const portfolioStyles = css`
   @media (max-width: 900px) {
     .portfolio-cards {
       grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .portfolio-card {
-      border-left: none;
-      border-top: 1px solid var(--ff-border);
-    }
-    .portfolio-card:nth-child(-n + 2) {
-      border-top: none;
     }
   }
 `;
