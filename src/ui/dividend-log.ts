@@ -11,6 +11,7 @@ import {
 } from '../dao/dividends.js';
 import { listStocks, type Stock } from '../dao/stocks.js';
 import { byDate, dateSortHeader } from './sort-header.js';
+import { PENCIL_ICON, TRASH_ICON } from './icons.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -251,18 +252,22 @@ export class DividendLog extends Base {
                         <td>
                           <div class="row-actions">
                             <button
-                              class="btn btn-secondary btn-small"
+                              type="button"
+                              class="icon-btn icon-btn-accent"
                               aria-label="Edit ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                              title="Edit ${this.stockName(e.stock_id)} dividend on ${e.date}"
                               @click=${() => this.requestEdit(e)}
                             >
-                              Edit
+                              ${PENCIL_ICON}
                             </button>
                             <button
-                              class="btn btn-secondary btn-small"
+                              type="button"
+                              class="icon-btn icon-btn-danger"
                               aria-label="Delete ${this.stockName(e.stock_id)} dividend on ${e.date}"
+                              title="Delete ${this.stockName(e.stock_id)} dividend on ${e.date}"
                               @click=${() => this.onDelete(e)}
                             >
-                              Delete
+                              ${TRASH_ICON}
                             </button>
                           </div>
                         </td>

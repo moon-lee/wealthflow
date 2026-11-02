@@ -86,9 +86,18 @@ function monthsHeldLabel(acquired: string, asOf: string): string {
 export async function replayStock(
   finance: FinanceApi,
   stockId: number,
-  opts: { exceptTradeId?: number; pending?: Trade | null } = {},
+  opts: {
+    exceptTradeId?: number;
+    pending?: Trade | null;
+    /**
+     * Parcels to replay against instead of the stored ones. A delete has to
+     * model the parcel its buy leaves behind, and that parcel is still in the
+     * table while the check runs.
+     */
+    parcels?: Parcel[];
+  } = {},
 ): Promise<Array<Disposal & { tradeId: number }>> {
-  const stored = await listParcels(finance, { stockId });
+  const stored = opts.parcels ?? (await listParcels(finance, { stockId }));
   const pending = opts.pending ?? null;
 
   // A pending BUY has no stored parcel yet, so the replay has to model it —

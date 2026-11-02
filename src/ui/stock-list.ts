@@ -29,7 +29,6 @@ export class StockList extends Base {
   editingId: number | null = null;
   editStockCode = '';
   editStockName = '';
-  editShares = '';
   /**
    * Stock ids that have at least one parcel. A holding with none has an
    * unknown unit count, and rendering its derived 0 would read as data loss.
@@ -145,19 +144,9 @@ export class StockList extends Base {
     return this.editStockName.trim() === '' ? 'Name is required.' : null;
   }
 
-  private get sharesError(): string | null {
-    const text = this.editShares.trim();
-    if (text === '') return 'Shares are required.';
-    const n = Number(text);
-    return Number.isFinite(n) && n >= 0 ? null : 'Shares must be ≥ 0.';
-  }
-
   private get canSaveEdit(): boolean {
     return (
-      this.codeError === null &&
-      this.nameError === null &&
-      this.sharesError === null &&
-      !this.savingEdit
+      this.codeError === null && this.nameError === null && !this.savingEdit
     );
   }
 
@@ -170,7 +159,6 @@ export class StockList extends Base {
     this.editingId = s.id;
     this.editStockCode = s.stock_code;
     this.editStockName = s.stock_full_name;
-    this.editShares = String(s.shares);
     this.editNotes = s.notes ?? '';
     this.editTouched = false;
     this.savingEdit = false;
@@ -210,7 +198,7 @@ export class StockList extends Base {
 
   private async saveEdit(s: Stock): Promise<void> {
     this.editTouched = true;
-    const blocker = this.codeError ?? this.nameError ?? this.sharesError;
+    const blocker = this.codeError ?? this.nameError;
     if (blocker !== null) {
       this.error = blocker;
       (this as any).requestUpdate?.();
@@ -377,7 +365,7 @@ export class StockList extends Base {
   }
 
   private editRow(s: Stock): unknown {
-    const blocker = this.codeError ?? this.nameError ?? this.sharesError;
+    const blocker = this.codeError ?? this.nameError;
     return html`
       <tr class="editing">
         <td colspan="3">
@@ -413,20 +401,18 @@ export class StockList extends Base {
               }
             </label>
             <label class="field"
-              ><span>Shares<em class="req">*</em></span>
+              ><span>Shares</span>
               <input
                 aria-label="Shares"
                 inputmode="decimal"
-                .value=${this.editShares}
-                @input=${(e: Event) =>
-                  this.onEditInput((v) => (this.editShares = v), e)}
-                @keydown=${(e: KeyboardEvent) => this.onEditKey(s, e)}
+                readonly
+                .value=${this.tracked.has(s.id) ? String(s.shares) : ''}
+                placeholder="not yet tracked"
+                title="Derived from your trade history — change it on the Trades tab."
               />
-              ${
-                this.errorFor(this.sharesError)
-                  ? html`<p class="field-error">${this.sharesError}</p>`
-                  : ''
-              }
+              <p class="muted">
+                Derived from trades. Change it by adding or removing a trade.
+              </p>
             </label>
             <label class="field edit-notes"
               ><span>Notes</span>

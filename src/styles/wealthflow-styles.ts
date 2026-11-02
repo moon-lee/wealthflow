@@ -269,7 +269,7 @@ export const wealthflowStyles = css`
     flex: 1 1 auto;
     min-width: 0;
   }
-  .cell-edit .btn-small {
+  .cell-edit .icon-btn {
     flex: 0 0 auto;
   }
   /* Filter strip above a log table. The 8px side padding is the table's own
@@ -573,6 +573,58 @@ export const wealthflowStyles = css`
     gap: 6px;
     justify-content: flex-end;
   }
+  /* Icon-only row action, the shape Income Flow and Expenses use: a square
+     target with a surface on hover, because an underline is a text affordance
+     and reads as nothing on a glyph. Accent marks edit, danger marks delete. */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 24px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--ff-radius-sm, 3px);
+    color: var(--ff-text-muted, #858585);
+    cursor: pointer;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease,
+      color 120ms ease;
+  }
+  .icon-btn:hover {
+    background: var(--ff-bg-input-hover, #4a4a4a);
+    border-color: var(--ff-border, #3e3e3e);
+    color: var(--ff-text, #d4d4d4);
+  }
+  .icon-btn-accent {
+    color: var(--ff-accent, #007acc);
+  }
+  .icon-btn-accent:hover {
+    color: var(--ff-accent-hover, #1177bb);
+  }
+  .icon-btn-danger {
+    color: var(--ff-danger, #f48771);
+  }
+  .icon-btn-danger:hover {
+    color: var(--ff-danger, #f48771);
+    filter: brightness(1.2);
+  }
+  .icon-btn svg {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .icon-btn {
+      transition: none;
+    }
+  }
   /* Clickable status badge — replaces the per-row Activate/Deactivate button. */
   .status-toggle {
     display: inline-flex;
@@ -702,7 +754,8 @@ export const wealthflowStyles = css`
   /* The superannuation section is three bands — position, form, log — on one
      screen, so it runs tighter than the two-padding rhythm the single-band
      sections use. 12px either side of the rule reads as one space, not two. */
-  .section-body.super-body {
+  .section-body.super-body,
+  .section-body.cgt-body {
     padding: 12px 16px 16px;
   }
   /* One form per section, opened above the log it feeds. A fixed gap below it,
@@ -823,6 +876,14 @@ export const wealthflowStyles = css`
   .header-actions .btn {
     padding: 2px 12px;
     font-size: var(--ff-font-sm, 12px);
+  }
+  /* Confirmation for Copy for Tax, stated in the header beside the button it
+     belongs to and cleared by the section after a moment. */
+  .copy-status {
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 600;
+    color: var(--ff-teal, #4ec9b0);
+    white-space: nowrap;
   }
   .rate-badge {
     display: inline-block;
@@ -1039,6 +1100,81 @@ export const wealthflowStyles = css`
   .hist-table td.money {
     font-weight: 700;
     color: var(--ff-text-strong, #fff);
+  }
+  /* The capital gains footer sums each money column, matching the dividend
+     log's Total row. The label takes the accent so the word and the figures
+     read as two different things. */
+  .hist-table tfoot td {
+    padding: 8px;
+    border-top: 1px solid var(--ff-border, #3e3e3e);
+    font-size: var(--ff-font-sm, 12px);
+    font-weight: 700;
+    color: var(--ff-text-strong, #fff);
+    white-space: nowrap;
+  }
+  .hist-table tfoot td.total-label {
+    color: var(--ff-accent, #007acc);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  /* A header too long for its fixed track wraps instead of being clipped;
+     "Gain before discount" is the name of the figure, not a code. */
+  .hist-table thead th.wrap {
+    white-space: normal;
+  }
+  /* The tax rule under the table reads as a note, not as leftover prose: a
+     quiet surface with an accent edge so it is visibly attached to the
+     figures above it. Scoped through .section-body to out-rank .section p. */
+  .section-body .cgt-note {
+    margin: 12px 0 0;
+    padding: 8px 12px;
+    background: var(--ff-bg-subpanel, #2a2a2a);
+    border-left: 3px solid var(--ff-accent, #007acc);
+    border-radius: var(--ff-radius-sm, 3px);
+    font-size: var(--ff-font-sm, 12px);
+    color: var(--ff-text-muted, #858585);
+  }
+  .section-body .cgt-note em {
+    font-style: normal;
+    font-weight: 600;
+    color: var(--ff-text, #d4d4d4);
+  }
+  /* The carried-forward loss is one labelled row - label left, money box and
+     Save right, the "carrying out" notice beneath - so it needs its own class:
+     the base form rule stacks children in a column and right-aligns them. */
+  .cgt-loss-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ff-border, #3e3e3e);
+  }
+  .cgt-loss-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .cgt-loss-label {
+    flex: 1 1 260px;
+    min-width: 0;
+  }
+  .cgt-loss-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+  .cgt-loss-controls input {
+    width: 140px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .section-body .cgt-loss-note {
+    margin: 0;
+    font-size: var(--ff-font-sm, 12px);
+    color: var(--ff-text-muted, #858585);
   }
   .muted {
     color: var(--ff-text-muted, #858585);

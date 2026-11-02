@@ -19,6 +19,7 @@ import {
 } from '../dao/interest-entries.js';
 
 import { byDate, dateSortHeader } from './sort-header.js';
+import { PENCIL_ICON } from './icons.js';
 
 const Base =
   typeof HTMLElement !== 'undefined'
@@ -307,12 +308,13 @@ export class InterestGrid extends Base {
                                   ${
                                     hit
                                       ? html`<button
-                                          class="btn btn-secondary btn-small"
+                                          type="button"
+                                          class="icon-btn icon-btn-accent"
                                           aria-label="Edit ${b.bank_code} entry for ${monthLabel(m)}"
                                           title="Edit date, bank or notes for this entry"
                                           @click=${() => this.requestEdit(b.id, m)}
                                         >
-                                          Edit
+                                          ${PENCIL_ICON}
                                         </button>`
                                       : ''
                                   }

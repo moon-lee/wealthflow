@@ -9,6 +9,7 @@ import type { InterestEntry } from '../dao/interest-entries.js';
 import type { SuperEntry, SuperKind } from '../dao/super-entries.js';
 import { SUPER_KINDS, superKindLabel } from '../dao/super-entries.js';
 import { byDate, dateSortHeader } from './sort-header.js';
+import { PENCIL_ICON, TRASH_ICON } from './icons.js';
 import type { DividendForm } from './dividend-form.js';
 import type { InterestForm } from './interest-form.js';
 import type { InterestGrid } from './interest-grid.js';
@@ -322,20 +323,26 @@ export class OverviewView extends Base {
                       <td>${superKindLabel(e.kind)}</td>
                       <td class="num money">${formatAUD(Number(e.amount))}</td>
                       <td class="actions">
-                        <button
-                          class="btn btn-secondary btn-small"
-                          type="button"
-                          @click=${() => this.requestSuperEdit(e)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          class="btn btn-secondary btn-small"
-                          type="button"
-                          @click=${() => this.deleteSuperEntry(e)}
-                        >
-                          Delete
-                        </button>
+                        <div class="row-actions">
+                          <button
+                            type="button"
+                            class="icon-btn icon-btn-accent"
+                            aria-label="Edit ${superKindLabel(e.kind)} ${formatAUD(Number(e.amount))} on ${e.date}"
+                            title="Edit ${superKindLabel(e.kind)} ${formatAUD(Number(e.amount))} on ${e.date}"
+                            @click=${() => this.requestSuperEdit(e)}
+                          >
+                            ${PENCIL_ICON}
+                          </button>
+                          <button
+                            type="button"
+                            class="icon-btn icon-btn-danger"
+                            aria-label="Delete ${superKindLabel(e.kind)} ${formatAUD(Number(e.amount))} on ${e.date}"
+                            title="Delete ${superKindLabel(e.kind)} ${formatAUD(Number(e.amount))} on ${e.date}"
+                            @click=${() => this.deleteSuperEntry(e)}
+                          >
+                            ${TRASH_ICON}
+                          </button>
+                        </div>
                       </td>
                     </tr>`,
                 )

@@ -3,6 +3,8 @@ import { sharedStyles } from '../styles/shared-styles.js';
 import { wealthflowStyles } from '../styles/wealthflow-styles.js';
 import type { Trade } from '../dao/trades.js';
 import { listTrades } from '../dao/trades.js';
+import { removeTrade } from '../services/holding-service.js';
+import { PENCIL_ICON, TRASH_ICON } from './icons.js';
 import { dateSortHeader } from './sort-header.js';
 import { formatAUD, formatPrice } from '../utils/format.js';
 
@@ -169,6 +171,39 @@ export class TradeLog extends Base {
     );
   }
 
+  /** A trade is a fact, but the holding is derived from it: removing one
+   *  re-runs FIFO for every later sale of the same stock. The service refuses
+   *  a delete that would leave the history unable to balance, and its message
+   *  is the one the reader needs. */
+  private async onDelete(t: Trade): Promise<void> {
+    const label = `${t.side} ${qty(t.quantity)} ${this.code(t.stock_id)} on ${t.date}`;
+    if (
+      !confirm(
+        `Delete ${label}? The parcels and capital gains for ${this.code(t.stock_id)} are rebuilt from the trades that remain.`,
+      )
+    )
+      return;
+    let refusal = '';
+    try {
+      await removeTrade(this.finance, t.id);
+      // The page owns the other sections' refresh; the delete is announced
+      // rather than reloaded here, so the counts and the parcel ledger agree.
+      this.dispatchEvent(
+        new CustomEvent('trade-delete', {
+          detail: { trade: t },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } catch (e: any) {
+      refusal = String(e?.message || e);
+    }
+    // `reload` clears `error` as it starts, so a refusal has to be re-stated
+    // after the refresh. Otherwise the delete looks like a no-op.
+    await this.reload();
+    this.error = refusal || this.error;
+  }
+
   /**
    * The Stock filter, in the Stock column header. It lists only the codes this
    * log holds: an option that selects no rows is a control that can only lie.
@@ -309,12 +344,26 @@ export class TradeLog extends Base {
                             ${formatAUD(t.quantity * t.price + t.brokerage)}
                           </td>
                           <td class="num actions">
-                            <button
-                              class="btn btn-secondary btn-small"
-                              @click=${() => this.editRequest(t)}
-                            >
-                              Edit
-                            </button>
+                            <div class="row-actions">
+                              <button
+                                type="button"
+                                class="icon-btn icon-btn-accent"
+                                aria-label="Edit ${t.side} ${qty(t.quantity)} ${this.code(t.stock_id)} on ${t.date}"
+                                title="Edit ${t.side} ${qty(t.quantity)} ${this.code(t.stock_id)} on ${t.date}"
+                                @click=${() => this.editRequest(t)}
+                              >
+                                ${PENCIL_ICON}
+                              </button>
+                              <button
+                                type="button"
+                                class="icon-btn icon-btn-danger"
+                                aria-label="Delete ${t.side} ${qty(t.quantity)} ${this.code(t.stock_id)} on ${t.date}"
+                                title="Delete ${t.side} ${qty(t.quantity)} ${this.code(t.stock_id)} on ${t.date}"
+                                @click=${() => this.onDelete(t)}
+                              >
+                                ${TRASH_ICON}
+                              </button>
+                            </div>
                           </td>
                         </tr>`,
                     )

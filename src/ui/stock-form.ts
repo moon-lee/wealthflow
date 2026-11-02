@@ -18,7 +18,6 @@ export class StockForm extends Base {
   finance: any = null;
   stockCode = '';
   stockName = '';
-  shares = '';
   notes = '';
   error = '';
   saving = false;
@@ -35,27 +34,15 @@ export class StockForm extends Base {
     return this.stockName.trim() === '' ? 'Name is required.' : null;
   }
 
-  private get sharesError(): string | null {
-    const text = this.shares.trim();
-    if (text === '') return 'Shares are required.';
-    const n = Number(text);
-    return Number.isFinite(n) && n >= 0 ? null : 'Shares must be ≥ 0.';
-  }
-
   private get canSave(): boolean {
-    return (
-      this.codeError === null &&
-      this.nameError === null &&
-      this.sharesError === null &&
-      !this.saving
-    );
+    return this.codeError === null && this.nameError === null && !this.saving;
   }
 
   private async onSubmit(e: Event): Promise<void> {
     e.preventDefault();
     this.error = '';
     if (!this.canSave) {
-      this.error = this.codeError ?? this.nameError ?? this.sharesError ?? '';
+      this.error = this.codeError ?? this.nameError ?? '';
       (this as any).requestUpdate?.();
       return;
     }
@@ -79,7 +66,6 @@ export class StockForm extends Base {
       );
       this.stockCode = '';
       this.stockName = '';
-      this.shares = '';
       this.notes = '';
     } catch (err: any) {
       logger.error('stock create failed:', err);
@@ -158,7 +144,7 @@ export class StockForm extends Base {
                   aria-label="Shares"
                   inputmode="decimal"
                   readonly
-                  .value=${this.shares}
+                  value="0"
                   title="Derived from your trade history — add a buy on the Trades tab."
                 />
                 <p class="muted">

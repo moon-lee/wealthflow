@@ -539,7 +539,7 @@ export class InvestmentTable extends Base {
                 else this.beginEdit();
               }}
             >
-              ${this.editing ? 'Cancel' : 'Edit table'}
+              ${this.editing ? 'Cancel' : 'Edit Price'}
             </button>
             ${
               this.editing
